@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../../lib/config';
 import { DealLifecycleNav } from '../../components/DealLifecycleNav';
 import { DealTicket, DealTicketData } from '../../components/DealTicket';
 import { TabularNumber } from '../../components/TabularNumber';
+import { useAuth } from '../../components/AuthContext';
 
 interface PolicyData {
   policyVersion: string;
@@ -47,6 +48,7 @@ interface PendingOffer {
 }
 
 export default function MerchantConsolePage() {
+  const { user, setRole } = useAuth();
   const [activeTab, setActiveTab] = useState<'policy' | 'catalog' | 'approvals'>('policy');
 
   // Policy Form State
@@ -263,6 +265,26 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
       <DealLifecycleNav currentStage="POLICY_APPROVED" />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
+        {user?.role !== 'merchant' && (
+          <div className="bg-amber-950/80 border border-amber-700/80 rounded-lg p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-amber-300 font-mono font-bold text-xs uppercase tracking-wider">
+                <span>🔒</span>
+                <span>Merchant Governance Access Restricted</span>
+              </div>
+              <p className="text-xs text-ink-300 font-sans">
+                You are currently viewing DealFlow as a <strong className="text-white">Buyer</strong>. Merchant policies, cost catalogs, and internal approval queues are reserved for merchants.
+              </p>
+            </div>
+            <button
+              onClick={() => setRole('merchant')}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-mono font-bold text-xs rounded transition-colors shadow shrink-0 self-start sm:self-auto"
+            >
+              Switch Role to Merchant →
+            </button>
+          </div>
+        )}
+
         {/* Header Strip with Plain-English Explainer */}
         <div className="border border-ink-700 bg-ink-900 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
           <div>

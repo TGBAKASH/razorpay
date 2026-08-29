@@ -4,12 +4,16 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { API_BASE_URL } from '../lib/config';
+import { useAuth, UserRole } from './AuthContext';
 
 export function DealLifecycleNav(_props?: { currentStage?: string }) {
   const pathname = usePathname();
   const currentPath = pathname || '/';
+  const { user, login, setRole } = useAuth();
   const [isResetting, setIsResetting] = useState(false);
-  const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [tempEmail, setTempEmail] = useState(user?.email || 'akash@dealflow.ai');
+  const [tempRole, setTempRole] = useState<UserRole>(user?.role || 'buyer');
 
   // The 4 Canonical Primary Navigation Items
   const mainRoutes = [
@@ -21,22 +25,17 @@ export function DealLifecycleNav(_props?: { currentStage?: string }) {
 
   const handleResetDemoData = async () => {
     setIsResetting(true);
-    setResetMessage(null);
     try {
       if (typeof window !== 'undefined') {
         localStorage.clear();
         sessionStorage.clear();
       }
       await fetch(`${API_BASE_URL}/api/demo/reset`, { method: 'POST' }).catch(() => {});
-      setResetMessage('Reset');
       setTimeout(() => {
-        setResetMessage(null);
         window.location.reload();
       }, 600);
     } catch {
-      setResetMessage('Reset');
       setTimeout(() => {
-        setResetMessage(null);
         window.location.reload();
       }, 600);
     } finally {
@@ -44,10 +43,16 @@ export function DealLifecycleNav(_props?: { currentStage?: string }) {
     }
   };
 
+  const handleSaveAuth = (e: React.FormEvent) => {
+    e.preventDefault();
+    login(tempEmail.trim() || 'user@dealflow.ai', tempRole);
+    setShowAuthModal(false);
+  };
+
   return (
     <header className="w-full bg-ink-900 border-b border-ink-700 select-none sticky top-0 z-40 shadow-sm">
       {/* Top Main Navigation Bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
         {/* Brand */}
         <Link
           href="/"
@@ -71,38 +76,63 @@ export function DealLifecycleNav(_props?: { currentStage?: string }) {
           </div>
         </Link>
 
-        {/* 4 Canonical Routes + Corner Utility Reset */}
-        <div className="flex items-center gap-3">
-          <nav className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none">
-            {mainRoutes.map((route) => {
-              const isActive =
-                currentPath === route.href ||
-                (route.href === '/merchant-console' &&
-                  (currentPath.startsWith('/policy') ||
-                    currentPath.startsWith('/catalog') ||
-                    currentPath.startsWith('/approvals'))) ||
-                (route.href === '/deal-room' &&
-                  (currentPath.startsWith('/simulator') ||
-                    currentPath.startsWith('/auction') ||
-                    currentPath.startsWith('/checkout')));
+        {/* 4 Canonical Routes */}
+        <nav className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none">
+          {mainRoutes.map((route) => {
+            const isActive =
+              currentPath === route.href ||
+              (route.href === '/merchant-console' &&
+                (currentPath.startsWith('/policy') ||
+                  currentPath.startsWith('/catalog') ||
+                  currentPath.startsWith('/approvals'))) ||
+              (route.href === '/deal-room' &&
+                (currentPath.startsWith('/simulator') ||
+                  currentPath.startsWith('/auction') ||
+                  currentPath.startsWith('/checkout')));
 
-              return (
-                <Link
-                  key={route.href}
-                  href={route.href}
-                  className={`text-xs font-mono font-medium px-3 py-1.5 rounded whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none ${
-                    isActive
-                      ? 'bg-ink-800 text-ink-100 border border-ink-600 font-bold shadow-sm'
-                      : 'text-ink-400 hover:text-ink-200 hover:bg-ink-850'
-                  }`}
-                >
-                  {route.label}
-                </Link>
-              );
-            })}
-          </nav>
+            return (
+              <Link
+                key={route.href}
+                href={route.href}
+                className={`text-xs font-mono font-medium px-3 py-1.5 rounded whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none ${
+                  isActive
+                    ? 'bg-ink-800 text-ink-100 border border-ink-600 font-bold shadow-sm'
+                    : 'text-ink-400 hover:text-ink-200 hover:bg-ink-850'
+                }`}
+              >
+                {route.label}
+              </Link>
+            );
+          })}
+        </nav>
 
-          {/* Small corner icon-only Reset Demo control */}
+        {/* Right Section: User Role Pill & Corner Reset */}
+        <div className="flex items-center gap-2.5">
+          {/* User Session Pill */}
+          <button
+            onClick={() => {
+              setTempEmail(user?.email || 'akash@dealflow.ai');
+              setTempRole(user?.role || 'buyer');
+              setShowAuthModal(true);
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-ink-950 hover:bg-ink-850 border border-ink-700 hover:border-ink-600 rounded text-xs font-mono transition-colors focus-visible:ring-1 focus-visible:ring-signal"
+            title="Click to switch role or edit session"
+          >
+            <span className="w-2 h-2 rounded-full bg-signal" />
+            <span className="text-ink-300 max-w-[120px] truncate hidden md:inline">{user?.email}</span>
+            <span
+              className={`px-1.5 py-0.2 rounded text-[10px] font-bold uppercase ${
+                user?.role === 'merchant'
+                  ? 'bg-amber-950 text-amber-300 border border-amber-800/80'
+                  : 'bg-signal-bg text-signal-light border border-signal-border'
+              }`}
+            >
+              {user?.role === 'merchant' ? 'Merchant' : 'Buyer'}
+            </span>
+            <span className="text-ink-500 text-[10px]">▼</span>
+          </button>
+
+          {/* Icon-only Reset Demo Control */}
           <button
             onClick={handleResetDemoData}
             disabled={isResetting}
@@ -114,6 +144,92 @@ export function DealLifecycleNav(_props?: { currentStage?: string }) {
           </button>
         </div>
       </div>
+
+      {/* Lightweight Role / Session Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 bg-ink-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-ink-900 border border-ink-700 rounded-lg p-6 max-w-sm w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-ink-800 pb-3">
+              <h3 className="text-sm font-bold text-ink-100 font-display">
+                Session & Role Settings
+              </h3>
+              <button
+                onClick={() => setShowAuthModal(false)}
+                className="text-ink-400 hover:text-ink-200 text-xs font-mono"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAuth} className="space-y-4">
+              <div>
+                <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={tempEmail}
+                  onChange={(e) => setTempEmail(e.target.value)}
+                  required
+                  placeholder="agent@company.com"
+                  className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
+                  Active Role
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTempRole('buyer')}
+                    className={`py-2 px-3 rounded text-xs font-mono font-medium transition-colors border ${
+                      tempRole === 'buyer'
+                        ? 'bg-signal text-white border-signal font-bold shadow'
+                        : 'bg-ink-950 text-ink-400 border-ink-700 hover:text-ink-200'
+                    }`}
+                  >
+                    Buyer Agent
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTempRole('merchant')}
+                    className={`py-2 px-3 rounded text-xs font-mono font-medium transition-colors border ${
+                      tempRole === 'merchant'
+                        ? 'bg-amber-600 text-white border-amber-500 font-bold shadow'
+                        : 'bg-ink-950 text-ink-400 border-ink-700 hover:text-ink-200'
+                    }`}
+                  >
+                    Merchant
+                  </button>
+                </div>
+                <p className="text-[11px] text-ink-500 mt-1">
+                  {tempRole === 'buyer'
+                    ? 'Buyer role: Confidential merchant margins & internal profit scores are hidden.'
+                    : 'Merchant role: Full access to Merchant Console, policies, catalog, and profit metrics.'}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-ink-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAuthModal(false)}
+                  className="px-3 py-1.5 bg-ink-950 hover:bg-ink-800 text-ink-400 hover:text-ink-200 text-xs font-mono rounded border border-ink-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-signal hover:bg-signal-hover text-white text-xs font-mono font-bold rounded shadow"
+                >
+                  Save Session
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

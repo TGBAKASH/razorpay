@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
+import { AuthProvider } from '../components/AuthContext';
 
 const fraunces = Fraunces({
   subsets: ['latin'],
@@ -38,7 +39,9 @@ export default function RootLayout({
       className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable} dark`}
     >
       <body className="min-h-screen bg-ink-950 text-ink-100 font-sans antialiased selection:bg-signal selection:text-white">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

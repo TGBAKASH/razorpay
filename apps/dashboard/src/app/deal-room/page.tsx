@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../../lib/config';
 import { DealLifecycleNav } from '../../components/DealLifecycleNav';
 import { DealTicket, DealTicketData } from '../../components/DealTicket';
 import { TabularNumber } from '../../components/TabularNumber';
+import { useAuth } from '../../components/AuthContext';
 
 type PaymentMethod = 'upi' | 'card' | 'netbanking' | 'cod';
 type ContinuousFlowStep = 'request' | 'negotiation' | 'contract' | 'checkout' | 'paid' | 'flagged';
@@ -53,8 +54,14 @@ interface CompetingBid {
 }
 
 export default function DealRoomPage() {
+  const { user } = useAuth();
   const [dealMode, setDealMode] = useState<'single' | 'auction'>('single');
   const [flowStep, setFlowStep] = useState<ContinuousFlowStep>('request');
+
+  // Free-Text Intent State
+  const [freeTextIntent, setFreeTextIntent] = useState('');
+  const [isParsingIntent, setIsParsingIntent] = useState(false);
+  const [parseSuccessMsg, setParseSuccessMsg] = useState<string | null>(null);
 
   // Complete Buyer Constraints State
   const [budgetInr, setBudgetInr] = useState<number>(4000);
@@ -98,6 +105,63 @@ export default function DealRoomPage() {
     d.setDate(d.getDate() + daysToAdd);
     setDeliveryDeadline(d.toISOString().split('T')[0] || '');
   }, []);
+
+  // Free-Text Gemini Intent Parser
+  const handleParseFreeTextIntent = async () => {
+    if (!freeTextIntent.trim()) return;
+    setIsParsingIntent(true);
+    setParseSuccessMsg(null);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/intent/parse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: freeTextIntent,
+          reference_date: new Date().toISOString(),
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const bc = data.buyer_constraints || {};
+
+        if (typeof bc.budget_max_paise === 'number' && bc.budget_max_paise > 0) {
+          setBudgetInr(Math.round(bc.budget_max_paise / 100));
+        }
+        if (typeof bc.quantity === 'number' && bc.quantity > 0) {
+          setQuantity(bc.quantity);
+        }
+        if (Array.isArray(bc.payment_preference) && bc.payment_preference.length > 0) {
+          setPaymentPreferences(bc.payment_preference);
+        }
+        if (bc.delivery_deadline) {
+          const dateStr = bc.delivery_deadline.split('T')[0];
+          if (dateStr) setDeliveryDeadline(dateStr);
+        }
+        if (bc.return_preference) {
+          setReturnPreference(bc.return_preference);
+        }
+
+        setParseSuccessMsg('✓ Intent parsed by Gemini — form fields updated.');
+        setTimeout(() => setParseSuccessMsg(null), 4000);
+      }
+    } catch {
+      // Offline fallback keyword parser
+      const lower = freeTextIntent.toLowerCase();
+      if (lower.includes('card')) setPaymentPreferences(['card']);
+      if (lower.includes('upi')) setPaymentPreferences(['upi']);
+      const matchBudget = lower.match(/(?:under|budget|for|below|₹)\s*(\d+[\d,]*)/);
+      if (matchBudget && matchBudget[1]) {
+        const parsed = parseInt(matchBudget[1].replace(/,/g, ''), 10);
+        if (parsed > 500 && parsed < 100000) setBudgetInr(parsed);
+      }
+      setParseSuccessMsg('✓ Intent parsed — form fields updated.');
+      setTimeout(() => setParseSuccessMsg(null), 4000);
+    } finally {
+      setIsParsingIntent(false);
+    }
+  };
 
   // 1. Submit Buyer Request & Trigger Visible Negotiation
   const handleStartNegotiation = async () => {
@@ -156,7 +220,7 @@ export default function DealRoomPage() {
           discount_reasons: offer.discount_reason || [
             'Prepaid UPI payment incentive (zero COD risk)',
             'Inventory clearance volume acceleration',
-            'Guaranteed delivery SLA satisfied',
+            'Guaranteed delivery satisfied',
           ],
           delivery_promise: offer.delivery_promise,
           return_terms_days: offer.return_terms_days,
@@ -292,7 +356,7 @@ export default function DealRoomPage() {
         discount_reasons: [
           'Prepaid UPI payment incentive (₹150 off)',
           'Clearance bracket volume match (41 pairs available)',
-          'Guaranteed Monday delivery SLA satisfied',
+          'Guaranteed Monday delivery satisfied',
         ],
         delivery_promise: deliveryDeadline ? `${deliveryDeadline}T23:59:59.000Z` : '2026-08-31T23:59:59.000Z',
         return_terms_days: 10,
@@ -333,7 +397,6 @@ export default function DealRoomPage() {
     setIsProcessing(true);
 
     try {
-      // Accept offer on server
       await fetch(`${API_BASE_URL}/api/offers/${singleOffer.offer_id}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -365,7 +428,6 @@ export default function DealRoomPage() {
         }),
       }).catch(() => {});
 
-      // Create Razorpay Order
       const orderRes = await fetch(`${API_BASE_URL}/api/orders/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -524,7 +586,7 @@ export default function DealRoomPage() {
           final_price_paise: winner.unit_price_paise,
           discount_paise: winner.discount_paise,
           discount_reasons: [
-            `Delivery SLA: ${winner.delivery_day_label} arrival guaranteed`,
+            `Delivery: ${winner.delivery_day_label} arrival guaranteed`,
             winner.extras_description,
             `${winner.return_terms_days}-day return & replacement terms`,
           ],
@@ -573,7 +635,7 @@ export default function DealRoomPage() {
         state: 'EXPIRED',
       });
       setExplanation(
-        'Contract expired — warehouse inventory depleted (no charge made). When live stock ran out before buyer acceptance, DealFlow cancelled the offer cleanly with zero charge rather than shipping partial items.'
+        'Contract expired — warehouse inventory depleted (no charge made). When live stock ran out before buyer acceptance, DealFlow cancelled the offer cleanly with zero charge.'
       );
       setFlowStep('contract');
     } else if (type === 'budget_exceeded') {
@@ -643,6 +705,8 @@ export default function DealRoomPage() {
       }
     }
   };
+
+  const isMerchant = user?.role === 'merchant';
 
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col justify-between">
@@ -769,15 +833,15 @@ export default function DealRoomPage() {
         {dealMode === 'single' && (
           <div className="space-y-8">
             {/* Step 1: Complete Buyer Constraints Specification Form */}
-            <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-base font-bold text-ink-100 font-display flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-signal text-white flex items-center justify-center text-xs font-mono">1</span>
                     Buyer Intent & Constraints Specification
                   </h2>
                   <p className="text-xs text-ink-400 mt-0.5">
-                    Configure all autonomous buyer agent parameters: budget ceiling, quantity, delivery deadline, returns, and priority weighting.
+                    Configure your constraints manually below, or describe your need in natural English to extract them with Gemini.
                   </p>
                 </div>
 
@@ -791,7 +855,59 @@ export default function DealRoomPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              {/* Free-Text Intent Parser Area */}
+              <div className="bg-ink-950 border border-ink-800 rounded-lg p-4 space-y-2">
+                <label className="block text-xs font-mono text-signal-light uppercase tracking-wider font-bold">
+                  Natural Language Query (Gemini AI Extraction)
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={freeTextIntent}
+                    onChange={(e) => setFreeTextIntent(e.target.value)}
+                    placeholder="e.g. I need 1 pair of SprintPro X2 under ₹4,000, delivered by next Tuesday, paying via UPI"
+                    className="flex-1 bg-ink-900 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none placeholder:text-ink-600"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleParseFreeTextIntent();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleParseFreeTextIntent}
+                    disabled={isParsingIntent || !freeTextIntent.trim()}
+                    className="px-4 py-2 bg-signal hover:bg-signal-hover text-white text-xs font-mono font-bold rounded shadow transition-colors disabled:opacity-50 shrink-0 flex items-center gap-1.5 justify-center"
+                  >
+                    {isParsingIntent ? (
+                      <>
+                        <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Extracting...
+                      </>
+                    ) : (
+                      'Extract with AI →'
+                    )}
+                  </button>
+                </div>
+
+                {/* Parsing Status Indicator */}
+                {isParsingIntent && (
+                  <div className="flex items-center gap-2 text-xs font-mono text-signal-light pt-1 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-signal" />
+                    <span>Merchant agent is reading your request with Gemini 1.5 Flash...</span>
+                  </div>
+                )}
+
+                {parseSuccessMsg && (
+                  <div className="text-xs font-mono text-emerald-400 pt-1 font-bold">
+                    {parseSuccessMsg}
+                  </div>
+                )}
+              </div>
+
+              {/* Structured Form Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* SKU */}
                 <div>
                   <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
@@ -850,12 +966,12 @@ export default function DealRoomPage() {
                 </div>
               </div>
 
-              {/* Additional Full Buyer Constraints (Delivery Deadline, Returns, Priority Ranking) */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-ink-800">
+              {/* Delivery Deadline & Returns */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-ink-800">
                 {/* Delivery Deadline */}
                 <div>
                   <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
-                    DELIVERY DEADLINE SLA
+                    DELIVERY DEADLINE
                   </label>
                   <input
                     type="date"
@@ -881,33 +997,18 @@ export default function DealRoomPage() {
                     <option value="final sale">Final sale / No returns</option>
                   </select>
                 </div>
-
-                {/* Priority Ranker */}
-                <div>
-                  <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
-                    BUYER PRIORITY WEIGHTING
-                  </label>
-                  <select
-                    value={prioritiesOrder[0]}
-                    onChange={(e) => {
-                      const p = e.target.value as PriorityType;
-                      const rest = (['price', 'delivery_speed', 'return_terms', 'extras'] as PriorityType[]).filter(
-                        (x) => x !== p
-                      );
-                      setPrioritiesOrder([p, ...rest]);
-                    }}
-                    className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
-                  >
-                    <option value="price">#1 Lowest Unit Price</option>
-                    <option value="delivery_speed">#1 Fastest Delivery SLA</option>
-                    <option value="return_terms">#1 Max Return Window</option>
-                    <option value="extras">#1 Custom Branding & Extras</option>
-                  </select>
-                </div>
               </div>
 
-              {/* Action Button & Safety Tests Sandbox */}
-              <div className="mt-5 pt-4 border-t border-ink-800 flex flex-wrap items-center justify-between gap-4">
+              {/* Informative Note for Single-Merchant Mode */}
+              <div className="p-2.5 bg-ink-950 border border-ink-800 rounded text-[11px] font-mono text-ink-400 flex items-center gap-2">
+                <span className="text-signal font-bold">ℹ Note:</span>
+                <span>
+                  Buyer Priority Weighting applies when multiple merchants are competing for your order in 3-Merchant Auction mode. In single-merchant mode, the merchant's governance policy evaluates candidate viability directly.
+                </span>
+              </div>
+
+              {/* Action Button & Safety Invariant Tests */}
+              <div className="pt-4 border-t border-ink-800 flex flex-wrap items-center justify-between gap-4">
                 <button
                   onClick={handleStartNegotiation}
                   disabled={isProcessing}
@@ -956,7 +1057,7 @@ export default function DealRoomPage() {
               </div>
             )}
 
-            {/* Step 2: The Visible Negotiation Moment (Buyer Agent ↔ Merchant Agent) */}
+            {/* Step 2: The Visible Negotiation Moment (Buyer View Confidentiality Enforced) */}
             {flowStep === 'negotiation' && candidateOffers.length > 0 && (
               <div className="bg-ink-900 border border-signal-border rounded-lg p-5 sm:p-6 shadow-md space-y-6">
                 <div>
@@ -967,7 +1068,7 @@ export default function DealRoomPage() {
                     </h2>
                   </div>
                   <p className="text-xs text-ink-400 mt-0.5">
-                    The merchant offer engine computed and scored 3 real candidates against margin floors and conversion likelihoods.
+                    The merchant offer engine computed candidate deals and selected the optimal package.
                   </p>
                 </div>
 
@@ -991,7 +1092,7 @@ export default function DealRoomPage() {
                         )}
 
                         <div className="text-xs font-mono font-bold text-ink-300 mb-2">
-                          Candidate {idx === 0 ? 'A (Optimized Clearance)' : idx === 1 ? 'B (Margin Maximizer)' : 'C (Policy Ceiling)'}
+                          Candidate {idx === 0 ? 'A (Optimized Clearance)' : idx === 1 ? 'B (Standard Pricing)' : 'C (Maximum Discount)'}
                         </div>
 
                         {/* Price & Discount */}
@@ -1010,32 +1111,37 @@ export default function DealRoomPage() {
                           </div>
                         </div>
 
-                        {/* Quantitative Metrics */}
-                        <div className="space-y-1.5 text-xs font-mono mb-3">
-                          <div className="flex justify-between">
-                            <span className="text-ink-400">Profit Margin:</span>
-                            <span className="text-ink-200 font-bold">{c.margin_pct.toFixed(1)}%</span>
+                        {/* Merchant-Only Confidential Metrics (Hidden from Buyer) */}
+                        {isMerchant && (
+                          <div className="mb-3 p-2.5 bg-amber-950/40 border border-amber-800/60 rounded text-xs font-mono space-y-1">
+                            <div className="text-[10px] font-bold text-amber-300 uppercase tracking-wider mb-1">
+                              Merchant Confidential Metrics:
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-ink-400">Profit Margin:</span>
+                              <span className="text-amber-200 font-bold">{c.margin_pct.toFixed(1)}%</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-ink-400">Gross Profit:</span>
+                              <span className="text-amber-200">
+                                <TabularNumber value={c.gross_profit_paise} isCurrencyPaise prefix="₹" />
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-ink-400">Est. Conversion:</span>
+                              <span className="text-amber-200">{(c.conversion_probability * 100).toFixed(0)}%</span>
+                            </div>
+                            <div className="flex justify-between border-t border-amber-900/60 pt-1">
+                              <span className="text-amber-300 font-bold">Expected Profit Score:</span>
+                              <span className="text-amber-300 font-bold">
+                                ₹{(c.expected_profit_score / 100).toFixed(2)}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-ink-400">Gross Profit:</span>
-                            <span className="text-ink-200">
-                              <TabularNumber value={c.gross_profit_paise} isCurrencyPaise prefix="₹" />
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-ink-400">Est. Conversion:</span>
-                            <span className="text-ink-200">{(c.conversion_probability * 100).toFixed(0)}%</span>
-                          </div>
-                          <div className="flex justify-between border-t border-ink-800 pt-1">
-                            <span className="text-signal-light font-bold">Expected Profit Score:</span>
-                            <span className="text-signal-light font-bold">
-                              ₹{(c.expected_profit_score / 100).toFixed(2)}
-                            </span>
-                          </div>
-                        </div>
+                        )}
 
-                        {/* Discount Justification */}
-                        <div className="text-[11px] text-ink-400 bg-ink-900 p-2 rounded border border-ink-800">
+                        {/* Plain-English Decision Rules (Legitimate for Buyer) */}
+                        <div className="text-[11px] text-ink-400 bg-ink-900 p-2.5 rounded border border-ink-800">
                           <span className="font-bold text-ink-300 block mb-0.5">Decision Rules:</span>
                           <ul className="list-disc pl-3 space-y-0.5">
                             {c.candidate.discount_reason?.map((r, i) => (
@@ -1072,7 +1178,7 @@ export default function DealRoomPage() {
               </div>
             )}
 
-            {/* Step 3: Sealed Cryptographic Deal Ticket */}
+            {/* Step 3: Sealed Cryptographic Deal Ticket (Distinct View) */}
             {flowStep === 'contract' && singleOffer && (
               <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm space-y-6">
                 <div>
@@ -1083,7 +1189,7 @@ export default function DealRoomPage() {
                     </h2>
                   </div>
                   <p className="text-xs text-ink-400 mt-0.5">
-                    Sealed with HMAC-SHA256 and single-use nonce. Acceptance triggers atomic inventory decrement.
+                    Sealed with HMAC-SHA256 and single-use nonce. Review all guaranteed terms before acceptance.
                   </p>
                 </div>
 
@@ -1103,8 +1209,8 @@ export default function DealRoomPage() {
               </div>
             )}
 
-            {/* Step 4 & 5: Embedded Checkout & Settlement Flow */}
-            {(flowStep === 'checkout' || flowStep === 'paid' || flowStep === 'flagged') && singleOffer && (
+            {/* Step 4: Embedded Checkout & Settlement Flow (Distinct View) */}
+            {(flowStep === 'checkout' || flowStep === 'flagged') && singleOffer && (
               <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm space-y-6">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1169,37 +1275,7 @@ export default function DealRoomPage() {
                   </div>
                 )}
 
-                {/* Step 5: Payment Paid Confirmed Status */}
-                {flowStep === 'paid' && (
-                  <div className="p-4 bg-emerald-950/80 border border-emerald-700 rounded-lg space-y-3">
-                    <div className="flex items-center gap-2 text-emerald-400 font-mono font-bold text-sm">
-                      <span>✓</span>
-                      <span>Payment Confirmed — Funds Captured via Razorpay Webhook</span>
-                    </div>
-                    <p className="text-xs text-ink-300">
-                      The signed offer contract has been successfully paid, inventory verified, and the state permanently committed to the immutable PostgreSQL audit ledger.
-                    </p>
-
-                    <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-emerald-800/60">
-                      <Link
-                        href={`/audit?offer_id=${singleOffer?.offer_id || ''}`}
-                        className="text-xs font-mono font-bold text-signal-light hover:underline flex items-center gap-1"
-                      >
-                        View Full Immutable Timeline in Audit Ledger →
-                      </Link>
-
-                      <button
-                        onClick={handleProcessRefund}
-                        disabled={isProcessing || !!refundResult}
-                        className="text-xs font-mono py-1 px-3 bg-ink-900 hover:bg-ink-800 text-ink-300 border border-ink-700 rounded transition-colors disabled:opacity-50"
-                      >
-                        {refundResult ? 'Dispute Refunded ✓' : 'Test 10-Day Dispute Refund'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 5b: Tampered Attack Blocked */}
+                {/* Tampered Attack Blocked Notice */}
                 {flowStep === 'flagged' && (
                   <div className="p-4 bg-rose-950/80 border border-rose-700 rounded-lg space-y-2">
                     <div className="flex items-center gap-2 text-rose-400 font-mono font-bold text-sm">
@@ -1219,6 +1295,50 @@ export default function DealRoomPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Step 5: Settled Status View (Distinct View) */}
+            {flowStep === 'paid' && singleOffer && (
+              <div className="bg-ink-900 border border-emerald-700/80 rounded-lg p-5 sm:p-6 shadow-sm space-y-6">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-mono">5</span>
+                    <h2 className="text-base font-bold text-ink-100 font-display">
+                      Deal Settled & Confirmed
+                    </h2>
+                  </div>
+                  <p className="text-xs text-ink-400 mt-0.5">
+                    Payment captured and committed to the immutable PostgreSQL ledger.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-emerald-950/80 border border-emerald-700 rounded-lg space-y-3">
+                  <div className="flex items-center gap-2 text-emerald-400 font-mono font-bold text-sm">
+                    <span>✓</span>
+                    <span>Payment Confirmed — Funds Captured via Razorpay Webhook</span>
+                  </div>
+                  <p className="text-xs text-ink-300">
+                    The signed offer contract has been successfully paid, inventory verified, and the state permanently committed to the immutable audit ledger.
+                  </p>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-emerald-800/60">
+                    <Link
+                      href={`/audit?offer_id=${singleOffer?.offer_id || ''}`}
+                      className="text-xs font-mono font-bold text-signal-light hover:underline flex items-center gap-1"
+                    >
+                      View Full Immutable Timeline in Audit Ledger →
+                    </Link>
+
+                    <button
+                      onClick={handleProcessRefund}
+                      disabled={isProcessing || !!refundResult}
+                      className="text-xs font-mono py-1 px-3 bg-ink-900 hover:bg-ink-800 text-ink-300 border border-ink-700 rounded transition-colors disabled:opacity-50"
+                    >
+                      {refundResult ? 'Dispute Refunded ✓' : 'Test 10-Day Dispute Refund'}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1392,7 +1512,7 @@ export default function DealRoomPage() {
               </div>
             )}
 
-            {/* Step 3: Auction Contract Ticket */}
+            {/* Step 3: Auction Contract Ticket (Distinct View) */}
             {flowStep === 'contract' && singleOffer && (
               <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm space-y-6">
                 <div>
@@ -1420,7 +1540,7 @@ export default function DealRoomPage() {
               </div>
             )}
 
-            {/* Step 4 & 5: Settlement for Auction */}
+            {/* Step 4 & 5: Settlement for Auction (Distinct View) */}
             {(flowStep === 'checkout' || flowStep === 'paid') && singleOffer && (
               <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm space-y-6">
                 <div>
