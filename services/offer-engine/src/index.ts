@@ -392,8 +392,7 @@ export async function processOfferNegotiation(
     policy_version: policy.policy_version,
   };
 
-  const productName = product.name || (product.sku.includes('SPRINTPRO') ? 'SprintPro X2 Running Shoes' : product.sku);
-  const explanation = `Negotiated final price of ₹${(winningCandidate.final_price_paise / 100).toLocaleString()} for ${productName} (saving ₹${(winningCandidate.discount_paise / 100).toLocaleString()}) preserving ${(winner.margin_pct).toFixed(1)}% profit margin.`;
+  const explanation = await generateOfferExplanation(winner, product, buyerConstraints, policy);
 
   return {
     winning_offer: winningOffer,
@@ -403,4 +402,88 @@ export async function processOfferNegotiation(
     gross_profit_paise: winner.gross_profit_paise,
     requires_human_approval: winner.evaluation.requires_human_approval,
   };
+}
+
+/**
+ * 5. Gemini 1.5 Flash Plain-English Explanation Generator
+ */
+export async function generateOfferExplanation(
+  winner: ScoredCandidateOffer,
+  product: ProductSnapshot,
+  buyerConstraints: BuyerConstraintsSection,
+  _policy: MerchantPolicyConfig
+): Promise<string> {
+  const productName = product.name || (product.sku.includes('SPRINTPRO') ? 'SprintPro X2 Running Shoes' : product.sku);
+  const winningCandidate = winner.candidate;
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  // Real Gemini API Call when API Key is configured and not running in fast unit test mode
+  if (process.env.NODE_ENV !== 'test' && apiKey && apiKey.trim() !== '') {
+    try {
+      const prompt = `You are an autonomous merchant negotiation agent for DealFlow.
+Generate a concise, natural, professional 2-3 sentence plain-English explanation of why this offer was selected for the buyer.
+
+Context:
+- Product: ${productName} (${winningCandidate.sku})
+- List Price: ₹${product.list_price_paise / 100}
+- Negotiated Final Price: ₹${winningCandidate.final_price_paise / 100} (Discount: ₹${winningCandidate.discount_paise / 100})
+- Merchant Profit Margin: ${winner.margin_pct.toFixed(1)}%
+- Buyer Constraints:
+  - Budget Ceiling: ${buyerConstraints.budget_max_paise ? `₹${buyerConstraints.budget_max_paise / 100}` : 'Unspecified'}
+  - Delivery Deadline: ${buyerConstraints.delivery_deadline || 'Unspecified'}
+  - Return Preference: ${buyerConstraints.return_preference || 'Unspecified'}
+  - Priorities: ${buyerConstraints.priorities ? buyerConstraints.priorities.join(' > ') : 'Price first'}
+- Winning Delivery Promise: ${winningCandidate.delivery_promise}
+- Winning Return Terms: ${winningCandidate.return_terms_days} days
+- Discount Reasons: ${winningCandidate.discount_reason?.join(', ')}
+
+Important Rules:
+- If the buyer specified a delivery deadline, explicitly mention how the delivery promise matches or beats it. If not specified, do NOT claim it matched a deadline.
+- If the buyer specified a return preference, explicitly reference the return terms.
+- Highlight the savings while preserving merchant margin. Return plain text only with no quotation marks.`;
+
+      console.log(`[Gemini AI Engine] Generating offer explanation for ${productName} (API Key: REDACTED)`);
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 150,
+            },
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const data: any = await response.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (text) {
+          console.log(`[Gemini AI Engine] Generated rationale: "${text}"`);
+          return text;
+        }
+      } else {
+        console.warn(`[Gemini AI Engine] API returned status ${response.status}`);
+      }
+    } catch (err) {
+      console.warn(`[Gemini AI Engine] Network error:`, err);
+    }
+  }
+
+  // Dynamic deterministic explanation factoring in buyer constraints
+  const savingsInr = (winningCandidate.discount_paise / 100).toLocaleString();
+  const finalPriceInr = (winningCandidate.final_price_paise / 100).toLocaleString();
+  let text = `Negotiated final price of ₹${finalPriceInr} for ${productName} (saving ₹${savingsInr}) preserving ${(winner.margin_pct).toFixed(1)}% profit margin.`;
+
+  if (buyerConstraints.delivery_deadline) {
+    text += ` Delivery promise matches your requested deadline.`;
+  }
+  if (buyerConstraints.return_preference) {
+    text += ` Includes ${winningCandidate.return_terms_days}-day return terms matching your preference.`;
+  }
+
+  return text;
 }

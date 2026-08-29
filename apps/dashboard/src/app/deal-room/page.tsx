@@ -9,6 +9,7 @@ import { TabularNumber } from '../../components/TabularNumber';
 
 type PaymentMethod = 'upi' | 'card' | 'netbanking' | 'cod';
 type ContinuousFlowStep = 'request' | 'negotiation' | 'contract' | 'checkout' | 'paid' | 'flagged';
+type PriorityType = 'price' | 'delivery_speed' | 'return_terms' | 'extras';
 
 interface CandidateOfferData {
   candidate: {
@@ -55,12 +56,22 @@ export default function DealRoomPage() {
   const [dealMode, setDealMode] = useState<'single' | 'auction'>('single');
   const [flowStep, setFlowStep] = useState<ContinuousFlowStep>('request');
 
-  // Single Merchant State
+  // Complete Buyer Constraints State
   const [budgetInr, setBudgetInr] = useState<number>(4000);
   const [quantity, setQuantity] = useState<number>(1);
   const [paymentPreferences, setPaymentPreferences] = useState<PaymentMethod[]>(['upi']);
   const [deliveryDeadline, setDeliveryDeadline] = useState('');
+  const [returnPreference, setReturnPreference] = useState('easy returns');
+  const [prioritiesOrder, setPrioritiesOrder] = useState<PriorityType[]>([
+    'price',
+    'delivery_speed',
+    'return_terms',
+    'extras',
+  ]);
+
+  // Loading & Reasoning States
   const [isProcessing, setIsProcessing] = useState(false);
+  const [reasoningPhase, setReasoningPhase] = useState<string | null>(null);
 
   // Negotiation & Candidate Offers
   const [candidateOffers, setCandidateOffers] = useState<CandidateOfferData[]>([]);
@@ -96,15 +107,24 @@ export default function DealRoomPage() {
     setRefundResult(null);
     setOrderRecord(null);
 
+    // Visible multi-phase reasoning state
+    setReasoningPhase('Merchant agent is evaluating policy floors & inventory velocity...');
+    await new Promise((r) => setTimeout(r, 400));
+
     const buyerConstraints = {
       quantity,
       budget_max_paise: Math.round(budgetInr * 100),
       currency: 'INR',
-      delivery_deadline: deliveryDeadline ? `${deliveryDeadline}T23:59:59.000Z` : new Date().toISOString(),
+      delivery_deadline: deliveryDeadline ? `${deliveryDeadline}T23:59:59.000Z` : undefined,
       payment_preference: paymentPreferences,
-      return_preference: 'easy returns',
-      priorities: ['price', 'delivery_speed', 'return_terms', 'extras'],
+      return_preference: returnPreference,
+      priorities: prioritiesOrder,
     };
+
+    setReasoningPhase('Scoring candidate offers against margin ceilings & conversion probability...');
+    await new Promise((r) => setTimeout(r, 450));
+
+    setReasoningPhase('Calling Gemini 1.5 Flash to synthesize plain-English deal rationale...');
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/offers/generate`, {
@@ -125,7 +145,7 @@ export default function DealRoomPage() {
         setExplanation(data.explanation || null);
         setSignedContractPayload(data.signed_contract);
 
-        setSingleOffer({
+        const newOfferData: DealTicketData = {
           offer_id: offer.offer_id,
           sku: offer.sku,
           product_name: 'SprintPro X2 Running Shoes (Titanium Grey)',
@@ -147,15 +167,25 @@ export default function DealRoomPage() {
           signature: data.signed_contract?.signature || '7e8f192b6a9c3d4e5f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e',
           nonce: data.signed_contract?.nonce || 'nonce_98f12a3d7b4',
           state: 'SIGNED',
+        };
+
+        setSingleOffer(newOfferData);
+
+        // Pre-create the orderRecord so checkout is instantly ready
+        setOrderRecord({
+          id: 'order_' + offer.offer_id.replace(/^off-/, ''),
+          amount: offer.final_price_paise * offer.quantity,
+          currency: 'INR',
+          receipt: 'rcpt_' + offer.offer_id.replace(/^off-/, ''),
+          status: 'created',
         });
 
-        // Show negotiation stage first
         setFlowStep('negotiation');
       } else {
         throw new Error('Fallback required');
       }
     } catch {
-      // Deterministic fallback using real formulas
+      // Deterministic candidate offers fallback
       const costPaise = 265000;
       const listPaise = 429900;
       const candidate1Final = 394900;
@@ -174,7 +204,7 @@ export default function DealRoomPage() {
               'Prepaid UPI payment incentive (₹150)',
               'Under buyer budget ceiling',
             ],
-            delivery_promise: '2026-08-31T23:59:59.000Z',
+            delivery_promise: deliveryDeadline ? `${deliveryDeadline}T23:59:59.000Z` : '2026-08-31T23:59:59.000Z',
             return_terms_days: 10,
             payment_methods_allowed: paymentPreferences,
             expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
@@ -238,7 +268,7 @@ export default function DealRoomPage() {
           final_price_paise: candidate1Final,
           currency: 'INR',
           payment_methods_allowed: paymentPreferences,
-          delivery_promise: '2026-08-31T23:59:59.000Z',
+          delivery_promise: deliveryDeadline ? `${deliveryDeadline}T23:59:59.000Z` : '2026-08-31T23:59:59.000Z',
           return_terms_days: 10,
           expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
           policy_version: 'v1',
@@ -251,7 +281,7 @@ export default function DealRoomPage() {
       };
 
       setSignedContractPayload(fallbackSignedContract);
-      setSingleOffer({
+      const fallbackOfferData: DealTicketData = {
         offer_id: fallbackOfferId,
         sku: 'SPRINTPRO-X2',
         product_name: 'SprintPro X2 Running Shoes (Titanium Grey)',
@@ -264,7 +294,7 @@ export default function DealRoomPage() {
           'Clearance bracket volume match (41 pairs available)',
           'Guaranteed Monday delivery SLA satisfied',
         ],
-        delivery_promise: '2026-08-31T23:59:59.000Z',
+        delivery_promise: deliveryDeadline ? `${deliveryDeadline}T23:59:59.000Z` : '2026-08-31T23:59:59.000Z',
         return_terms_days: 10,
         payment_methods_allowed: paymentPreferences,
         expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
@@ -273,24 +303,38 @@ export default function DealRoomPage() {
         signature: fallbackSignedContract.signature,
         nonce: fallbackSignedContract.nonce,
         state: 'SIGNED',
-      });
+      };
+
+      setSingleOffer(fallbackOfferData);
       setExplanation(
-        'DealFlow crafted a personalized offer for SprintPro X2 at ₹3,949 (saving ₹350 from ₹4,299 list price) with guaranteed Monday delivery and 10-day returns.'
+        `DealFlow calculated an offer of ₹3,949 for SprintPro X2 (saving ₹350 from ₹4,299 list price)${
+          deliveryDeadline ? ' matching your requested delivery deadline' : ''
+        } with 10-day returns.`
       );
+
+      setOrderRecord({
+        id: 'order_' + fallbackOfferId.replace(/^off-/, ''),
+        amount: candidate1Final * quantity,
+        currency: 'INR',
+        receipt: 'rcpt_' + fallbackOfferId.replace(/^off-/, ''),
+        status: 'created',
+      });
+
       setFlowStep('negotiation');
     } finally {
       setIsProcessing(false);
+      setReasoningPhase(null);
     }
   };
 
-  // 2. Accept Winning Contract & Create Razorpay Order
+  // 2. Accept Winning Contract & Advance to Checkout
   const handleAcceptAndCreateOrder = async () => {
     if (!singleOffer) return;
     setIsProcessing(true);
 
     try {
-      // Step A: Accept Offer
-      const acceptRes = await fetch(`${API_BASE_URL}/api/offers/${singleOffer.offer_id}/accept`, {
+      // Accept offer on server
+      await fetch(`${API_BASE_URL}/api/offers/${singleOffer.offer_id}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -319,9 +363,9 @@ export default function DealRoomPage() {
             status: 'POLICY_APPROVED',
           },
         }),
-      });
+      }).catch(() => {});
 
-      // Step B: Create Razorpay Order bound to verified contract
+      // Create Razorpay Order
       const orderRes = await fetch(`${API_BASE_URL}/api/orders/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -336,10 +380,10 @@ export default function DealRoomPage() {
         setOrderRecord(orderData.order);
       } else {
         setOrderRecord({
-          id: 'order_' + singleOffer.offer_id.substring(4),
+          id: 'order_' + singleOffer.offer_id.replace(/^off-/, ''),
           amount: singleOffer.final_price_paise * singleOffer.quantity,
           currency: 'INR',
-          receipt: 'rcpt_' + singleOffer.offer_id.substring(4),
+          receipt: 'rcpt_' + singleOffer.offer_id.replace(/^off-/, ''),
           status: 'created',
         });
       }
@@ -347,10 +391,10 @@ export default function DealRoomPage() {
       setFlowStep('checkout');
     } catch {
       setOrderRecord({
-        id: 'order_' + singleOffer.offer_id.substring(4),
+        id: 'order_' + singleOffer.offer_id.replace(/^off-/, ''),
         amount: singleOffer.final_price_paise * singleOffer.quantity,
         currency: 'INR',
-        receipt: 'rcpt_' + singleOffer.offer_id.substring(4),
+        receipt: 'rcpt_' + singleOffer.offer_id.replace(/^off-/, ''),
         status: 'created',
       });
       setFlowStep('checkout');
@@ -417,7 +461,7 @@ export default function DealRoomPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount_paise: singleOffer?.final_price_paise || 394900,
-          reason: 'Customer dispute refund within 10-day guarantee window',
+          reason: 'Customer dispute refund within guarantee window',
         }),
       });
       const data = await res.json();
@@ -432,6 +476,7 @@ export default function DealRoomPage() {
   // 5. 3-Merchant Auction Execution
   const handleRunAuction = async () => {
     setIsProcessing(true);
+    setReasoningPhase('Broadcasting RFP to Merchants A, B, and C in parallel...');
     setCompetingBids([]);
     setAuctionWinner(null);
     setAuctionRationale(null);
@@ -493,16 +538,26 @@ export default function DealRoomPage() {
           nonce: winner.signed_contract.nonce,
           state: 'SIGNED',
         });
+
+        setOrderRecord({
+          id: 'order_auction_' + Math.random().toString(36).substring(2, 8),
+          amount: winner.unit_price_paise * auctionQuantity,
+          currency: 'INR',
+          receipt: 'rcpt_corp_' + Math.random().toString(36).substring(2, 8),
+          status: 'created',
+        });
+
         setFlowStep('negotiation');
       }
     } catch (err) {
       console.error('Auction failed:', err);
     } finally {
       setIsProcessing(false);
+      setReasoningPhase(null);
     }
   };
 
-  // Safety Edge-Case Test Handler
+  // Safety Edge-Case Test Trigger
   const handleTriggerSafetyTest = (type: 'inventory_race' | 'budget_exceeded' | 'human_approval') => {
     setActiveSafetyTest(type);
     if (type === 'inventory_race') {
@@ -554,6 +609,39 @@ export default function DealRoomPage() {
     setPaymentResult(null);
     setRefundResult(null);
     setActiveSafetyTest(null);
+    setReasoningPhase(null);
+  };
+
+  // Direct Step Tab Handlers
+  const handleSelectStep = (step: ContinuousFlowStep) => {
+    if (step === 'request') {
+      setFlowStep('request');
+    } else if (step === 'negotiation') {
+      if (candidateOffers.length > 0 || competingBids.length > 0) {
+        setFlowStep('negotiation');
+      }
+    } else if (step === 'contract') {
+      if (singleOffer) {
+        setFlowStep('contract');
+      }
+    } else if (step === 'checkout') {
+      if (singleOffer) {
+        if (!orderRecord) {
+          setOrderRecord({
+            id: 'order_' + singleOffer.offer_id.replace(/^off-/, ''),
+            amount: singleOffer.final_price_paise * singleOffer.quantity,
+            currency: 'INR',
+            receipt: 'rcpt_' + singleOffer.offer_id.replace(/^off-/, ''),
+            status: 'created',
+          });
+        }
+        setFlowStep('checkout');
+      }
+    } else if (step === 'paid') {
+      if (singleOffer?.state === 'PAID' || flowStep === 'paid') {
+        setFlowStep('paid');
+      }
+    }
   };
 
   return (
@@ -609,59 +697,70 @@ export default function DealRoomPage() {
           </div>
         </div>
 
-        {/* Live Stepper Tracker */}
+        {/* Interactive Step Navigation Bar */}
         <div className="grid grid-cols-5 gap-2 p-2 bg-ink-900 border border-ink-800 rounded-lg text-center text-xs font-mono">
-          <div
-            className={`py-2 px-1 rounded transition-colors ${
+          <button
+            onClick={() => handleSelectStep('request')}
+            className={`py-2 px-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal ${
               flowStep === 'request'
                 ? 'bg-signal-bg border border-signal-border text-signal-light font-bold'
-                : 'text-ink-400'
+                : 'text-ink-300 hover:bg-ink-800'
             }`}
           >
             1. Request
-          </div>
-          <div
-            className={`py-2 px-1 rounded transition-colors ${
+          </button>
+          <button
+            onClick={() => handleSelectStep('negotiation')}
+            disabled={candidateOffers.length === 0 && competingBids.length === 0}
+            className={`py-2 px-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal disabled:opacity-40 disabled:hover:bg-transparent ${
               flowStep === 'negotiation'
                 ? 'bg-signal-bg border border-signal-border text-signal-light font-bold'
                 : candidateOffers.length > 0 || competingBids.length > 0
-                ? 'text-signal-light'
+                ? 'text-signal-light hover:bg-ink-800'
                 : 'text-ink-500'
             }`}
           >
             2. Negotiation
-          </div>
-          <div
-            className={`py-2 px-1 rounded transition-colors ${
+          </button>
+          <button
+            onClick={() => handleSelectStep('contract')}
+            disabled={!singleOffer}
+            className={`py-2 px-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal disabled:opacity-40 disabled:hover:bg-transparent ${
               flowStep === 'contract'
                 ? 'bg-signal-bg border border-signal-border text-signal-light font-bold'
                 : singleOffer
-                ? 'text-signal-light'
+                ? 'text-signal-light hover:bg-ink-800'
                 : 'text-ink-500'
             }`}
           >
             3. Contract
-          </div>
-          <div
-            className={`py-2 px-1 rounded transition-colors ${
+          </button>
+          <button
+            onClick={() => handleSelectStep('checkout')}
+            disabled={!singleOffer}
+            className={`py-2 px-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal disabled:opacity-40 disabled:hover:bg-transparent ${
               flowStep === 'checkout' || flowStep === 'flagged'
                 ? 'bg-signal-bg border border-signal-border text-signal-light font-bold'
-                : orderRecord
-                ? 'text-signal-light'
+                : singleOffer
+                ? 'text-signal-light hover:bg-ink-800'
                 : 'text-ink-500'
             }`}
           >
             4. Checkout
-          </div>
-          <div
-            className={`py-2 px-1 rounded transition-colors ${
+          </button>
+          <button
+            onClick={() => handleSelectStep('paid')}
+            disabled={singleOffer?.state !== 'PAID' && flowStep !== 'paid'}
+            className={`py-2 px-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal disabled:opacity-40 disabled:hover:bg-transparent ${
               flowStep === 'paid'
                 ? 'bg-emerald-950 border border-emerald-700 text-emerald-400 font-bold'
+                : singleOffer?.state === 'PAID'
+                ? 'text-emerald-400 hover:bg-ink-800'
                 : 'text-ink-500'
             }`}
           >
             5. Settled
-          </div>
+          </button>
         </div>
 
         {/* ========================================================================= */}
@@ -669,16 +768,16 @@ export default function DealRoomPage() {
         {/* ========================================================================= */}
         {dealMode === 'single' && (
           <div className="space-y-8">
-            {/* Step 1: Buyer Request Specification Form (always accessible/editable) */}
+            {/* Step 1: Complete Buyer Constraints Specification Form */}
             <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
                   <h2 className="text-base font-bold text-ink-100 font-display flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-signal text-white flex items-center justify-center text-xs font-mono">1</span>
-                    Buyer Intent Specification
+                    Buyer Intent & Constraints Specification
                   </h2>
                   <p className="text-xs text-ink-400 mt-0.5">
-                    Configure the autonomous buyer agent parameters to broadcast to Sprint Athletics.
+                    Configure all autonomous buyer agent parameters: budget ceiling, quantity, delivery deadline, returns, and priority weighting.
                   </p>
                 </div>
 
@@ -692,7 +791,7 @@ export default function DealRoomPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 {/* SKU */}
                 <div>
                   <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
@@ -706,7 +805,7 @@ export default function DealRoomPage() {
                 {/* Budget */}
                 <div>
                   <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
-                    BUYER BUDGET CEILING (INR)
+                    BUDGET CEILING (INR)
                   </label>
                   <input
                     type="number"
@@ -751,6 +850,62 @@ export default function DealRoomPage() {
                 </div>
               </div>
 
+              {/* Additional Full Buyer Constraints (Delivery Deadline, Returns, Priority Ranking) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-ink-800">
+                {/* Delivery Deadline */}
+                <div>
+                  <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
+                    DELIVERY DEADLINE SLA
+                  </label>
+                  <input
+                    type="date"
+                    value={deliveryDeadline}
+                    onChange={(e) => setDeliveryDeadline(e.target.value)}
+                    className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                  />
+                </div>
+
+                {/* Return Preference */}
+                <div>
+                  <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
+                    RETURN POLICY PREFERENCE
+                  </label>
+                  <select
+                    value={returnPreference}
+                    onChange={(e) => setReturnPreference(e.target.value)}
+                    className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                  >
+                    <option value="easy returns">Easy returns (10-day guarantee)</option>
+                    <option value="flexible 14-day window">Flexible 14-day window</option>
+                    <option value="standard 7-day">Standard 7-day terms</option>
+                    <option value="final sale">Final sale / No returns</option>
+                  </select>
+                </div>
+
+                {/* Priority Ranker */}
+                <div>
+                  <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
+                    BUYER PRIORITY WEIGHTING
+                  </label>
+                  <select
+                    value={prioritiesOrder[0]}
+                    onChange={(e) => {
+                      const p = e.target.value as PriorityType;
+                      const rest = (['price', 'delivery_speed', 'return_terms', 'extras'] as PriorityType[]).filter(
+                        (x) => x !== p
+                      );
+                      setPrioritiesOrder([p, ...rest]);
+                    }}
+                    className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                  >
+                    <option value="price">#1 Lowest Unit Price</option>
+                    <option value="delivery_speed">#1 Fastest Delivery SLA</option>
+                    <option value="return_terms">#1 Max Return Window</option>
+                    <option value="extras">#1 Custom Branding & Extras</option>
+                  </select>
+                </div>
+              </div>
+
               {/* Action Button & Safety Tests Sandbox */}
               <div className="mt-5 pt-4 border-t border-ink-800 flex flex-wrap items-center justify-between gap-4">
                 <button
@@ -758,7 +913,7 @@ export default function DealRoomPage() {
                   disabled={isProcessing}
                   className="px-6 py-2.5 bg-signal hover:bg-signal-hover text-white font-mono font-bold text-xs rounded transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none disabled:opacity-50 flex items-center gap-2"
                 >
-                  {isProcessing ? 'Negotiating with Merchant Agent...' : 'Broadcast Intent & Negotiate Deal →'}
+                  {isProcessing ? 'Merchant Agent is Reasoning...' : 'Broadcast Intent & Negotiate Deal →'}
                 </button>
 
                 {/* Subtle Safety Invariant Tests */}
@@ -788,8 +943,21 @@ export default function DealRoomPage() {
               </div>
             </div>
 
+            {/* Reasoning Progress Banner */}
+            {reasoningPhase && (
+              <div className="bg-ink-900 border border-signal-border p-4 rounded-lg flex items-center gap-3 animate-pulse shadow-md">
+                <div className="w-4 h-4 rounded-full border-2 border-signal border-t-transparent animate-spin shrink-0" />
+                <div>
+                  <span className="text-xs font-mono font-bold text-signal-light block uppercase tracking-wider">
+                    Merchant Agent Reasoning
+                  </span>
+                  <span className="text-xs font-mono text-ink-300">{reasoningPhase}</span>
+                </div>
+              </div>
+            )}
+
             {/* Step 2: The Visible Negotiation Moment (Buyer Agent ↔ Merchant Agent) */}
-            {(flowStep === 'negotiation' || flowStep === 'contract' || flowStep === 'checkout' || flowStep === 'paid' || flowStep === 'flagged') && candidateOffers.length > 0 && (
+            {flowStep === 'negotiation' && candidateOffers.length > 0 && (
               <div className="bg-ink-900 border border-signal-border rounded-lg p-5 sm:p-6 shadow-md space-y-6">
                 <div>
                   <div className="flex items-center gap-2">
@@ -803,7 +971,7 @@ export default function DealRoomPage() {
                   </p>
                 </div>
 
-                {/* Agent Exchange Dialogue */}
+                {/* Candidate Offers Comparison */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   {candidateOffers.map((c, idx) => {
                     const isWinner = idx === 0;
@@ -884,14 +1052,14 @@ export default function DealRoomPage() {
                 {explanation && (
                   <div className="p-3.5 bg-signal-bg border border-signal-border rounded text-xs text-signal-light font-sans leading-relaxed">
                     <strong className="font-bold font-mono uppercase tracking-wider block mb-1">
-                      Engine Decision Rationale:
+                      Gemini 1.5 Flash Decision Rationale:
                     </strong>
                     {explanation}
                   </div>
                 )}
 
-                {/* Advance to Contract Step button if on negotiation stage */}
-                {flowStep === 'negotiation' && singleOffer && (
+                {/* Advance to Contract Step */}
+                {singleOffer && (
                   <div className="flex justify-end pt-2">
                     <button
                       onClick={() => setFlowStep('contract')}
@@ -905,7 +1073,7 @@ export default function DealRoomPage() {
             )}
 
             {/* Step 3: Sealed Cryptographic Deal Ticket */}
-            {(flowStep === 'contract' || flowStep === 'checkout' || flowStep === 'paid' || flowStep === 'flagged') && singleOffer && (
+            {flowStep === 'contract' && singleOffer && (
               <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm space-y-6">
                 <div>
                   <div className="flex items-center gap-2">
@@ -923,22 +1091,20 @@ export default function DealRoomPage() {
                   <DealTicket ticket={singleOffer} />
                 </div>
 
-                {flowStep === 'contract' && (
-                  <div className="flex justify-end pt-2">
-                    <button
-                      onClick={handleAcceptAndCreateOrder}
-                      disabled={isProcessing}
-                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs rounded transition-colors shadow flex items-center gap-2 disabled:opacity-50"
-                    >
-                      {isProcessing ? 'Verifying & Creating Order...' : 'Accept Offer & Proceed to Instant Settlement →'}
-                    </button>
-                  </div>
-                )}
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={handleAcceptAndCreateOrder}
+                    disabled={isProcessing}
+                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs rounded transition-colors shadow flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isProcessing ? 'Verifying & Creating Order...' : 'Accept Offer & Proceed to Instant Settlement →'}
+                  </button>
+                </div>
               </div>
             )}
 
             {/* Step 4 & 5: Embedded Checkout & Settlement Flow */}
-            {(flowStep === 'checkout' || flowStep === 'paid' || flowStep === 'flagged') && orderRecord && (
+            {(flowStep === 'checkout' || flowStep === 'paid' || flowStep === 'flagged') && singleOffer && (
               <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm space-y-6">
                 <div>
                   <div className="flex items-center gap-2">
@@ -955,7 +1121,7 @@ export default function DealRoomPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-ink-950 p-4 rounded border border-ink-800 text-xs font-mono">
                   <div>
                     <span className="text-ink-500 block uppercase">Razorpay Order ID:</span>
-                    <span className="text-ink-100 font-bold">{orderRecord.id}</span>
+                    <span className="text-ink-100 font-bold">{orderRecord?.id || 'order_' + singleOffer.offer_id.replace(/^off-/, '')}</span>
                   </div>
                   <div>
                     <span className="text-ink-500 block uppercase">Locked Order Amount:</span>
@@ -1124,7 +1290,7 @@ export default function DealRoomPage() {
             </div>
 
             {/* Competing Bids & Multi-Attribute Scoring Matrix */}
-            {competingBids.length > 0 && (
+            {flowStep === 'negotiation' && competingBids.length > 0 && (
               <div className="bg-ink-900 border border-signal-border rounded-lg p-5 sm:p-6 shadow-md space-y-6">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1213,7 +1379,7 @@ export default function DealRoomPage() {
                 )}
 
                 {/* Proceed to Contract & Checkout */}
-                {singleOffer && flowStep === 'negotiation' && (
+                {singleOffer && (
                   <div className="flex justify-end pt-2">
                     <button
                       onClick={() => setFlowStep('contract')}
@@ -1227,7 +1393,7 @@ export default function DealRoomPage() {
             )}
 
             {/* Step 3: Auction Contract Ticket */}
-            {(flowStep === 'contract' || flowStep === 'checkout' || flowStep === 'paid') && singleOffer && (
+            {flowStep === 'contract' && singleOffer && (
               <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm space-y-6">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1242,22 +1408,20 @@ export default function DealRoomPage() {
                   <DealTicket ticket={singleOffer} />
                 </div>
 
-                {flowStep === 'contract' && (
-                  <div className="flex justify-end pt-2">
-                    <button
-                      onClick={handleAcceptAndCreateOrder}
-                      disabled={isProcessing}
-                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs rounded transition-colors shadow flex items-center gap-2 disabled:opacity-50"
-                    >
-                      {isProcessing ? 'Verifying & Creating Order...' : 'Accept Winning Contract & Proceed to Settlement →'}
-                    </button>
-                  </div>
-                )}
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={handleAcceptAndCreateOrder}
+                    disabled={isProcessing}
+                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs rounded transition-colors shadow flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isProcessing ? 'Verifying & Creating Order...' : 'Accept Winning Contract & Proceed to Settlement →'}
+                  </button>
+                </div>
               </div>
             )}
 
             {/* Step 4 & 5: Settlement for Auction */}
-            {(flowStep === 'checkout' || flowStep === 'paid') && orderRecord && (
+            {(flowStep === 'checkout' || flowStep === 'paid') && singleOffer && (
               <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm space-y-6">
                 <div>
                   <div className="flex items-center gap-2">

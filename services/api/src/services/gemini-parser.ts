@@ -215,6 +215,7 @@ Important Rules:
 - Money MUST be integer paise (1 Rupee = 100 paise). NEVER output floats.
 - Return ONLY valid JSON, no markdown code fence or commentary.`;
 
+      console.log(`[Gemini Intent Parser] Sending query: "${rawQuery}" to gemini-1.5-flash (API Key: REDACTED)`);
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -228,6 +229,7 @@ Important Rules:
         const data: any = await response.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) {
+          console.log(`[Gemini Intent Parser] Received structured response: ${text.substring(0, 120)}...`);
           const parsed = JSON.parse(text);
           extracted = {
             category: parsed.category || undefined,

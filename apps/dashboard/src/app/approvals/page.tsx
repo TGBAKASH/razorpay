@@ -35,27 +35,10 @@ export default function ApprovalsPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/offers/pending-approvals`);
       const data = await res.json();
-      if (data.pending_offers) {
-        setPendingOffers(data.pending_offers);
-      }
+      const list = data.offers || data.pending_offers || [];
+      setPendingOffers(list);
     } catch {
-      if (pendingOffers.length === 0) {
-        setPendingOffers([
-          {
-            offer_id: 'offer-enterprise-bulk-01',
-            sku: 'SPRINTPRO-X2',
-            quantity: 10,
-            final_price_paise: 394900,
-            total_order_paise: 3949000,
-            delivery_promise: '2026-08-31T23:59:59Z',
-            return_terms_days: 10,
-            payment_methods_allowed: ['UPI', 'Card'],
-            expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-            policy_version: 'v1',
-            signed_at: new Date().toISOString(),
-          },
-        ]);
-      }
+      setPendingOffers([]);
     }
   }
 

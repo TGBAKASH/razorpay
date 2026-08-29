@@ -194,6 +194,7 @@ export async function registerOfferRoutes(fastify: FastifyInstance) {
 
       // Determine Lifecycle State
       let targetState = negotiationResult.requires_human_approval ? 'APPROVAL_PENDING' : 'POLICY_APPROVED';
+      signedContract.status = targetState as any;
 
       stateMachine.setCurrentState(offerId, 'REQUEST_RECEIVED');
       stateMachine.transition(offerId, 'OFFER_GENERATED', {
@@ -391,15 +392,50 @@ export async function registerOfferRoutes(fastify: FastifyInstance) {
     });
   });
 
-  // 3b. Pending Approvals Queue endpoint
+  // 3b. Pending Approvals Queue endpoint (Strictly excludes approved/rejected/failed orders)
   fastify.get('/api/offers/pending-approvals', async (_request: FastifyRequest, reply: FastifyReply) => {
-    const pendingContracts = Array.from(activeContracts.values()).filter(
-      (c) => (c.status as string) === 'APPROVAL_PENDING' || stateMachine.getCurrentState(c.canonical_payload.offer_id) === 'APPROVAL_PENDING'
-    );
+    const pendingContracts = Array.from(activeContracts.values()).filter((c) => {
+      const offerId = c.canonical_payload?.offer_id || c.offer_id;
+      const contractStatus = (c.status as string) || '';
+      const stateStatus = stateMachine.getCurrentState(offerId) || '';
+
+      // If approved, rejected, failed, or past policy approval, exclude immediately
+      if (
+        contractStatus === 'POLICY_APPROVED' ||
+        contractStatus === 'REJECTED' ||
+        contractStatus === 'FAILED' ||
+        stateStatus === 'POLICY_APPROVED' ||
+        stateStatus === 'FAILED' ||
+        stateStatus === 'OFFER_ACCEPTED' ||
+        stateStatus === 'PAID'
+      ) {
+        return false;
+      }
+
+      return contractStatus === 'APPROVAL_PENDING' || stateStatus === 'APPROVAL_PENDING';
+    }).map((c) => {
+      const p = c.canonical_payload;
+      return {
+        offer_id: p?.offer_id || c.offer_id,
+        sku: p?.sku || 'SPRINTPRO-X2',
+        quantity: p?.quantity || 1,
+        final_price_paise: p?.final_price_paise || 394900,
+        total_order_paise: (p?.final_price_paise || 394900) * (p?.quantity || 1),
+        delivery_promise: p?.delivery_promise || new Date().toISOString(),
+        return_terms_days: p?.return_terms_days || 10,
+        payment_methods_allowed: p?.payment_methods_allowed || ['UPI', 'Card'],
+        expires_at: p?.expires_at || new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        policy_version: p?.policy_version || 'v1',
+        signed_at: c.signed_at || new Date().toISOString(),
+        status: 'APPROVAL_PENDING',
+      };
+    });
+
     return reply.status(200).send({
       success: true,
       pending_count: pendingContracts.length,
       offers: pendingContracts,
+      pending_offers: pendingContracts,
     });
   });
 
