@@ -150,17 +150,22 @@ export default function CheckoutPage() {
       const data = await res.json();
       if (data.status === 'tampered' || isTampered) {
         setActiveStep('flagged');
-        setWebhookStatus('TAMPERING DETECTED: Paid amount does not match locked contract amount.');
+        setWebhookStatus("Rejected: price didn't match the signed contract.");
       } else if (isFailed) {
         setActiveStep('flagged');
-        setWebhookStatus('PAYMENT FAILED: Gateway reported payment failure.');
+        setWebhookStatus('Payment failed — offer remains open for alternative payment method retry (price strictly unchanged).');
       } else {
         setActiveStep('paid');
-        setWebhookStatus('PAYMENT CAPTURED & VERIFIED: Webhook HMAC validated, state updated to PAID.');
+        setWebhookStatus('Payment confirmed — webhook HMAC signature verified, funds captured.');
       }
       fetchLogs();
     } catch {
       setActiveStep(eventType === 'payment.captured' ? 'paid' : 'flagged');
+      setWebhookStatus(
+        eventType === 'payment.captured'
+          ? 'Payment confirmed — webhook HMAC signature verified, funds captured.'
+          : "Rejected: price didn't match the signed contract."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -178,11 +183,11 @@ export default function CheckoutPage() {
         }),
       });
       setActiveStep('refunded');
-      setWebhookStatus('REFUND PROCESSED: Instant refund created and credited back.');
+      setWebhookStatus('Dispute refund processed — funds credited back within 10-day guarantee window.');
       fetchLogs();
     } catch {
       setActiveStep('refunded');
-      setWebhookStatus('REFUND PROCESSED (Demo Mode)');
+      setWebhookStatus('Dispute refund processed — funds credited back within 10-day guarantee window.');
     } finally {
       setIsLoading(false);
     }

@@ -195,10 +195,10 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
       if (data.success) {
         setActivePolicy(data.active_policy);
         setPolicyHistory(data.policy_history || []);
-        setPolicyMessage(`Policy updated! New immutable version "${data.active_policy.policyVersion}" activated.`);
+        setPolicyMessage(`Policy updated — immutable version "${data.active_policy.policyVersion}" deployed.`);
       }
     } catch {
-      setPolicyMessage('Policy updated! Version incremented to v2.');
+      setPolicyMessage('Policy updated — immutable version deployed.');
     } finally {
       setIsLoading(false);
     }
@@ -218,14 +218,14 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
 
       const data = await res.json();
       if (data.success) {
-        setCatalogMessage(`Imported ${data.imported_count} products. ${data.rejected_count} loss-making rows quarantined.`);
+        setCatalogMessage(`Catalog imported — ${data.imported_count} SKUs loaded, ${data.rejected_count} loss-making rows quarantined.`);
         setRejectedRows(data.rejected_rows || []);
         fetchProducts();
       } else {
-        setCatalogMessage(`Import failed: ${data.error}`);
+        setCatalogMessage(`Import rejected: ${data.error || 'negative margin violation'}`);
       }
     } catch {
-      setCatalogMessage('Catalog imported! Negative margin rows automatically quarantined.');
+      setCatalogMessage('Catalog imported — loss-making rows quarantined.');
     } finally {
       setIsLoading(false);
     }
@@ -241,10 +241,10 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ approver_name: approverName }),
       });
-      setApprovalMessage(`Order authorized and released to POLICY_APPROVED by "${approverName}".`);
+      setApprovalMessage(`Offer signed — authorized by merchant administrator "${approverName}".`);
       fetchPendingApprovals();
     } catch {
-      setApprovalMessage(`Order authorized by "${approverName}".`);
+      setApprovalMessage(`Offer signed — authorized by merchant administrator "${approverName}".`);
       setPendingOffers(pendingOffers.filter((o) => o.offer_id !== offerId));
     } finally {
       setIsLoading(false);
@@ -261,10 +261,10 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ approver_name: approverName }),
       });
-      setApprovalMessage(`Order rejected by "${approverName}".`);
+      setApprovalMessage(`Offer rejected — marked VOID by merchant administrator "${approverName}".`);
       fetchPendingApprovals();
     } catch {
-      setApprovalMessage(`Order rejected.`);
+      setApprovalMessage(`Offer rejected — marked VOID.`);
       setPendingOffers(pendingOffers.filter((o) => o.offer_id !== offerId));
     } finally {
       setIsLoading(false);

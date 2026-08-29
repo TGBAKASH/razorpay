@@ -184,11 +184,11 @@ export default function DemoPage() {
       name: '1. Inventory Race',
       code: 'INVENTORY_RACE',
       badgeColor: 'amber',
-      title: 'FAILURE CAUGHT: INVENTORY RACE AT ACCEPT-TIME',
+      title: 'CONTRACT EXPIRED — INVENTORY DEPLETED AT ACCEPT-TIME',
       caption:
-        'Offer was signed for qty 2, but warehouse inventory dropped to 1 before buyer acceptance arrived. Instead of silently shipping partial quantity or overcharging, DealFlow cleanly expires the offer with ZERO charge to the buyer.',
+        'Contract expired — warehouse inventory depleted (no charge made). Offer was signed for qty 2, but live warehouse inventory dropped to 1 before buyer acceptance arrived. Instead of silently shipping partial quantity or overcharging, DealFlow cleanly expires the offer with zero charge to the buyer.',
       whatFailed: 'Live warehouse stock depleted from 2 to 1 during buyer agent deliberation window.',
-      systemAction: 'Acceptance rejected with INVENTORY_DEPLETED (409). Offer cleanly expired. Buyer charged ₹0.',
+      systemAction: 'Contract expired cleanly with zero financial charge. Rejection code INVENTORY_DEPLETED (409).',
       invariant: 'Never silently substitute partial quantity or charge buyer for unavailable stock.',
     },
     {
@@ -196,11 +196,11 @@ export default function DemoPage() {
       name: '2. Offer Tampering',
       code: 'TAMPER_DIGIT_FLIP',
       badgeColor: 'redline',
-      title: 'FAILURE CAUGHT: CRYPTOGRAPHIC SIGNATURE MISMATCH',
+      title: 'REJECTED: PRICE DID NOT MATCH THE SIGNED CONTRACT',
       caption:
-        'A compromised accept request altered final_price_paise from ₹3,949 to ₹2,949 (digit flip attack). DealFlow’s HMAC-SHA256 check fails immediately and rejects the request before any Razorpay API call is made.',
+        'Rejected: price didn’t match the signed contract. A compromised accept request altered final_price_paise from ₹3,949 to ₹2,949 (digit flip attack). DealFlow’s HMAC-SHA256 check fails immediately and rejects the request before any Razorpay API call is made.',
       whatFailed: 'Compromised request altered payload price from 394900 to 294900 paise.',
-      systemAction: 'HMAC verification failed. Gateway order creation blocked. Security alarm logged.',
+      systemAction: 'HMAC signature mismatch detected. Gateway order call blocked. Security alarm logged.',
       invariant: 'Cryptographic contract check must pass before any payment gateway API call.',
     },
     {
@@ -208,9 +208,9 @@ export default function DemoPage() {
       name: '3. Payment Failure & Retry',
       code: 'PAYMENT_FAILURE_RETRY',
       badgeColor: 'amber',
-      title: 'FAILURE HANDLED: PAYMENT FAILURE WITH ZERO PRICE DRIFT',
+      title: 'PAYMENT FAILED — RETRY ACTIVE WITH ZERO PRICE DRIFT',
       caption:
-        'The buyer’s payment card failed at the Razorpay gateway. DealFlow prompts for an alternative payment method while keeping the agreed contract price (₹3,949) strictly unchanged—preventing predatory win-back discounting.',
+        'Payment failed — offer remains open for alternative payment method retry (price strictly unchanged). The buyer’s payment card failed at the Razorpay gateway. DealFlow prompts for an alternative payment method while keeping the agreed contract price (₹3,949) strictly unchanged.',
       whatFailed: 'Gateway reported payment card decline or network timeout.',
       systemAction: 'Offer remains in OFFER_CREATED state for retry. Price locked strictly at ₹3,949.',
       invariant: 'Payment retries must not alter agreed contract price (zero win-back discounting).',
@@ -331,13 +331,13 @@ export default function DemoPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1 space-y-6">
         {/* Top Control Bar for Video Recording */}
-        <div className="border border-ink-700 bg-ink-900 rounded-lg p-5 flex flex-wrap items-center justify-between gap-4 shadow-md">
+        <div className="border border-ink-700 bg-ink-900 rounded-lg p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 sm:gap-4 shadow-md">
           {/* Script Selectors */}
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono text-ink-400 uppercase mr-1">DEMO SCRIPT:</span>
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <span className="text-[10px] sm:text-[11px] font-mono text-ink-400 uppercase mr-1">DEMO SCRIPT:</span>
             <button
               onClick={() => handleSwitchScript('single')}
-              className={`py-1.5 px-3 rounded text-xs font-mono transition-colors ${
+              className={`py-1.5 px-2.5 sm:px-3 rounded text-xs font-mono transition-colors focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none ${
                 activeScript === 'single'
                   ? 'bg-signal-bg text-signal-light border border-signal-border font-bold'
                   : 'bg-ink-950 text-ink-400 border border-ink-800 hover:text-ink-200'
@@ -347,7 +347,7 @@ export default function DemoPage() {
             </button>
             <button
               onClick={() => handleSwitchScript('auction')}
-              className={`py-1.5 px-3 rounded text-xs font-mono transition-colors ${
+              className={`py-1.5 px-2.5 sm:px-3 rounded text-xs font-mono transition-colors focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none ${
                 activeScript === 'auction'
                   ? 'bg-signal-bg text-signal-light border border-signal-border font-bold'
                   : 'bg-ink-950 text-ink-400 border border-ink-800 hover:text-ink-200'
@@ -358,10 +358,10 @@ export default function DemoPage() {
           </div>
 
           {/* Playback Controls */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             <button
               onClick={handleRestart}
-              className="py-1.5 px-3 bg-ink-800 hover:bg-ink-750 text-ink-200 border border-ink-600 rounded text-xs font-mono flex items-center gap-1 transition-colors"
+              className="py-1.5 px-2.5 sm:px-3 bg-ink-800 hover:bg-ink-750 text-ink-200 border border-ink-600 rounded text-xs font-mono flex items-center gap-1 transition-colors focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
               title="Reset demo data to beginning"
             >
               <span>↺</span> Restart
@@ -370,7 +370,7 @@ export default function DemoPage() {
             <button
               onClick={handleStepBack}
               disabled={currentStepIndex === 0}
-              className="py-1.5 px-3 bg-ink-800 hover:bg-ink-750 text-ink-200 border border-ink-600 rounded text-xs font-mono disabled:opacity-40 transition-colors"
+              className="py-1.5 px-2.5 sm:px-3 bg-ink-800 hover:bg-ink-750 text-ink-200 border border-ink-600 rounded text-xs font-mono disabled:opacity-40 transition-colors focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
               title="Step back one transition"
             >
               ⏮ Back
@@ -378,7 +378,7 @@ export default function DemoPage() {
 
             <button
               onClick={handlePlayPause}
-              className={`py-1.5 px-4 rounded text-xs font-mono font-bold flex items-center gap-1.5 transition-colors shadow ${
+              className={`py-1.5 px-3.5 sm:px-4 rounded text-xs font-mono font-bold flex items-center gap-1.5 transition-colors shadow focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none ${
                 isPlaying
                   ? 'bg-amber text-ink-950 hover:bg-amber-light'
                   : 'bg-signal text-white hover:bg-signal-light'
@@ -390,18 +390,18 @@ export default function DemoPage() {
             <button
               onClick={handleStepForward}
               disabled={currentStepIndex >= currentSteps.length - 1}
-              className="py-1.5 px-3 bg-ink-800 hover:bg-ink-750 text-ink-200 border border-ink-600 rounded text-xs font-mono disabled:opacity-40 transition-colors"
+              className="py-1.5 px-2.5 sm:px-3 bg-ink-800 hover:bg-ink-750 text-ink-200 border border-ink-600 rounded text-xs font-mono disabled:opacity-40 transition-colors focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
               title="Step forward one transition"
             >
               Step Forward ⏭
             </button>
 
             {/* Pacing Toggle */}
-            <div className="flex items-center gap-1 ml-2 bg-ink-950 p-1 rounded border border-ink-800 text-[10px] font-mono">
+            <div className="flex items-center gap-1 bg-ink-950 p-1 rounded border border-ink-800 text-[10px] font-mono">
               <span className="text-ink-500 px-1">SPEED:</span>
               <button
                 onClick={() => setPlaybackSpeedMs(5000)}
-                className={`px-2 py-0.5 rounded ${
+                className={`px-1.5 sm:px-2 py-0.5 rounded focus-visible:ring-1 focus-visible:ring-signal focus-visible:outline-none ${
                   playbackSpeedMs === 5000
                     ? 'bg-ink-800 text-ink-100 font-bold'
                     : 'text-ink-500 hover:text-ink-300'
@@ -411,7 +411,7 @@ export default function DemoPage() {
               </button>
               <button
                 onClick={() => setPlaybackSpeedMs(2500)}
-                className={`px-2 py-0.5 rounded ${
+                className={`px-1.5 sm:px-2 py-0.5 rounded focus-visible:ring-1 focus-visible:ring-signal focus-visible:outline-none ${
                   playbackSpeedMs === 2500
                     ? 'bg-ink-800 text-ink-100 font-bold'
                     : 'text-ink-500 hover:text-ink-300'
