@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { API_BASE_URL } from '../../lib/config';
+import { DealLifecycleNav } from '../../components/DealLifecycleNav';
+import { TabularNumber } from '../../components/TabularNumber';
 
 interface PolicyData {
   policyVersion: string;
@@ -85,209 +88,223 @@ export default function PolicyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
-      <div className="max-w-5xl mx-auto space-y-8">
-        <header className="border-b border-slate-800 pb-6 flex items-center justify-between">
+    <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col">
+      <DealLifecycleNav />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
+        {/* Header Strip */}
+        <div className="border border-ink-700 bg-ink-900 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-              <span>🛡️</span> Merchant Policy & Version Control
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-mono text-xs font-bold text-signal bg-signal-bg border border-signal-border px-2 py-0.5 rounded">
+                OPERATIONAL DESK • POLICY GOVERNANCE
+              </span>
+            </div>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink-100">
+              Merchant Policy Matrix & Version Control
             </h1>
-            <p className="text-slate-400 mt-1">
-              Phase 8: Immutable policy versioning (v1 &rarr; v2 &rarr; v3) with zero in-place mutation
+            <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
+              Deterministic parameters governing auto-negotiation. Every update creates an append-only, immutable policy version (v1 → v2).
             </p>
           </div>
-          <div className="bg-purple-950 border border-purple-600 px-4 py-2 rounded-lg text-purple-300 font-mono font-bold text-sm">
-            Active Policy: {activePolicy.policyVersion}
+
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs font-bold text-signal bg-signal-bg border border-signal-border px-3 py-1.5 rounded">
+              ACTIVE VERSION: {activePolicy.policyVersion}
+            </span>
           </div>
-        </header>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: Form */}
-          <div className="lg:col-span-2 space-y-6">
-            <form onSubmit={handleSavePolicy} className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <span>⚙️</span> Policy Parameter Matrix
-                </h2>
-                <span className="text-xs text-slate-400 font-mono">
-                  Never mutates in place; increments version
-                </span>
-              </div>
+        {statusMessage && (
+          <div className="bg-signal-bg border border-signal-border p-4 rounded-lg text-signal-light text-xs font-mono">
+            {statusMessage}
+          </div>
+        )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Policy Configuration Form */}
+          <div className="lg:col-span-7 bg-ink-900 border border-ink-700 rounded-lg p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-ink-800 pb-2">
+              <span className="font-mono text-xs font-bold text-ink-300 uppercase">
+                Deterministic Policy Parameter Controls
+              </span>
+              <span className="font-mono text-[10px] text-ink-500 uppercase">
+                MUTATION LOCK
+              </span>
+            </div>
+
+            <form onSubmit={handleSavePolicy} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">
-                    MINIMUM PROFIT MARGIN (%)
+                  <label className="block text-[11px] font-mono uppercase text-ink-400 mb-1">
+                    Minimum Gross Margin Floor (%)
                   </label>
                   <input
                     type="number"
                     step="0.1"
                     value={activePolicy.minMarginPct}
-                    onChange={(e) => setActivePolicy({ ...activePolicy, minMarginPct: parseFloat(e.target.value) })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 font-mono text-cyan-300 focus:outline-none focus:border-blue-500"
-                    required
+                    onChange={(e) =>
+                      setActivePolicy({ ...activePolicy, minMarginPct: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full bg-ink-950 border border-ink-700 rounded px-2.5 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
                   />
-                  <span className="text-[11px] text-slate-500">Hard floor below which offers are rejected</span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">
-                    MAXIMUM DISCOUNT CEILING (%)
+                  <label className="block text-[11px] font-mono uppercase text-ink-400 mb-1">
+                    Maximum Auto-Discount Ceiling (%)
                   </label>
                   <input
                     type="number"
                     step="0.1"
                     value={activePolicy.maxDiscountPct}
-                    onChange={(e) => setActivePolicy({ ...activePolicy, maxDiscountPct: parseFloat(e.target.value) })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 font-mono text-emerald-300 focus:outline-none focus:border-blue-500"
-                    required
+                    onChange={(e) =>
+                      setActivePolicy({ ...activePolicy, maxDiscountPct: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full bg-ink-950 border border-ink-700 rounded px-2.5 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
                   />
-                  <span className="text-[11px] text-slate-500">Autonomous discount ceiling (e.g. 12% or 8%)</span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">
-                    FREE DELIVERY THRESHOLD (₹)
+                  <label className="block text-[11px] font-mono uppercase text-ink-400 mb-1">
+                    Free Delivery Order Threshold (Paise)
                   </label>
                   <input
                     type="number"
-                    value={activePolicy.freeDeliveryAbovePaise / 100}
-                    onChange={(e) => setActivePolicy({ ...activePolicy, freeDeliveryAbovePaise: Math.round(parseFloat(e.target.value) * 100) })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 font-mono text-slate-200 focus:outline-none focus:border-blue-500"
-                    required
+                    value={activePolicy.freeDeliveryAbovePaise}
+                    onChange={(e) =>
+                      setActivePolicy({
+                        ...activePolicy,
+                        freeDeliveryAbovePaise: parseInt(e.target.value, 10) || 0,
+                      })
+                    }
+                    className="w-full bg-ink-950 border border-ink-700 rounded px-2.5 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
                   />
-                  <span className="text-[11px] text-slate-500">Cart amount in INR for free shipping</span>
+                  <div className="text-[10px] font-mono text-ink-500 mt-1">
+                    = <TabularNumber value={activePolicy.freeDeliveryAbovePaise} isCurrencyPaise prefix="₹" />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">
-                    CLEARANCE WINDOW (DAYS)
+                  <label className="block text-[11px] font-mono uppercase text-ink-400 mb-1">
+                    Human Approval Threshold (Paise)
                   </label>
                   <input
                     type="number"
-                    value={activePolicy.clearWithinDays}
-                    onChange={(e) => setActivePolicy({ ...activePolicy, clearWithinDays: parseInt(e.target.value, 10) })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 font-mono text-slate-200 focus:outline-none focus:border-blue-500"
-                    required
+                    value={activePolicy.humanApprovalAbovePaise}
+                    onChange={(e) =>
+                      setActivePolicy({
+                        ...activePolicy,
+                        humanApprovalAbovePaise: parseInt(e.target.value, 10) || 0,
+                      })
+                    }
+                    className="w-full bg-ink-950 border border-ink-700 rounded px-2.5 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
                   />
-                  <span className="text-[11px] text-slate-500">Days to expiry forcing clearance eligibility</span>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">
-                    HUMAN APPROVAL THRESHOLD (₹)
-                  </label>
-                  <input
-                    type="number"
-                    value={activePolicy.humanApprovalAbovePaise / 100}
-                    onChange={(e) => setActivePolicy({ ...activePolicy, humanApprovalAbovePaise: Math.round(parseFloat(e.target.value) * 100) })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 font-mono text-amber-300 focus:outline-none focus:border-blue-500"
-                    required
-                  />
-                  <span className="text-[11px] text-slate-500">Orders above this route to APPROVAL_PENDING</span>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">
-                    OPERATOR IDENTITY
-                  </label>
-                  <input
-                    type="text"
-                    value={approverName}
-                    onChange={(e) => setApproverName(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 font-mono text-purple-300 focus:outline-none focus:border-blue-500"
-                    required
-                  />
-                  <span className="text-[11px] text-slate-500">Named administrator signing this version</span>
+                  <div className="text-[10px] font-mono text-ink-500 mt-1">
+                    = <TabularNumber value={activePolicy.humanApprovalAbovePaise} isCurrencyPaise prefix="₹" />
+                  </div>
                 </div>
               </div>
 
               {/* Toggles */}
-              <div className="space-y-3 pt-2 border-t border-slate-800">
-                <label className="flex items-center gap-3 cursor-pointer">
+              <div className="space-y-2 pt-2 border-t border-ink-800">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={activePolicy.noDiscountFastMoving}
-                    onChange={(e) => setActivePolicy({ ...activePolicy, noDiscountFastMoving: e.target.checked })}
-                    className="w-4 h-4 rounded text-blue-600 bg-slate-950 border-slate-700"
+                    onChange={(e) =>
+                      setActivePolicy({ ...activePolicy, noDiscountFastMoving: e.target.checked })
+                    }
+                    className="rounded bg-ink-950 border-ink-700 text-signal focus:ring-signal"
                   />
-                  <div>
-                    <span className="font-semibold text-slate-300 text-sm">Strict Fast-Moving SKU Discount Prohibition</span>
-                    <p className="text-xs text-slate-500">Disallow discounts on high-velocity items unless clearance flag is active.</p>
-                  </div>
+                  <span className="text-xs font-sans text-ink-300">
+                    Prohibit auto-discounts on high-velocity (fast moving) SKUs
+                  </span>
                 </label>
 
-                <label className="flex items-center gap-3 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={activePolicy.prepaidDiscountOnHighCodRisk}
-                    onChange={(e) => setActivePolicy({ ...activePolicy, prepaidDiscountOnHighCodRisk: e.target.checked })}
-                    className="w-4 h-4 rounded text-blue-600 bg-slate-950 border-slate-700"
+                    onChange={(e) =>
+                      setActivePolicy({
+                        ...activePolicy,
+                        prepaidDiscountOnHighCodRisk: e.target.checked,
+                      })
+                    }
+                    className="rounded bg-ink-950 border-ink-700 text-signal focus:ring-signal"
                   />
-                  <div>
-                    <span className="font-semibold text-slate-300 text-sm">Prepaid Subsidy on High COD Return Risk</span>
-                    <p className="text-xs text-slate-500">Offer promo discount subsidizing prepaid UPI to eliminate RTO shipping losses.</p>
-                  </div>
+                  <span className="text-xs font-sans text-ink-300">
+                    Incentivize prepaid (UPI/Card) on high COD return risk orders
+                  </span>
                 </label>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-ink-400 mb-1">
+                  Authorizing Merchant Admin Identifier
+                </label>
+                <input
+                  type="text"
+                  value={approverName}
+                  onChange={(e) => setApproverName(e.target.value)}
+                  className="w-full bg-ink-950 border border-ink-700 rounded px-2.5 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                />
               </div>
 
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-lg shadow transition disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-2.5 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-semibold rounded transition-colors shadow disabled:opacity-50"
               >
-                {isLoading ? 'Activating New Version...' : `🚀 Activate New Policy Version`}
+                {isLoading ? 'Saving Immutable Version...' : 'Deploy New Policy Version (v2) →'}
               </button>
-
-              {statusMessage && (
-                <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg text-xs font-mono text-emerald-400">
-                  {statusMessage}
-                </div>
-              )}
             </form>
           </div>
 
-          {/* Right Column: Version History */}
-          <div className="lg:col-span-1 space-y-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <span>📚</span> Version History
-              </h2>
+          {/* Policy Version History Ledger */}
+          <div className="lg:col-span-5 bg-ink-900 border border-ink-700 rounded-lg p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-ink-800 pb-2">
+              <span className="font-mono text-xs font-bold text-ink-300 uppercase">
+                Immutable Version History
+              </span>
+              <span className="font-mono text-[10px] text-ink-500 uppercase">
+                AUDITABLE
+              </span>
+            </div>
 
-              <p className="text-xs text-slate-400">
-                Old signed offers remain verifiable and auditable against the exact version that approved them.
-              </p>
+            <div className="space-y-3">
+              <div className="bg-ink-950 border border-signal-border p-3 rounded text-xs font-mono space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-signal font-bold">CURRENT: {activePolicy.policyVersion}</span>
+                  <span className="text-[10px] text-ink-500">LIVE ENGINE</span>
+                </div>
+                <div className="text-ink-400 text-[11px]">
+                  Floor: {activePolicy.minMarginPct}% • Ceiling: {activePolicy.maxDiscountPct}%
+                </div>
+                <div className="text-ink-500 text-[10px]">
+                  Approval threshold: <TabularNumber value={activePolicy.humanApprovalAbovePaise} isCurrencyPaise prefix="₹" />
+                </div>
+              </div>
 
-              <div className="space-y-3 font-mono text-xs">
-                <div className="bg-purple-950/60 border border-purple-800/80 p-3 rounded-lg space-y-1">
-                  <div className="flex justify-between text-purple-300 font-bold">
-                    <span>{activePolicy.policyVersion} (ACTIVE)</span>
-                    <span className="text-emerald-400">LIVE</span>
+              {history.map((hist, idx) => (
+                <div
+                  key={idx}
+                  className="bg-ink-950 border border-ink-800 p-3 rounded text-xs font-mono space-y-1 text-ink-400"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-ink-300">HISTORICAL: {hist.policyVersion}</span>
+                    <span className="text-[10px] text-ink-600">ARCHIVED</span>
                   </div>
-                  <div className="text-slate-400 text-[11px]">
-                    Max Discount: {activePolicy.maxDiscountPct}% • Min Margin: {activePolicy.minMarginPct}%
+                  <div className="text-[11px]">
+                    Floor: {hist.minMarginPct}% • Ceiling: {hist.maxDiscountPct}%
                   </div>
                 </div>
-
-                {history.map((hist, idx) => (
-                  <div key={idx} className="bg-slate-950 border border-slate-800 p-3 rounded-lg space-y-1 text-slate-400">
-                    <div className="flex justify-between font-bold text-slate-300">
-                      <span>{hist.policyVersion} (ARCHIVED)</span>
-                      <span className="text-slate-500">IMMUTABLE</span>
-                    </div>
-                    <div className="text-[11px]">
-                      Max Discount: {hist.maxDiscountPct}% • Min Margin: {hist.minMarginPct}%
-                    </div>
-                    <div className="text-[10px] text-slate-500">
-                      Updated By: {hist.updatedBy || 'system'}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

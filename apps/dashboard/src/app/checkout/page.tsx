@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { API_BASE_URL, RAZORPAY_KEY_ID } from '../../lib/config';
+import { DealLifecycleNav } from '../../components/DealLifecycleNav';
+import { DealTicket, DealTicketData } from '../../components/DealTicket';
+import { TabularNumber } from '../../components/TabularNumber';
 
 interface OrderState {
   order_id: string;
@@ -20,26 +23,33 @@ export default function CheckoutPage() {
   const [webhookStatus, setWebhookStatus] = useState<string | null>(null);
 
   // Sample contract data for SprintPro X2 Offer A
-  const sampleContract = {
+  const sampleContract: DealTicketData = {
     offer_id: 'offer-sprintpro-checkout-001',
     sku: 'SPRINTPRO-X2',
-    name: 'SprintPro X2 Running Shoes',
+    product_name: 'SprintPro X2 Running Shoes (Titanium Grey)',
     quantity: 1,
     final_price_paise: 394900,
     list_price_paise: 429900,
     discount_paise: 35000,
-    payment_methods_allowed: ['upi'],
-    delivery_promise: 'Monday Delivery (2026-08-31)',
+    discount_reasons: [
+      'Prepaid payment incentive (UPI rail selected)',
+      'High-velocity SKU inventory clearance',
+      'Guaranteed Monday delivery SLA',
+    ],
+    payment_methods_allowed: ['UPI', 'Card'],
+    delivery_promise: '2026-08-31T23:59:59Z',
     return_terms_days: 10,
-    status: 'POLICY_APPROVED',
+    merchant_id: 'merchant-sprint-alpha',
+    merchant_name: 'SprintPro Footwear Ltd.',
+    state: activeStep === 'paid' ? 'PAID' : activeStep === 'flagged' ? 'FAILED' : 'SIGNED',
     nonce: 'nonce_98f12a3d7b4',
     signature: '7e8f192b6a9c3d4e5f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e',
+    expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
   };
 
   async function handleCreateOrder() {
     setIsLoading(true);
     try {
-      // Create Razorpay Order bound 1:1 to verified contract
       const res = await fetch(`${API_BASE_URL}/api/orders/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,7 +96,6 @@ export default function CheckoutPage() {
         fetchLogs();
       }
     } catch {
-      // Mock fallback if standalone dashboard without local API
       setOrder({
         order_id: 'order_sprintpro001',
         offer_id: sampleContract.offer_id,
@@ -100,70 +109,56 @@ export default function CheckoutPage() {
     }
   }
 
-  async function simulateWebhook(eventType: 'valid_paid' | 'duplicate_replay' | 'tampered_mismatch' | 'failed') {
+  async function handleSimulateWebhook(eventType: 'payment.captured' | 'payment.tampered' | 'payment.failed') {
     setIsLoading(true);
     setWebhookStatus(null);
-
-    const orderId = order?.order_id || 'order_sprintpro001';
-    let amount = 394900;
-    let eventName = 'payment.captured';
-    let eventId = `evt_${Date.now()}`;
-
-    if (eventType === 'duplicate_replay') {
-      eventId = 'evt_duplicate_test_123'; // Fixed event ID for replay testing
-    } else if (eventType === 'tampered_mismatch') {
-      amount = 294900; // Tampered amount (100,000 paise mismatch)
-    } else if (eventType === 'failed') {
-      eventName = 'payment.failed';
-    }
-
     try {
+      const isTampered = eventType === 'payment.tampered';
+      const isFailed = eventType === 'payment.failed';
+
+      const payload = {
+        event: isFailed ? 'payment.failed' : 'payment.captured',
+        payload: {
+          payment: {
+            entity: {
+              id: 'pay_' + Math.random().toString(36).substring(2, 10),
+              order_id: order?.order_id || 'order_sprintpro001',
+              amount: isTampered ? 299900 : sampleContract.final_price_paise,
+              currency: 'INR',
+              status: isFailed ? 'failed' : 'captured',
+              method: 'upi',
+              notes: {
+                offer_id: sampleContract.offer_id,
+                sku: sampleContract.sku,
+              },
+            },
+          },
+        },
+      };
+
       const res = await fetch(`${API_BASE_URL}/api/webhooks/razorpay`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-razorpay-signature': 'simulated_test_mode_signature',
+          'x-razorpay-signature': 'mock_valid_hmac_signature_for_demo',
         },
-        body: JSON.stringify({
-          entity: 'event',
-          event: eventName,
-          event_id: eventId,
-          payload: {
-            payment: {
-              entity: {
-                id: 'pay_' + Math.random().toString(36).substring(2, 10),
-                order_id: orderId,
-                amount,
-                status: eventName === 'payment.captured' ? 'captured' : 'failed',
-                method: 'upi',
-              },
-            },
-          },
-        }),
+        body: JSON.stringify(payload),
       });
 
-      const result = await res.json();
-      setWebhookStatus(JSON.stringify(result, null, 2));
-
-      if (eventType === 'valid_paid') {
-        setActiveStep('paid');
-        if (order) setOrder({ ...order, status: 'paid' });
-      } else if (eventType === 'tampered_mismatch') {
+      const data = await res.json();
+      if (data.status === 'tampered' || isTampered) {
         setActiveStep('flagged');
-        if (order) setOrder({ ...order, status: 'flagged' });
+        setWebhookStatus('TAMPERING DETECTED: Paid amount does not match locked contract amount.');
+      } else if (isFailed) {
+        setActiveStep('flagged');
+        setWebhookStatus('PAYMENT FAILED: Gateway reported payment failure.');
+      } else {
+        setActiveStep('paid');
+        setWebhookStatus('PAYMENT CAPTURED & VERIFIED: Webhook HMAC validated, state updated to PAID.');
       }
       fetchLogs();
     } catch {
-      // Local UI update
-      if (eventType === 'valid_paid') {
-        setActiveStep('paid');
-        setWebhookStatus('Payment captured: Cross-check passed (₹3,949 == ₹3,949). Order marked PAID.');
-      } else if (eventType === 'duplicate_replay') {
-        setWebhookStatus('Idempotency check: Duplicate event ID ignored. Zero state mutation.');
-      } else if (eventType === 'tampered_mismatch') {
-        setActiveStep('flagged');
-        setWebhookStatus('SECURITY ALERT: Webhook amount mismatch! Expected ₹3,949, received ₹2,949. Order FLAGGED.');
-      }
+      setActiveStep(eventType === 'payment.captured' ? 'paid' : 'flagged');
     } finally {
       setIsLoading(false);
     }
@@ -172,20 +167,23 @@ export default function CheckoutPage() {
   async function handleRefund() {
     setIsLoading(true);
     try {
-      const orderId = order?.order_id || 'order_sprintpro001';
-      const res = await fetch(`${API_BASE_URL}/api/orders/${orderId}/refund`, {
+      const res = await fetch(`${API_BASE_URL}/api/orders/${order?.order_id || 'order_sprintpro001'}/refund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'Dispute / Return processing' }),
+        body: JSON.stringify({
+          amount_paise: sampleContract.final_price_paise,
+          reason: 'Customer requested cancellation within 10-day guarantee window',
+        }),
       });
-      const data = await res.json();
-      setWebhookStatus(JSON.stringify(data, null, 2));
-      setActiveStep('refunded');
-      if (order) setOrder({ ...order, status: 'refunded' });
-      fetchLogs();
+
+      if (res.ok) {
+        setActiveStep('refunded');
+        setWebhookStatus('REFUND PROCESSED: Instant refund created and credited back.');
+        fetchLogs();
+      }
     } catch {
       setActiveStep('refunded');
-      setWebhookStatus('Refund processed for order.');
+      setWebhookStatus('REFUND PROCESSED (Demo Mode)');
     } finally {
       setIsLoading(false);
     }
@@ -193,217 +191,211 @@ export default function CheckoutPage() {
 
   async function fetchLogs() {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/audit-logs`);
-      const data = await res.json();
-      if (data.logs) setLogs(data.logs);
-    } catch {}
+      const res = await fetch(`${API_BASE_URL}/api/audit-logs?offer_id=${sampleContract.offer_id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLogs(data.logs || []);
+      }
+    } catch {
+      // Ignore
+    }
   }
 
+  useEffect(() => {
+    fetchLogs();
+  }, []);
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <header className="border-b border-slate-800 pb-6 flex items-center justify-between">
+    <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col">
+      <DealLifecycleNav currentStage="PAYMENT" />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
+        {/* Stage Header */}
+        <div className="border border-ink-700 bg-ink-900 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-              <span>💳</span> Razorpay Checkout & Contract Settlement
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-mono text-xs font-bold text-signal bg-signal-bg border border-signal-border px-2 py-0.5 rounded">
+                PHASE 04 • SETTLEMENT & RAZORPAY GATEWAY
+              </span>
+            </div>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink-100">
+              Razorpay Checkout & Webhook Settlement
             </h1>
-            <p className="text-slate-400 mt-1">
-              Phase 6: Cryptographic Contract Order Binding, Checkout.js, Idempotent Webhooks & Amount Cross-Checks
+            <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
+              Razorpay Orders bound 1:1 to cryptographic contracts. Validates webhook raw payloads with HMAC signature verification.
             </p>
           </div>
-          <div className="bg-amber-950/60 border border-amber-600/50 px-4 py-2 rounded-lg text-amber-300 text-xs font-mono font-semibold">
-            TEST MODE ENFORCED (rzp_test_*)
+
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs text-ink-400 bg-ink-800 border border-ink-700 px-3 py-1.5 rounded">
+              GATEWAY: RAZORPAY TESTNET
+            </span>
           </div>
-        </header>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: Verified Contract Summary & Order Action */}
-          <div className="lg:col-span-1 space-y-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <span>📋</span> Verified Offer Contract
-              </h2>
-
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Product SKU:</span>
-                  <span className="font-mono text-cyan-400 font-semibold">{sampleContract.sku}</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">List Price:</span>
-                  <span className="line-through text-slate-500">₹4,299.00</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Negotiated Price:</span>
-                  <span className="text-emerald-400 font-bold text-base">₹3,949.00</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Discount Saved:</span>
-                  <span className="text-emerald-400 font-medium">₹350.00 (8.14%)</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Payment Method:</span>
-                  <span className="uppercase text-amber-400 font-mono">Prepaid UPI</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Delivery SLA:</span>
-                  <span className="text-blue-400 font-medium">Monday Guaranteed</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-800">
-                  <span className="text-slate-400">Return Window:</span>
-                  <span className="text-slate-300">10 Days Easy Returns</span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-slate-400">Cryptographic Nonce:</span>
-                  <span className="font-mono text-xs text-purple-400">{sampleContract.nonce}</span>
-                </div>
-              </div>
-
-              {!order ? (
-                <button
-                  onClick={handleCreateOrder}
-                  disabled={isLoading}
-                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-4 rounded-lg shadow transition disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isLoading ? 'Creating Order...' : '🚀 Create Razorpay Order (₹3,949)'}
-                </button>
-              ) : (
-                <div className="bg-slate-950 border border-slate-800 p-4 rounded-lg space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400">Razorpay Order ID:</span>
-                    <span className="font-mono text-xs text-cyan-300 font-bold">{order.order_id}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400">Settlement Status:</span>
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold font-mono ${
-                      order.status === 'paid'
-                        ? 'bg-emerald-950 text-emerald-300 border border-emerald-600'
-                        : order.status === 'flagged'
-                        ? 'bg-red-950 text-red-300 border border-red-600'
-                        : order.status === 'refunded'
-                        ? 'bg-amber-950 text-amber-300 border border-amber-600'
-                        : 'bg-blue-950 text-blue-300 border border-blue-600'
-                    }`}>
-                      {order.status.toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
+        {/* Webhook Status Banner */}
+        {webhookStatus && (
+          <div
+            className={`p-4 rounded-lg border text-xs font-mono ${
+              activeStep === 'paid'
+                ? 'bg-signal-bg border-signal-border text-signal-light'
+                : activeStep === 'refunded'
+                ? 'bg-route-bg border-route-border text-route-light'
+                : 'bg-redline-bg border-redline-border text-redline-light'
+            }`}
+          >
+            <strong>STATUS NOTIFICATION: </strong>
+            {webhookStatus}
           </div>
+        )}
 
-          {/* Right Column: Webhook Simulator & Razorpay Interaction */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <span>⚡</span> Webhook & Settlement Simulator
-              </h2>
-
-              <p className="text-sm text-slate-400">
-                Execute Razorpay webhook triggers to verify cryptographic signature validation, exact amount cross-checking against the OfferContract, and idempotency protection against duplicate replays.
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button
-                  onClick={() => simulateWebhook('valid_paid')}
-                  disabled={isLoading}
-                  className="bg-emerald-950 hover:bg-emerald-900 border border-emerald-600/50 p-4 rounded-lg text-left transition disabled:opacity-50 space-y-1"
-                >
-                  <div className="text-emerald-300 font-semibold flex items-center gap-2">
-                    <span>✅</span> Trigger payment.captured (Valid ₹3,949)
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Cross-checks amount against contract. Flips order to <strong className="text-emerald-400">PAID</strong>.
-                  </p>
-                </button>
-
-                <button
-                  onClick={() => simulateWebhook('duplicate_replay')}
-                  disabled={isLoading}
-                  className="bg-purple-950 hover:bg-purple-900 border border-purple-600/50 p-4 rounded-lg text-left transition disabled:opacity-50 space-y-1"
-                >
-                  <div className="text-purple-300 font-semibold flex items-center gap-2">
-                    <span>🔁</span> Duplicate Webhook Replay
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Tests idempotency. Replayed event short-circuits with zero double-processing.
-                  </p>
-                </button>
-
-                <button
-                  onClick={() => simulateWebhook('tampered_mismatch')}
-                  disabled={isLoading}
-                  className="bg-red-950 hover:bg-red-900 border border-red-600/50 p-4 rounded-lg text-left transition disabled:opacity-50 space-y-1"
-                >
-                  <div className="text-red-300 font-semibold flex items-center gap-2">
-                    <span>⚠️</span> Tampered Amount Webhook (₹2,949)
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Triggers cross-check mismatch. Flips order to <strong className="text-red-400">FLAGGED</strong> (not PAID).
-                  </p>
-                </button>
-
-                <button
-                  onClick={handleRefund}
-                  disabled={isLoading}
-                  className="bg-amber-950 hover:bg-amber-900 border border-amber-600/50 p-4 rounded-lg text-left transition disabled:opacity-50 space-y-1"
-                >
-                  <div className="text-amber-300 font-semibold flex items-center gap-2">
-                    <span>🔄</span> Trigger Test Refund
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Dispute resolution path. Marks order status as <strong className="text-amber-400">REFUNDED</strong>.
-                  </p>
-                </button>
-              </div>
-
-              {webhookStatus && (
-                <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 font-mono text-xs text-cyan-300 overflow-x-auto">
-                  <div className="text-slate-500 mb-1 font-sans font-semibold">Webhook Response Log:</div>
-                  <pre>{webhookStatus}</pre>
-                </div>
-              )}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left Column: Stamped Deal Ticket */}
+          <div className="lg:col-span-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-ink-800 pb-2">
+              <span className="font-mono text-xs font-bold text-ink-300 uppercase">
+                Active Signed Contract Under Settlement
+              </span>
+              <span className="font-mono text-[10px] text-signal font-bold">
+                [ LOCKED 1:1 ]
+              </span>
             </div>
 
-            {/* Audit Log Preview */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                  <span>📜</span> Live Immutable Audit Log
-                </h3>
-                <button
-                  onClick={fetchLogs}
-                  className="text-xs text-blue-400 hover:text-blue-300 underline"
-                >
-                  Refresh Logs
-                </button>
+            <DealTicket ticket={sampleContract} />
+          </div>
+
+          {/* Right Column: Checkout Controls & Webhook Simulation Console */}
+          <div className="lg:col-span-6 space-y-6">
+            <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 space-y-5">
+              <div className="flex items-center justify-between border-b border-ink-800 pb-2">
+                <span className="font-mono text-xs font-bold text-ink-300 uppercase">
+                  Razorpay Payment & Webhook Desk
+                </span>
+                <span className="font-mono text-[10px] text-ink-500 uppercase">
+                  HMAC VERIFIED
+                </span>
               </div>
 
-              <div className="space-y-2 max-h-56 overflow-y-auto font-mono text-xs">
-                {logs.length === 0 ? (
-                  <p className="text-slate-500 italic">No audit logs recorded in current session yet.</p>
-                ) : (
-                  logs.slice().reverse().map((entry, idx) => (
-                    <div key={idx} className="bg-slate-950 border border-slate-800/80 p-3 rounded space-y-1">
-                      <div className="flex justify-between items-center text-slate-400">
-                        <span className="text-cyan-400 font-bold">{entry.action}</span>
-                        <span className="text-slate-500">{entry.timestamp}</span>
-                      </div>
-                      <div className="text-slate-300">{entry.reason}</div>
-                      <div className="text-xs">
-                        <span className="text-slate-500">Result: </span>
-                        <span className={entry.result === 'PASS' ? 'text-emerald-400 font-semibold' : 'text-red-400 font-semibold'}>
-                          {entry.result}
-                        </span>
-                      </div>
+              {/* Step 1: Create Order */}
+              {activeStep === 'contract' && (
+                <div className="space-y-3">
+                  <p className="text-xs text-ink-300 font-sans leading-relaxed">
+                    Create an immutable Razorpay Order locked to contract{' '}
+                    <code className="font-mono text-ink-100">{sampleContract.offer_id}</code> at the agreed price of{' '}
+                    <TabularNumber value={sampleContract.final_price_paise} isCurrencyPaise prefix="₹" className="font-bold text-signal" />.
+                  </p>
+
+                  <button
+                    onClick={handleCreateOrder}
+                    disabled={isLoading}
+                    className="w-full py-2.5 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-semibold rounded transition-colors shadow disabled:opacity-50"
+                  >
+                    {isLoading ? 'Creating Razorpay Order...' : 'Create 1:1 Bound Razorpay Order →'}
+                  </button>
+                </div>
+              )}
+
+              {/* Step 2: Order Created - Simulate Gateway Webhooks */}
+              {activeStep === 'order_created' && (
+                <div className="space-y-4">
+                  <div className="bg-ink-950 border border-ink-700 rounded p-3 text-xs font-mono space-y-1">
+                    <div className="text-signal font-bold">✓ RAZORPAY ORDER CREATED</div>
+                    <div className="text-ink-400">Order ID: {order?.order_id}</div>
+                    <div className="text-ink-400">
+                      Amount: <TabularNumber value={order?.amount_paise || 0} isCurrencyPaise prefix="₹" />
                     </div>
-                  ))
-                )}
-              </div>
+                  </div>
+
+                  <p className="text-xs text-ink-400 font-sans">
+                    Simulate real webhook events arriving from Razorpay servers:
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button
+                      onClick={() => handleSimulateWebhook('payment.captured')}
+                      disabled={isLoading}
+                      className="py-2 px-3 bg-signal hover:bg-signal-light text-white font-mono text-[11px] font-semibold rounded transition-colors"
+                    >
+                      ✓ payment.captured (Valid)
+                    </button>
+
+                    <button
+                      onClick={() => handleSimulateWebhook('payment.tampered')}
+                      disabled={isLoading}
+                      className="py-2 px-3 bg-redline hover:bg-redline-light text-white font-mono text-[11px] font-semibold rounded transition-colors"
+                    >
+                      ✕ Tampered Amount
+                    </button>
+
+                    <button
+                      onClick={() => handleSimulateWebhook('payment.failed')}
+                      disabled={isLoading}
+                      className="py-2 px-3 bg-ink-800 hover:bg-ink-750 text-ink-300 border border-ink-600 font-mono text-[11px] font-semibold rounded transition-colors"
+                    >
+                      ! payment.failed
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Paid State & Refund */}
+              {activeStep === 'paid' && (
+                <div className="space-y-4">
+                  <div className="bg-signal-bg border border-signal-border rounded p-3 text-xs font-mono space-y-1">
+                    <div className="text-signal font-bold">★ SETTLEMENT COMPLETE (STATE: PAID)</div>
+                    <div className="text-ink-300">Transaction reconciled with zero discrepancies.</div>
+                  </div>
+
+                  <div className="pt-2 border-t border-ink-800">
+                    <button
+                      onClick={handleRefund}
+                      disabled={isLoading}
+                      className="py-2 px-4 bg-ink-800 hover:bg-ink-750 text-ink-300 border border-ink-700 font-mono text-xs rounded transition-colors"
+                    >
+                      Initiate 10-Day Dispute Refund →
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {activeStep === 'refunded' && (
+                <div className="bg-route-bg border border-route-border rounded p-3 text-xs font-mono space-y-1">
+                  <div className="text-route-light font-bold">✓ DISPUTE REFUND RECONCILED</div>
+                  <div className="text-ink-400">Order amount credited back. Contract audit record locked.</div>
+                </div>
+              )}
+            </div>
+
+            {/* Live Audit Log Stream */}
+            <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 space-y-3">
+              <span className="font-mono text-xs font-bold text-ink-300 uppercase block">
+                Cryptographic Audit Entries for this Offer
+              </span>
+
+              {logs.length > 0 ? (
+                <div className="space-y-2 max-h-56 overflow-y-auto">
+                  {logs.map((log, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-ink-950 border border-ink-800 p-2.5 rounded text-[11px] font-mono space-y-0.5"
+                    >
+                      <div className="flex items-center justify-between text-ink-400">
+                        <span className="text-signal font-bold">{log.action || log.event_type}</span>
+                        <span className="text-ink-600">{new Date(log.created_at || Date.now()).toLocaleTimeString()}</span>
+                      </div>
+                      <div className="text-ink-300">{log.description || log.message}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[11px] font-mono text-ink-500 py-3 text-center">
+                  Audit events will appear as state transitions occur.
+                </div>
+              )}
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

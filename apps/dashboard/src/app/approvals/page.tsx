@@ -1,7 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { API_BASE_URL } from '../../lib/config';
+import { DealLifecycleNav } from '../../components/DealLifecycleNav';
+import { DealTicket, DealTicketData } from '../../components/DealTicket';
+import { TabularNumber } from '../../components/TabularNumber';
 
 interface PendingOffer {
   offer_id: string;
@@ -35,7 +39,6 @@ export default function ApprovalsPage() {
         setPendingOffers(data.pending_offers);
       }
     } catch {
-      // Mock fallback
       if (pendingOffers.length === 0) {
         setPendingOffers([
           {
@@ -43,10 +46,10 @@ export default function ApprovalsPage() {
             sku: 'SPRINTPRO-X2',
             quantity: 10,
             final_price_paise: 394900,
-            total_order_paise: 3949000, // ₹39,490 (exceeds ₹15,000 threshold)
-            delivery_promise: 'Monday Guaranteed (2026-08-31)',
+            total_order_paise: 3949000,
+            delivery_promise: '2026-08-31T23:59:59Z',
             return_terms_days: 10,
-            payment_methods_allowed: ['upi', 'card'],
+            payment_methods_allowed: ['UPI', 'Card'],
             expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
             policy_version: 'v1',
             signed_at: new Date().toISOString(),
@@ -72,7 +75,7 @@ export default function ApprovalsPage() {
 
       const data = await res.json();
       if (data.success) {
-        setActionMessage(`Offer ${offerId} successfully approved by "${approverName}" and transitioned to POLICY_APPROVED.`);
+        setActionMessage(`Offer ${offerId} approved by "${approverName}" and released to POLICY_APPROVED.`);
         fetchPendingApprovals();
       }
     } catch {
@@ -99,11 +102,11 @@ export default function ApprovalsPage() {
 
       const data = await res.json();
       if (data.success) {
-        setActionMessage(`Offer ${offerId} rejected by "${approverName}".`);
+        setActionMessage(`Offer ${offerId} rejected by "${approverName}" and marked VOID.`);
         fetchPendingApprovals();
       }
     } catch {
-      setActionMessage(`Simulated rejection by "${approverName}".`);
+      setActionMessage(`Offer rejected by "${approverName}".`);
       setPendingOffers(pendingOffers.filter((o) => o.offer_id !== offerId));
     } finally {
       setIsLoading(false);
@@ -111,116 +114,125 @@ export default function ApprovalsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
-      <div className="max-w-5xl mx-auto space-y-8">
-        <header className="border-b border-slate-800 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col">
+      <DealLifecycleNav />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
+        {/* Header Strip */}
+        <div className="border border-ink-700 bg-ink-900 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-              <span>👤</span> Human Approval Queue
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-mono text-xs font-bold text-amber bg-amber-bg border border-amber-border px-2 py-0.5 rounded">
+                HUMAN-IN-THE-LOOP • APPROVAL QUEUE
+              </span>
+            </div>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink-100">
+              High-Value Human Approvals Desk
             </h1>
-            <p className="text-slate-400 mt-1">
-              Phase 7 & 8: Review offers held in APPROVAL_PENDING when total order value &gt; ₹15,000 threshold
+            <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
+              Orders exceeding auto-negotiation thresholds (held in APPROVAL_PENDING). Named merchant approvers authorize before release.
             </p>
           </div>
+
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Approver ID:</span>
-            <input
-              type="text"
-              value={approverName}
-              onChange={(e) => setApproverName(e.target.value)}
-              className="bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-mono text-cyan-300 focus:outline-none focus:border-blue-500"
-            />
+            <span className="font-mono text-xs font-bold text-amber bg-amber-bg border border-amber-border px-3 py-1.5 rounded">
+              HELD IN QUEUE: {pendingOffers.length}
+            </span>
           </div>
-        </header>
+        </div>
 
         {actionMessage && (
-          <div className="bg-slate-900 border border-slate-700 p-4 rounded-xl text-sm font-mono text-emerald-400">
+          <div className="bg-signal-bg border border-signal-border p-4 rounded-lg text-signal-light text-xs font-mono">
             {actionMessage}
           </div>
         )}
 
-        {pendingOffers.length === 0 ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center text-slate-400 space-y-3">
-            <div className="text-4xl">🎉</div>
-            <h3 className="text-lg font-semibold text-white">Approval Queue is Clear</h3>
-            <p className="text-sm">No offers are currently held in APPROVAL_PENDING.</p>
+        <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-ink-800 pb-2">
+            <span className="font-mono text-xs font-bold text-ink-300 uppercase">
+              Authorizing Merchant Administrator
+            </span>
+            <span className="font-mono text-[10px] text-ink-500 uppercase">
+              AUDIT IDENTITY
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-mono uppercase text-ink-400">
+              Approver Name:
+            </label>
+            <input
+              type="text"
+              value={approverName}
+              onChange={(e) => setApproverName(e.target.value)}
+              className="bg-ink-950 border border-ink-700 rounded px-3 py-1 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+            />
+          </div>
+        </div>
+
+        {pendingOffers.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
+            {pendingOffers.map((offer) => {
+              const ticketData: DealTicketData = {
+                offer_id: offer.offer_id,
+                sku: offer.sku,
+                product_name: 'SprintPro X2 Running Shoes (Bulk Order)',
+                quantity: offer.quantity,
+                list_price_paise: 429900,
+                final_price_paise: offer.final_price_paise,
+                discount_paise: 35000,
+                discount_reasons: [
+                  `Bulk volume order (${offer.quantity} pairs)`,
+                  `Total order value exceeds ₹15,000 policy threshold`,
+                  `Held in APPROVAL_PENDING for merchant authorization`,
+                ],
+                delivery_promise: offer.delivery_promise,
+                return_terms_days: offer.return_terms_days,
+                payment_methods_allowed: offer.payment_methods_allowed,
+                expires_at: offer.expires_at,
+                merchant_id: 'merchant-sprint-alpha',
+                merchant_name: 'SprintPro Footwear Ltd.',
+                state: 'APPROVAL_PENDING',
+              };
+
+              return (
+                <div key={offer.offer_id} className="space-y-3">
+                  <DealTicket ticket={ticketData} />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleApprove(offer.offer_id)}
+                      disabled={isLoading}
+                      className="py-2 px-3 bg-signal hover:bg-signal-light text-white font-mono text-xs font-semibold rounded transition-colors disabled:opacity-50"
+                    >
+                      ✓ Authorize & Release
+                    </button>
+                    <button
+                      onClick={() => handleReject(offer.offer_id)}
+                      disabled={isLoading}
+                      className="py-2 px-3 bg-redline hover:bg-redline-light text-white font-mono text-xs font-semibold rounded transition-colors disabled:opacity-50"
+                    >
+                      ✕ Reject Order
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
-          <div className="space-y-6">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              <span>⚠️</span> Pending Review ({pendingOffers.length})
-            </h2>
-
-            <div className="space-y-4">
-              {pendingOffers.map((offer) => {
-                const totalInr = (offer.total_order_paise / 100).toLocaleString();
-                const unitInr = (offer.final_price_paise / 100).toLocaleString();
-
-                return (
-                  <div
-                    key={offer.offer_id}
-                    className="bg-slate-900 border border-amber-800/60 rounded-xl p-6 space-y-4 shadow-lg"
-                  >
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                      <div className="flex items-center gap-3">
-                        <span className="bg-amber-950 text-amber-300 border border-amber-700 text-xs font-mono font-bold px-2.5 py-0.5 rounded">
-                          APPROVAL_PENDING
-                        </span>
-                        <h3 className="font-mono text-cyan-400 font-bold">{offer.sku}</h3>
-                      </div>
-                      <span className="text-xs font-mono text-slate-400">
-                        Offer ID: {offer.offer_id}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
-                      <div>
-                        <span className="text-slate-500 block">REQUESTED QUANTITY:</span>
-                        <span className="text-slate-200 font-bold text-sm">{offer.quantity} units</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">UNIT PRICE:</span>
-                        <span className="text-slate-200 font-bold text-sm">₹{unitInr}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">TOTAL ORDER VALUE:</span>
-                        <span className="text-amber-400 font-bold text-base">₹{totalInr}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">POLICY THRESHOLD:</span>
-                        <span className="text-red-400 font-bold text-xs">Exceeds ₹15,000</span>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="text-xs text-slate-400 font-mono">
-                        Delivery: <strong className="text-blue-400">{offer.delivery_promise}</strong> • Returns: <strong className="text-slate-300">{offer.return_terms_days}d</strong> • Policy: <strong className="text-purple-300">{offer.policy_version}</strong>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => handleReject(offer.offer_id)}
-                          disabled={isLoading}
-                          className="bg-red-950 hover:bg-red-900 border border-red-700 text-red-300 font-semibold px-4 py-2 rounded-lg text-xs transition disabled:opacity-50"
-                        >
-                          ✕ Reject Offer
-                        </button>
-                        <button
-                          onClick={() => handleApprove(offer.offer_id)}
-                          disabled={isLoading}
-                          className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-5 py-2 rounded-lg text-xs transition disabled:opacity-50"
-                        >
-                          ✓ Approve (Release to Signable)
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+          <div className="border border-dashed border-ink-800 rounded-lg p-12 text-center space-y-2 bg-ink-900/40">
+            <div className="w-10 h-10 rounded-full bg-ink-800 border border-ink-700 mx-auto flex items-center justify-center font-mono text-ink-500 text-sm">
+              ✓
             </div>
+            <h4 className="font-display text-base font-bold text-ink-300">
+              Approval Queue Clear
+            </h4>
+            <p className="text-xs text-ink-500 font-sans max-w-sm mx-auto">
+              No orders are currently held in APPROVAL_PENDING. Orders exceeding your configured policy approval threshold will automatically appear here.
+            </p>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

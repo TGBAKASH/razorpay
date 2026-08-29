@@ -1,3 +1,155 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  /* Core Obsidian / Ink Foundation */
+  --color-ink-950: #0B0E14;
+  --color-ink-900: #10141B;
+  --color-ink-850: #141A23;
+  --color-ink-800: #18202C;
+  --color-ink-750: #1E2736;
+  --color-ink-700: #263245;
+  --color-ink-600: #3B4B63;
+  --color-ink-500: #5A6D8B;
+  --color-ink-400: #7E90AC;
+  --color-ink-300: #A8B7CD;
+  --color-ink-200: #CBD5E1;
+  --color-ink-100: #E6EDF6;
+
+  /* Ledger Parchment Paper (Physical Contract Surface) */
+  --color-ledger: #EDEAE0;
+  --color-ledger-surface: #F5F3ED;
+  --color-ledger-border: #D8D4C7;
+  --color-ledger-ink: #10141B;
+  --color-ledger-muted: #5C584E;
+
+  /* Signal Emerald (Profit, Approvals, Closed Deals) */
+  --color-signal: #2E7D5C;
+  --color-signal-light: #3EA67A;
+  --color-signal-bg: #0B1E16;
+  --color-signal-border: #1B4D38;
+
+  /* Amber Mustard (Expiry, Countdowns, Pending Reviews) */
+  --color-amber: #C98A2E;
+  --color-amber-light: #E5A442;
+  --color-amber-bg: #221706;
+  --color-amber-border: #573B12;
+
+  /* Route Steel (Logistics, Carrier SLA, Geography) */
+  --color-route: #4C6B8A;
+  --color-route-light: #648CAE;
+  --color-route-bg: #0F1A24;
+  --color-route-border: #23374A;
+
+  /* Redline Brick (Policy Breaches, Tampering, Stock Race) */
+  --color-redline: #B23A2E;
+  --color-redline-light: #D44E41;
+  --color-redline-bg: #220B08;
+  --color-redline-border: #521812;
+}
+
+@layer base {
+  * {
+    border-color: #232B38;
+  }
+  body {
+    background-color: var(--color-ink-950);
+    color: var(--color-ink-100);
+    font-family: var(--font-plex-sans), sans-serif;
+  }
+  h1, h2, h3, .font-display {
+    font-family: var(--font-fraunces), serif;
+  }
+  .font-mono, .tabular-nums, [data-ticker] {
+    font-family: var(--font-plex-mono), monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Accessible visible focus ring */
+*:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+}
+
+/* Physical Perforated Ticket Styling */
+.ticket-perforated {
+  background-color: var(--color-ledger);
+  color: var(--color-ledger-ink);
+  position: relative;
+  border-radius: 4px;
+}
+
+.ticket-perforated::before,
+.ticket-perforated::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background-size: 12px 6px;
+  background-repeat: repeat-x;
+}
+
+.ticket-perforated::before {
+  top: -3px;
+  background-image: radial-gradient(circle, var(--color-ink-950) 3px, transparent 3px);
+}
+
+.ticket-perforated::after {
+  bottom: -3px;
+  background-image: radial-gradient(circle, var(--color-ink-950) 3px, transparent 3px);
+}
+
+/* Rubber Stamp Micro-Animation */
+@keyframes stampDrop {
+  0% {
+    opacity: 0;
+    transform: scale(2.2) rotate(-24deg);
+  }
+  70% {
+    opacity: 0.95;
+    transform: scale(0.95) rotate(-10deg);
+  }
+  100% {
+    opacity: 0.9;
+    transform: scale(1) rotate(-12deg);
+  }
+}
+
+.animate-stamp-drop {
+  animation: stampDrop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* Typewriter Line Reveal */
+@keyframes typewriterReveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-typewriter-line {
+  animation: typewriterReveal 0.25s ease-out forwards;
+}
+
+/* Respect user's motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-stamp-drop {
+    transform: rotate(-12deg) !important;
+    opacity: 0.9 !important;
+  }
+}

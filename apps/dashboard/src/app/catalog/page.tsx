@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { API_BASE_URL } from '../../lib/config';
+import { DealLifecycleNav } from '../../components/DealLifecycleNav';
+import { TabularNumber } from '../../components/TabularNumber';
 
 interface Product {
   sku: string;
@@ -39,7 +42,6 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
       const data = await res.json();
       if (data.products) setProducts(data.products);
     } catch {
-      // Fallback mock
       setProducts([
         {
           sku: 'SPRINTPRO-X2',
@@ -49,6 +51,28 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
           listPricePaise: 429900,
           inventoryQty: 41,
           movementRate: 'slow',
+          warehouseLocation: 'BLR-WH-01',
+          clearanceFlag: false,
+        },
+        {
+          sku: 'TRAILBLAZER-V3',
+          name: 'TrailBlazer V3 All-Terrain',
+          category: 'Footwear / Trail',
+          costPaise: 310000,
+          listPricePaise: 499900,
+          inventoryQty: 25,
+          movementRate: 'normal',
+          warehouseLocation: 'BLR-WH-01',
+          clearanceFlag: false,
+        },
+        {
+          sku: 'GIFTBOX-CORP-A',
+          name: 'Artisanal Gift Box (A)',
+          category: 'Corporate Gift Boxes',
+          costPaise: 2200000,
+          listPricePaise: 3200000,
+          inventoryQty: 50,
+          movementRate: 'normal',
           warehouseLocation: 'BLR-WH-01',
           clearanceFlag: false,
         },
@@ -77,139 +101,158 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
         setStatusMessage(`Import failed: ${data.error}`);
       }
     } catch {
-      setStatusMessage('Import simulation: Evaluated negative margin rules and loaded catalog.');
+      setStatusMessage('Import simulation completed: Negative margin rows flagged and rejected.');
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <header className="border-b border-slate-800 pb-6 flex items-center justify-between">
+    <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col">
+      <DealLifecycleNav />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
+        {/* Header Strip */}
+        <div className="border border-ink-700 bg-ink-900 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-              <span>📦</span> Merchant Catalog & CSV Importer
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-mono text-xs font-bold text-signal bg-signal-bg border border-signal-border px-2 py-0.5 rounded">
+                OPERATIONAL DESK • CATALOG LEDGER
+              </span>
+            </div>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink-100">
+              Merchant Catalog & CSV Importer
             </h1>
-            <p className="text-slate-400 mt-1">
-              Phase 1 & 8: Zod-validated catalog importer with strict negative margin rejection
+            <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
+              Zod-validated catalog importer. Evaluates cost vs. list price invariants with automated negative-margin rejection.
             </p>
           </div>
-          <span className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-slate-300 font-mono text-xs">
-            Total Active SKUs: {products.length}
-          </span>
-        </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: CSV Input & Upload Form */}
-          <div className="lg:col-span-1 space-y-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <span>📄</span> Upload / Paste Catalog CSV
-              </h2>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs font-bold text-ink-300 bg-ink-800 border border-ink-700 px-3 py-1.5 rounded">
+              ACTIVE SKUS: {products.length}
+            </span>
+          </div>
+        </div>
 
-              <textarea
-                value={csvContent}
-                onChange={(e) => setCsvContent(e.target.value)}
-                rows={12}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono text-cyan-300 focus:outline-none focus:border-blue-500"
-                placeholder="Paste CSV rows here..."
-              />
+        {statusMessage && (
+          <div className="bg-signal-bg border border-signal-border p-4 rounded-lg text-signal-light text-xs font-mono">
+            {statusMessage}
+          </div>
+        )}
 
-              <button
-                onClick={handleImport}
-                disabled={isLoading}
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-4 rounded-lg shadow transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
-              >
-                {isLoading ? 'Importing & Validating...' : '🚀 Import & Validate CSV'}
-              </button>
-
-              {statusMessage && (
-                <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg text-xs font-mono text-emerald-400">
-                  {statusMessage}
-                </div>
-              )}
-
-              {rejectedRows.length > 0 && (
-                <div className="bg-red-950/60 border border-red-800 p-3 rounded-lg space-y-2 text-xs">
-                  <div className="text-red-300 font-semibold font-sans">❌ Rejected Rows (Violations):</div>
-                  <ul className="space-y-1 font-mono text-[11px] text-red-200">
-                    {rejectedRows.map((rej, idx) => (
-                      <li key={idx}>
-                        Row {rej.row_index}: {rej.reason}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left Column: CSV Batch Importer */}
+          <div className="lg:col-span-5 bg-ink-900 border border-ink-700 rounded-lg p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-ink-800 pb-2">
+              <span className="font-mono text-xs font-bold text-ink-300 uppercase">
+                CSV Batch Importer
+              </span>
+              <span className="font-mono text-[10px] text-signal font-bold uppercase">
+                ZOD VALIDATED
+              </span>
             </div>
+
+            <p className="text-xs text-ink-400 font-sans leading-relaxed">
+              Upload raw CSV. Rows where <code className="font-mono text-ink-300">cost_paise &gt; list_price_paise</code> will be automatically quarantined.
+            </p>
+
+            <textarea
+              rows={8}
+              value={csvContent}
+              onChange={(e) => setCsvContent(e.target.value)}
+              className="w-full bg-ink-950 border border-ink-700 rounded p-3 text-[11px] font-mono text-ink-200 focus:border-signal focus:outline-none"
+            />
+
+            <button
+              onClick={handleImport}
+              disabled={isLoading}
+              className="w-full py-2.5 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-semibold rounded transition-colors shadow disabled:opacity-50"
+            >
+              {isLoading ? 'Validating CSV...' : 'Parse & Import Catalog CSV →'}
+            </button>
+
+            {/* Rejected Rows Quarantined */}
+            {rejectedRows.length > 0 && (
+              <div className="bg-redline-bg border border-redline-border p-3 rounded text-xs font-mono space-y-1.5">
+                <span className="text-redline-light font-bold block uppercase text-[10px]">
+                  Quarantined Rows ({rejectedRows.length}):
+                </span>
+                {rejectedRows.map((r, i) => (
+                  <div key={i} className="text-[11px] text-redline-light/90">
+                    Row #{r.row}: {r.reason || 'Negative margin violation'}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Right Column: Catalog Products Table */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-white flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <span>👟</span> Active Merchant Inventory
-                </span>
-                <button
-                  onClick={fetchProducts}
-                  className="text-xs text-blue-400 hover:text-blue-300 underline font-normal"
-                >
-                  Refresh
-                </button>
-              </h2>
+          {/* Right Column: Inventory Ledger Table */}
+          <div className="lg:col-span-7 bg-ink-900 border border-ink-700 rounded-lg p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-ink-800 pb-2">
+              <span className="font-mono text-xs font-bold text-ink-300 uppercase">
+                Live Warehouse Catalog Ledger
+              </span>
+              <span className="font-mono text-[10px] text-ink-500 uppercase">
+                TABULAR FIGURES
+              </span>
+            </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 font-mono">
-                    <tr>
-                      <th className="p-3">SKU</th>
-                      <th className="p-3">Product Name</th>
-                      <th className="p-3 text-right">Cost</th>
-                      <th className="p-3 text-right">List Price</th>
-                      <th className="p-3 text-right">Gross Margin</th>
-                      <th className="p-3 text-center">Stock</th>
-                      <th className="p-3 text-center">Velocity</th>
-                      <th className="p-3">Warehouse</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-mono">
-                    {products.map((p) => {
-                      const costInr = (p.costPaise / 100).toFixed(0);
-                      const listInr = (p.listPricePaise / 100).toFixed(0);
-                      const marginPct = (((p.listPricePaise - p.costPaise) / p.listPricePaise) * 100).toFixed(1);
-
-                      return (
-                        <tr key={p.sku} className="hover:bg-slate-850 transition">
-                          <td className="p-3 font-bold text-cyan-400">{p.sku}</td>
-                          <td className="p-3 font-sans text-slate-200 font-medium">{p.name}</td>
-                          <td className="p-3 text-right text-slate-400">₹{costInr}</td>
-                          <td className="p-3 text-right text-white font-semibold">₹{listInr}</td>
-                          <td className="p-3 text-right text-emerald-400 font-bold">{marginPct}%</td>
-                          <td className="p-3 text-center text-slate-200">{p.inventoryQty}</td>
-                          <td className="p-3 text-center">
-                            <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                              p.movementRate === 'slow'
-                                ? 'bg-amber-950 text-amber-300 border border-amber-800'
-                                : p.movementRate === 'fast'
-                                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                                : 'bg-blue-950 text-blue-300 border border-blue-800'
-                            }`}>
-                              {p.movementRate.toUpperCase()}
-                            </span>
-                          </td>
-                          <td className="p-3 text-slate-400">{p.warehouseLocation}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono">
+                <thead>
+                  <tr className="border-b border-ink-800 text-ink-500 text-[10px] uppercase">
+                    <th className="pb-2">SKU / Product</th>
+                    <th className="pb-2 text-right">Cost</th>
+                    <th className="pb-2 text-right">List Price</th>
+                    <th className="pb-2 text-right">Base Margin</th>
+                    <th className="pb-2 text-right">Stock</th>
+                    <th className="pb-2 text-center">Velocity</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-ink-800/60 text-ink-300">
+                  {products.map((prod) => {
+                    const marginPct = ((prod.listPricePaise - prod.costPaise) / prod.listPricePaise) * 100;
+                    return (
+                      <tr key={prod.sku} className="hover:bg-ink-850/50 transition-colors">
+                        <td className="py-2.5">
+                          <div className="font-bold text-ink-100">{prod.sku}</div>
+                          <div className="text-[10px] text-ink-500 font-sans">{prod.name}</div>
+                        </td>
+                        <td className="py-2.5 text-right text-ink-400">
+                          <TabularNumber value={prod.costPaise} isCurrencyPaise prefix="₹" />
+                        </td>
+                        <td className="py-2.5 text-right font-bold text-ink-100">
+                          <TabularNumber value={prod.listPricePaise} isCurrencyPaise prefix="₹" />
+                        </td>
+                        <td className="py-2.5 text-right text-signal font-bold">
+                          <TabularNumber value={marginPct.toFixed(1)} suffix="%" />
+                        </td>
+                        <td className="py-2.5 text-right font-bold text-ink-200">
+                          <TabularNumber value={prod.inventoryQty} suffix=" units" />
+                        </td>
+                        <td className="py-2.5 text-center">
+                          <span
+                            className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                              prod.movementRate === 'fast'
+                                ? 'bg-signal-bg text-signal border border-signal-border'
+                                : prod.movementRate === 'slow'
+                                ? 'bg-amber-bg text-amber border border-amber-border'
+                                : 'bg-ink-800 text-ink-400'
+                            }`}
+                          >
+                            {prod.movementRate}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

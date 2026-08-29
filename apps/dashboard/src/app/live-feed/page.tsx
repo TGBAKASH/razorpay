@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { API_BASE_URL } from '../../lib/config';
+import { DealLifecycleNav } from '../../components/DealLifecycleNav';
+import { TabularNumber } from '../../components/TabularNumber';
 
 interface LiveFeedItem {
   offer_id: string;
@@ -35,7 +38,6 @@ export default function LiveFeedPage() {
       const data = await res.json();
       if (data.feed) setFeed(data.feed);
     } catch {
-      // Mock fallback
       if (feed.length === 0) {
         setFeed([
           {
@@ -47,7 +49,8 @@ export default function LiveFeedPage() {
             discount_paise: 35000,
             current_state: 'PAID',
             margin_pct: 49.02,
-            explanation: 'DealFlow crafted a personalized offer for SprintPro X2 at ₹3,949 saving ₹350 under active policy v1.',
+            explanation:
+              'DealFlow crafted a personalized offer for SprintPro X2 at ₹3,949 saving ₹350 under active policy v1.',
             created_at: new Date().toISOString(),
             candidates_count: 3,
           },
@@ -57,101 +60,143 @@ export default function LiveFeedPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <header className="border-b border-slate-800 pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col">
+      <DealLifecycleNav />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
+        {/* Header Strip */}
+        <div className="border border-ink-700 bg-ink-900 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-              <span>📡</span> Live Negotiation Feed
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-mono text-xs font-bold text-signal bg-signal-bg border border-signal-border px-2 py-0.5 rounded">
+                TELEMETRY • REAL-TIME DEAL DESK STREAM
+              </span>
+            </div>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink-100">
+              Live Negotiation Feed & Telemetry
             </h1>
-            <p className="text-slate-400 mt-1">
-              Real-time stream of incoming buyer agent requests, multi-candidate scoring, and policy decisions
+            <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
+              Continuous live stream of incoming buyer agent requests, deterministic scoring candidate matrices, and autonomous deal closures.
             </p>
           </div>
+
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsAutoRefresh(!isAutoRefresh)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border transition ${
+              className={`px-3 py-1.5 rounded text-xs font-mono border transition-colors ${
                 isAutoRefresh
-                  ? 'bg-emerald-950 text-emerald-300 border-emerald-600'
-                  : 'bg-slate-900 text-slate-400 border-slate-700'
+                  ? 'bg-signal-bg text-signal-light border-signal-border font-bold'
+                  : 'bg-ink-800 text-ink-400 border-ink-700'
               }`}
             >
-              {isAutoRefresh ? '🟢 Auto-Polling (3s)' : '⏸️ Polling Paused'}
+              {isAutoRefresh ? '● Auto-Polling (3s)' : '○ Polling Paused'}
             </button>
             <button
               onClick={fetchFeed}
-              className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1.5 rounded-lg font-semibold transition"
+              className="py-1.5 px-3 bg-ink-800 hover:bg-ink-750 text-ink-200 border border-ink-600 text-xs font-mono rounded transition-colors"
             >
-              Refresh Now
+              ↻ Refresh Ticker
             </button>
           </div>
-        </header>
+        </div>
 
         {feed.length === 0 ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center text-slate-400">
-            No active negotiations yet. Submit a query from the Buyer Agent Simulator to populate the live feed!
+          <div className="border border-dashed border-ink-800 rounded-lg p-12 text-center space-y-2 bg-ink-900/40">
+            <div className="w-10 h-10 rounded-full bg-ink-800 border border-ink-700 mx-auto flex items-center justify-center font-mono text-ink-500 text-sm">
+              📡
+            </div>
+            <h4 className="font-display text-base font-bold text-ink-300">
+              Waiting for Live Deal Stream
+            </h4>
+            <p className="text-xs text-ink-500 font-sans max-w-sm mx-auto">
+              No active negotiations recorded in current session. Launch an agent from the Simulator to populate live telemetry.
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
             {feed.map((item, idx) => (
               <div
                 key={item.offer_id || idx}
-                className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4 hover:border-slate-700 transition"
+                className="bg-ink-900 border border-ink-700 rounded-lg p-5 space-y-3"
               >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-white text-base">{item.category}</span>
-                    <span className="bg-slate-800 text-cyan-300 text-xs font-mono px-2 py-0.5 rounded">
-                      {item.buyer_agent_id}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink-800 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-ink-100">
+                      OFFER #{item.offer_id ? item.offer_id.slice(0, 8).toUpperCase() : '00000000'}
                     </span>
+                    <span className="text-ink-600 font-mono">•</span>
+                    <span className="text-xs text-ink-400 font-sans">{item.category}</span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold ${
-                      item.current_state === 'PAID'
-                        ? 'bg-emerald-950 text-emerald-300 border border-emerald-600'
-                        : item.current_state === 'APPROVAL_PENDING'
-                        ? 'bg-amber-950 text-amber-300 border border-amber-600'
-                        : item.current_state === 'FLAGGED'
-                        ? 'bg-red-950 text-red-300 border border-red-600'
-                        : 'bg-blue-950 text-blue-300 border border-blue-600'
-                    }`}>
+
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                        item.current_state === 'PAID'
+                          ? 'bg-signal-bg border-signal-border text-signal-light'
+                          : 'bg-amber-bg border-amber-border text-amber-light'
+                      }`}
+                    >
                       {item.current_state}
                     </span>
-                    <span className="text-xs text-slate-500 font-mono">{item.created_at}</span>
+                    <span className="font-mono text-[10px] text-ink-500">
+                      {new Date(item.created_at).toLocaleTimeString()}
+                    </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
+                {/* Ticker Metrics Strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-ink-950 p-3 rounded border border-ink-800 text-xs font-mono">
                   <div>
-                    <span className="text-slate-500 block">BUYER BUDGET:</span>
-                    <span className="text-slate-200 font-bold">₹{(item.budget_max_paise / 100).toLocaleString()}</span>
+                    <span className="text-ink-500 block text-[10px] uppercase">Buyer Ceiling</span>
+                    <TabularNumber
+                      value={item.budget_max_paise}
+                      isCurrencyPaise
+                      prefix="₹"
+                      className="text-ink-300 font-bold"
+                    />
                   </div>
+
                   <div>
-                    <span className="text-slate-500 block">SETTLED PRICE:</span>
-                    <span className="text-emerald-400 font-bold text-sm">₹{(item.winning_price_paise / 100).toLocaleString()}</span>
+                    <span className="text-ink-500 block text-[10px] uppercase">Agreed Settlement</span>
+                    <TabularNumber
+                      value={item.winning_price_paise}
+                      isCurrencyPaise
+                      prefix="₹"
+                      className="text-signal-light font-bold"
+                    />
                   </div>
+
                   <div>
-                    <span className="text-slate-500 block">DISCOUNT SAVINGS:</span>
-                    <span className="text-amber-300 font-bold">₹{(item.discount_paise / 100).toLocaleString()}</span>
+                    <span className="text-ink-500 block text-[10px] uppercase">Discount Given</span>
+                    <TabularNumber
+                      value={item.discount_paise}
+                      isCurrencyPaise
+                      prefix="- ₹"
+                      className="text-amber font-bold"
+                    />
                   </div>
+
                   <div>
-                    <span className="text-slate-500 block">RETAINED PROFIT MARGIN:</span>
-                    <span className="text-purple-300 font-bold">{item.margin_pct?.toFixed(1) || '32.9'}%</span>
+                    <span className="text-ink-500 block text-[10px] uppercase">Gross Margin</span>
+                    <TabularNumber
+                      value={item.margin_pct.toFixed(1)}
+                      suffix="%"
+                      className="text-signal font-bold"
+                    />
                   </div>
                 </div>
 
-                <div className="bg-slate-950 border border-slate-800/80 rounded-lg p-3 text-xs text-slate-300">
-                  <span className="text-slate-500 font-sans font-semibold uppercase tracking-wider block mb-1">
-                    Deterministic Decision Rationale ({item.candidates_count} Candidates Evaluated):
-                  </span>
-                  {item.explanation}
-                </div>
+                {/* Plain English Summary */}
+                {item.explanation && (
+                  <p className="text-xs text-ink-300 font-sans leading-relaxed">
+                    {item.explanation}
+                  </p>
+                )}
               </div>
             ))}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
