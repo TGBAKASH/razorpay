@@ -426,7 +426,7 @@ export function scoreCandidateOffer(
     conversionProbability += 0.20;
   }
 
-  const isPrepaid = candidate.payment_methods_allowed.some((m) =>
+  const isPrepaid = candidate.payment_methods_allowed.some((m: string) =>
     ['upi', 'card'].includes(m.toLowerCase())
   );
   if (isPrepaid) {
@@ -486,7 +486,7 @@ Return Terms: ${winningCandidate.return_terms_days} days
 Payment Method: ${winningCandidate.payment_methods_allowed.join(', ')}
 Expiry: ${expiryMinutes} minutes
 Reasons:
-${winningCandidate.discount_reason?.map((r) => `- ${r}`).join('\n')}
+${winningCandidate.discount_reason?.map((r: string) => `- ${r}`).join('\n')}
 
 STRICT INSTRUCTION:
 Write a single concise, professional, plain-English paragraph summarizing why this offer was generated.
@@ -516,7 +516,7 @@ CRITICAL MANDATE: You MUST NOT invent, alter, or suggest any new numbers, prices
   }
 
   const reasonsText = winningCandidate.discount_reason
-    ? winningCandidate.discount_reason.map((r, i) => `(${i + 1}) ${r}`).join(', ')
+    ? winningCandidate.discount_reason.map((r: string, i: number) => `(${i + 1}) ${r}`).join(', ')
     : 'standard policy rules';
 
   return `DealFlow crafted a personalized offer for ${productName} at ₹${priceInr} (₹${discountInr} discount from ₹${listInr} list price) with guaranteed delivery, ${winningCandidate.return_terms_days}-day returns, and an ${expiryMinutes}-minute validity window. This offer is approved under merchant policy based on: ${reasonsText}.`;

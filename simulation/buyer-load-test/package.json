@@ -14,11 +14,9 @@
   },
   "dependencies": {
     "@razorpay-dealflow/adapters": "^0.1.0",
-    "@razorpay-dealflow/policy-engine": "^0.1.0",
+    "@razorpay-dealflow/contract-service": "^0.1.0",
     "@razorpay-dealflow/offer-engine": "^0.1.0",
-    "@razorpay-dealflow/contract-service": "^0.1.0"
-  },
-  "devDependencies": {
+    "@razorpay-dealflow/policy-engine": "^0.1.0",
     "@types/node": "^22.13.4",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3"

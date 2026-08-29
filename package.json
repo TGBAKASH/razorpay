@@ -9,7 +9,8 @@
     "simulation/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build --workspace=@razorpay-dealflow/adapters && npm run build --workspace=@razorpay-dealflow/policy-engine && npm run build --workspace=@razorpay-dealflow/contract-service && npm run build --workspace=@razorpay-dealflow/razorpay-client && npm run build --workspace=@razorpay-dealflow/offer-engine && npm run build --workspace=@razorpay-dealflow/buyer-load-test && npm run build --workspace=@razorpay-dealflow/api",
+    "build:all": "npm run build && npm run build --workspace=@razorpay-dealflow/dashboard",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "npm run lint --workspaces --if-present",
@@ -26,13 +27,15 @@
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
-  "devDependencies": {
+  "dependencies": {
     "@prisma/client": "^6.4.1",
     "@types/node": "^22.13.4",
-    "eslint": "^9.20.1",
     "prisma": "^6.4.1",
     "tsx": "^4.19.3",
-    "typescript": "^5.7.3",
+    "typescript": "^5.7.3"
+  },
+  "devDependencies": {
+    "eslint": "^9.20.1",
     "vitest": "^3.0.5"
   }
 }

@@ -18,10 +18,8 @@
   "dependencies": {
     "@razorpay-dealflow/adapters": "*",
     "@razorpay-dealflow/policy-engine": "*",
-    "zod": "^3.24.2"
-  },
-  "devDependencies": {
     "@types/node": "^22.13.4",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "zod": "^3.24.2"
   }
 }

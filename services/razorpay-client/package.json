@@ -17,10 +17,8 @@
   },
   "dependencies": {
     "@razorpay-dealflow/contract-service": "*",
-    "razorpay": "^2.9.5"
-  },
-  "devDependencies": {
     "@types/node": "^22.13.4",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "zod": "^3.24.2"
   }
 }
