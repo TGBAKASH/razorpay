@@ -242,7 +242,7 @@ export function runDualPathSimulation(
     const candidates = generateCandidateOffers(req.buyer_constraints, product, policy, inventory, now);
 
     // 2. Pure Deterministic Policy Verification
-    const validScoredCandidates = [];
+    const validScoredCandidates: Array<ReturnType<typeof scoreCandidateOffer>> = [];
     for (const candidate of candidates) {
       const evaluation = evaluateAllPolicies(candidate, policy, product, inventory, now);
       if (evaluation.pass) {
