@@ -5,7 +5,7 @@ import { TabularNumber } from '../components/TabularNumber';
 import { DealTicket, DealTicketData } from '../components/DealTicket';
 import { DealLifecycleNav } from '../components/DealLifecycleNav';
 
-describe('apps/dashboard - Visual Identity & Core Components', () => {
+describe('apps/dashboard - 5 Canonical Views & Stepper Stepper Navigation', () => {
   it('renders TabularNumber with strict tabular-nums and INR currency formatting', () => {
     const html = renderToString(
       React.createElement(TabularNumber, {
@@ -50,17 +50,32 @@ describe('apps/dashboard - Visual Identity & Core Components', () => {
     expect(html).toContain('HMAC-SHA256');
   });
 
-  it('renders DealLifecycleNav with all 5 lifecycle spine phases', () => {
+  it('renders DealLifecycleNav with all 6 exact deal lifecycle states', () => {
     const html = renderToString(
       React.createElement(DealLifecycleNav, {
-        currentStage: 'REQUEST',
+        currentStage: 'REQUEST_RECEIVED',
       })
     );
 
-    expect(html).toContain('Intent / Request');
-    expect(html).toContain('Auction / Policy');
-    expect(html).toContain('Signed Contract');
-    expect(html).toContain('Razorpay Settlement');
-    expect(html).toContain('Audit Log &amp; State');
+    expect(html).toContain('REQUEST_RECEIVED');
+    expect(html).toContain('OFFER_GENERATED');
+    expect(html).toContain('POLICY_APPROVED');
+    expect(html).toContain('OFFER_ACCEPTED');
+    expect(html).toContain('ORDER_CREATED');
+    expect(html).toContain('PAID');
+  });
+
+  it('renders the 5 canonical route links in DealLifecycleNav', () => {
+    const html = renderToString(
+      React.createElement(DealLifecycleNav, {
+        currentStage: 'REQUEST_RECEIVED',
+      })
+    );
+
+    expect(html).toContain('01 Overview');
+    expect(html).toContain('02 Merchant Console');
+    expect(html).toContain('03 Deal Room');
+    expect(html).toContain('04 Contract &amp; Checkout');
+    expect(html).toContain('05 Audit Ledger');
   });
 });

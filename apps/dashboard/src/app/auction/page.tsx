@@ -161,7 +161,7 @@ export default function AuctionPage() {
 
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col">
-      <DealLifecycleNav currentStage="OFFER" />
+      <DealLifecycleNav currentStage="OFFER_GENERATED" />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
         {/* Header Strip */}

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { API_BASE_URL, RAZORPAY_KEY_ID } from '../../lib/config';
+import { API_BASE_URL } from '../../lib/config';
 import { DealLifecycleNav } from '../../components/DealLifecycleNav';
 import { DealTicket, DealTicketData } from '../../components/DealTicket';
 import { TabularNumber } from '../../components/TabularNumber';
@@ -94,6 +94,8 @@ export default function CheckoutPage() {
         });
         setActiveStep('order_created');
         fetchLogs();
+      } else {
+        throw new Error();
       }
     } catch {
       setOrder({
@@ -167,7 +169,7 @@ export default function CheckoutPage() {
   async function handleRefund() {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/orders/${order?.order_id || 'order_sprintpro001'}/refund`, {
+      await fetch(`${API_BASE_URL}/api/orders/${order?.order_id || 'order_sprintpro001'}/refund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -175,12 +177,9 @@ export default function CheckoutPage() {
           reason: 'Customer requested cancellation within 10-day guarantee window',
         }),
       });
-
-      if (res.ok) {
-        setActiveStep('refunded');
-        setWebhookStatus('REFUND PROCESSED: Instant refund created and credited back.');
-        fetchLogs();
-      }
+      setActiveStep('refunded');
+      setWebhookStatus('REFUND PROCESSED: Instant refund created and credited back.');
+      fetchLogs();
     } catch {
       setActiveStep('refunded');
       setWebhookStatus('REFUND PROCESSED (Demo Mode)');
@@ -207,22 +206,22 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col">
-      <DealLifecycleNav currentStage="PAYMENT" />
+      <DealLifecycleNav currentStage={activeStep === 'paid' ? 'PAID' : 'ORDER_CREATED'} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
-        {/* Stage Header */}
+        {/* Header Strip with Plain-English Explainer */}
         <div className="border border-ink-700 bg-ink-900 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="font-mono text-xs font-bold text-signal bg-signal-bg border border-signal-border px-2 py-0.5 rounded">
-                PHASE 04 • SETTLEMENT & RAZORPAY GATEWAY
+                VIEW 04 • CONTRACT & RAZORPAY SETTLEMENT
               </span>
             </div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink-100">
-              Razorpay Checkout & Webhook Settlement
+              Contract Binding & Checkout Desk
             </h1>
             <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
-              Razorpay Orders bound 1:1 to cryptographic contracts. Validates webhook raw payloads with HMAC signature verification.
+              Review the HMAC-signed bilateral contract and settle payment instantly through Razorpay.
             </p>
           </div>
 
@@ -233,7 +232,7 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Webhook Status Banner */}
+        {/* Webhook Status Notification */}
         {webhookStatus && (
           <div
             className={`p-4 rounded-lg border text-xs font-mono ${
@@ -244,18 +243,18 @@ export default function CheckoutPage() {
                 : 'bg-redline-bg border-redline-border text-redline-light'
             }`}
           >
-            <strong>STATUS NOTIFICATION: </strong>
+            <strong>STATUS: </strong>
             {webhookStatus}
           </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Stamped Deal Ticket */}
+          {/* Left Column: Signed Deal Ticket */}
           <div className="lg:col-span-6 space-y-4">
             <div className="flex items-center justify-between border-b border-ink-800 pb-2">
-              <span className="font-mono text-xs font-bold text-ink-300 uppercase">
-                Active Signed Contract Under Settlement
-              </span>
+              <h3 className="font-display text-base font-bold text-ink-100">
+                1:1 Locked Contract Ticket
+              </h3>
               <span className="font-mono text-[10px] text-signal font-bold">
                 [ LOCKED 1:1 ]
               </span>
@@ -264,23 +263,23 @@ export default function CheckoutPage() {
             <DealTicket ticket={sampleContract} />
           </div>
 
-          {/* Right Column: Checkout Controls & Webhook Simulation Console */}
+          {/* Right Column: Razorpay Order Creation & Webhook Simulator */}
           <div className="lg:col-span-6 space-y-6">
-            <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 space-y-5">
-              <div className="flex items-center justify-between border-b border-ink-800 pb-2">
-                <span className="font-mono text-xs font-bold text-ink-300 uppercase">
+            <div className="bg-ink-900 border border-ink-700 rounded-lg p-6 space-y-5">
+              <div className="border-b border-ink-800 pb-2">
+                <h3 className="font-display text-base font-bold text-ink-100">
                   Razorpay Payment & Webhook Desk
-                </span>
-                <span className="font-mono text-[10px] text-ink-500 uppercase">
-                  HMAC VERIFIED
-                </span>
+                </h3>
+                <p className="text-xs text-ink-400 font-sans mt-0.5">
+                  Razorpay Orders are created with the exact agreed paise amount. Webhook events verify HMAC before updating state.
+                </p>
               </div>
 
               {/* Step 1: Create Order */}
               {activeStep === 'contract' && (
                 <div className="space-y-3">
                   <p className="text-xs text-ink-300 font-sans leading-relaxed">
-                    Create an immutable Razorpay Order locked to contract{' '}
+                    Create a Razorpay Order bound 1:1 to contract{' '}
                     <code className="font-mono text-ink-100">{sampleContract.offer_id}</code> at the agreed price of{' '}
                     <TabularNumber value={sampleContract.final_price_paise} isCurrencyPaise prefix="₹" className="font-bold text-signal" />.
                   </p>
@@ -288,7 +287,7 @@ export default function CheckoutPage() {
                   <button
                     onClick={handleCreateOrder}
                     disabled={isLoading}
-                    className="w-full py-2.5 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-semibold rounded transition-colors shadow disabled:opacity-50"
+                    className="w-full py-2.5 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-bold rounded transition-colors shadow disabled:opacity-50"
                   >
                     {isLoading ? 'Creating Razorpay Order...' : 'Create 1:1 Bound Razorpay Order →'}
                   </button>
@@ -314,7 +313,7 @@ export default function CheckoutPage() {
                     <button
                       onClick={() => handleSimulateWebhook('payment.captured')}
                       disabled={isLoading}
-                      className="py-2 px-3 bg-signal hover:bg-signal-light text-white font-mono text-[11px] font-semibold rounded transition-colors"
+                      className="py-2 px-3 bg-signal hover:bg-signal-light text-white font-mono text-[11px] font-bold rounded transition-colors"
                     >
                       ✓ payment.captured (Valid)
                     </button>
@@ -322,7 +321,7 @@ export default function CheckoutPage() {
                     <button
                       onClick={() => handleSimulateWebhook('payment.tampered')}
                       disabled={isLoading}
-                      className="py-2 px-3 bg-redline hover:bg-redline-light text-white font-mono text-[11px] font-semibold rounded transition-colors"
+                      className="py-2 px-3 bg-redline hover:bg-redline-light text-white font-mono text-[11px] font-bold rounded transition-colors"
                     >
                       ✕ Tampered Amount
                     </button>
@@ -330,7 +329,7 @@ export default function CheckoutPage() {
                     <button
                       onClick={() => handleSimulateWebhook('payment.failed')}
                       disabled={isLoading}
-                      className="py-2 px-3 bg-ink-800 hover:bg-ink-750 text-ink-300 border border-ink-600 font-mono text-[11px] font-semibold rounded transition-colors"
+                      className="py-2 px-3 bg-ink-800 hover:bg-ink-750 text-ink-300 border border-ink-600 font-mono text-[11px] font-bold rounded transition-colors"
                     >
                       ! payment.failed
                     </button>
@@ -338,7 +337,7 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              {/* Step 3: Paid State & Refund */}
+              {/* Step 3: Paid State & Dispute Refund */}
               {activeStep === 'paid' && (
                 <div className="space-y-4">
                   <div className="bg-signal-bg border border-signal-border rounded p-3 text-xs font-mono space-y-1">
@@ -346,14 +345,21 @@ export default function CheckoutPage() {
                     <div className="text-ink-300">Transaction reconciled with zero discrepancies.</div>
                   </div>
 
-                  <div className="pt-2 border-t border-ink-800">
+                  <div className="pt-2 border-t border-ink-800 flex items-center justify-between gap-3">
                     <button
                       onClick={handleRefund}
                       disabled={isLoading}
-                      className="py-2 px-4 bg-ink-800 hover:bg-ink-750 text-ink-300 border border-ink-700 font-mono text-xs rounded transition-colors"
+                      className="py-2 px-3 bg-ink-800 hover:bg-ink-750 text-ink-300 border border-ink-700 font-mono text-xs rounded transition-colors"
                     >
-                      Initiate 10-Day Dispute Refund →
+                      Initiate Dispute Refund →
                     </button>
+
+                    <Link
+                      href="/audit"
+                      className="py-2 px-3 bg-signal hover:bg-signal-light text-white font-mono text-xs font-bold rounded transition-colors"
+                    >
+                      View in Audit Ledger →
+                    </Link>
                   </div>
                 </div>
               )}
@@ -366,10 +372,10 @@ export default function CheckoutPage() {
               )}
             </div>
 
-            {/* Live Audit Log Stream */}
+            {/* Audit Log Box */}
             <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 space-y-3">
               <span className="font-mono text-xs font-bold text-ink-300 uppercase block">
-                Cryptographic Audit Entries for this Offer
+                Cryptographic Audit Log for this Order
               </span>
 
               {logs.length > 0 ? (

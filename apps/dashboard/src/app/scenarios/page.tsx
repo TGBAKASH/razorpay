@@ -104,7 +104,6 @@ export default function ScenariosPage() {
       const data = await res.json();
       setResults((prev) => ({ ...prev, [id]: data }));
     } catch {
-      // Mock fallback result
       const target = SCENARIOS.find((s) => s.id === id)!;
       setResults((prev) => ({
         ...prev,
@@ -143,22 +142,22 @@ export default function ScenariosPage() {
 
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col">
-      <DealLifecycleNav currentStage="CONTRACT" />
+      <DealLifecycleNav />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
-        {/* Header Strip */}
+        {/* Header Strip with Plain-English Explainer */}
         <div className="border border-ink-700 bg-ink-900 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="font-mono text-xs font-bold text-signal bg-signal-bg border border-signal-border px-2 py-0.5 rounded">
-                PHASE 03 • FAILURE MODES & INVARIANT TESTBED
+                VIEW 06 • INVARIANT TESTBED & FAILURE MODES
               </span>
             </div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink-100">
               Interactive Invariant Verification Desk
             </h1>
             <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
-              Trigger all 8 edge cases live. Proves that DealFlow fails cleanly, protects buyer mandates, catches tampering, and maintains zero state corruption.
+              Trigger 8 live edge-case scenarios to verify that DealFlow rejects tampering, catches inventory races, and respects buyer mandates.
             </p>
           </div>
 
@@ -166,7 +165,7 @@ export default function ScenariosPage() {
             <button
               onClick={triggerAllScenarios}
               disabled={batchLoading}
-              className="py-2 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-semibold rounded transition-colors shadow disabled:opacity-50"
+              className="py-2 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-bold rounded transition-colors shadow disabled:opacity-50"
             >
               {batchLoading ? 'Triggering All 8 Stations...' : 'Run All 8 Invariant Tests →'}
             </button>
@@ -212,7 +211,6 @@ export default function ScenariosPage() {
                     {scenario.description}
                   </p>
 
-                  {/* Expected Invariant */}
                   <div className="bg-ink-950 border border-ink-800 rounded p-2.5 mt-3 text-[11px] font-mono text-ink-400 space-y-1">
                     <span className="text-ink-500 uppercase block text-[9px] font-bold">
                       Guaranteed System Invariant:
@@ -221,7 +219,6 @@ export default function ScenariosPage() {
                   </div>
                 </div>
 
-                {/* Result & Actions */}
                 <div className="space-y-3 pt-3 border-t border-ink-800">
                   {result && (
                     <div className="bg-ink-950 p-3 rounded text-xs font-mono space-y-1.5 border border-ink-800">
@@ -253,7 +250,7 @@ export default function ScenariosPage() {
                   <button
                     onClick={() => triggerScenario(scenario.id)}
                     disabled={isLoading || batchLoading}
-                    className="w-full py-2 px-3 bg-ink-800 hover:bg-ink-750 text-ink-100 border border-ink-600 font-mono text-xs font-semibold rounded transition-colors disabled:opacity-50"
+                    className="w-full py-2 px-3 bg-ink-800 hover:bg-ink-750 text-ink-100 border border-ink-600 font-mono text-xs font-bold rounded transition-colors disabled:opacity-50"
                   >
                     {isLoading ? 'Executing Scenario...' : 'Trigger Scenario Test →'}
                   </button>

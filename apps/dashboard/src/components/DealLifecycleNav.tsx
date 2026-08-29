@@ -4,64 +4,92 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+export type LifecycleStage =
+  | 'REQUEST_RECEIVED'
+  | 'OFFER_GENERATED'
+  | 'POLICY_APPROVED'
+  | 'OFFER_ACCEPTED'
+  | 'ORDER_CREATED'
+  | 'PAID';
+
 interface DealLifecycleNavProps {
-  currentStage?: 'REQUEST' | 'OFFER' | 'CONTRACT' | 'PAYMENT' | 'AUDIT';
+  currentStage?: LifecycleStage;
 }
 
 export function DealLifecycleNav({ currentStage }: DealLifecycleNavProps) {
   const pathname = usePathname();
+  const currentPath = pathname || '/';
 
-  const lifecycleStages = [
+  // Primary 5 Canonical App Routes
+  const mainRoutes = [
+    { label: '01 Overview', href: '/' },
+    { label: '02 Merchant Console', href: '/merchant-console' },
+    { label: '03 Deal Room', href: '/deal-room' },
+    { label: '04 Contract & Checkout', href: '/checkout' },
+    { label: '05 Audit Ledger', href: '/audit' },
+    { label: '06 Invariant Testbed', href: '/scenarios' },
+  ];
+
+  // The 6 Exact Deal Lifecycle States (The Living Stepper)
+  const lifecycleStates: { id: LifecycleStage; number: string; label: string; href: string }[] = [
     {
-      id: 'REQUEST',
+      id: 'REQUEST_RECEIVED',
       number: '01',
-      label: 'Intent / Request',
-      href: '/simulator',
-      activePaths: ['/simulator'],
+      label: 'REQUEST_RECEIVED',
+      href: '/deal-room',
     },
     {
-      id: 'OFFER',
+      id: 'OFFER_GENERATED',
       number: '02',
-      label: 'Auction / Policy',
-      href: '/auction',
-      activePaths: ['/auction'],
+      label: 'OFFER_GENERATED',
+      href: '/deal-room',
     },
     {
-      id: 'CONTRACT',
+      id: 'POLICY_APPROVED',
       number: '03',
-      label: 'Signed Contract',
-      href: '/scenarios',
-      activePaths: ['/scenarios'],
+      label: 'POLICY_APPROVED',
+      href: '/merchant-console',
     },
     {
-      id: 'PAYMENT',
+      id: 'OFFER_ACCEPTED',
       number: '04',
-      label: 'Razorpay Settlement',
+      label: 'OFFER_ACCEPTED',
       href: '/checkout',
-      activePaths: ['/checkout'],
     },
     {
-      id: 'AUDIT',
+      id: 'ORDER_CREATED',
       number: '05',
-      label: 'Audit Log & State',
+      label: 'ORDER_CREATED',
+      href: '/checkout',
+    },
+    {
+      id: 'PAID',
+      number: '06',
+      label: 'PAID',
       href: '/audit',
-      activePaths: ['/audit'],
     },
   ];
 
-  const operationalTools = [
-    { label: 'Catalog Ledger', href: '/catalog' },
-    { label: 'Policy Matrix', href: '/policy' },
-    { label: 'Approvals Queue', href: '/approvals' },
-    { label: 'Live Deal Ticker', href: '/live-feed' },
-    { label: 'Demo Controls', href: '/scenarios' },
-  ];
+  // Determine which lifecycle stage to highlight based on path if not explicitly provided
+  const derivedStage: LifecycleStage =
+    currentStage ||
+    (currentPath === '/'
+      ? 'REQUEST_RECEIVED'
+      : currentPath.startsWith('/merchant-console') || currentPath.startsWith('/policy') || currentPath.startsWith('/catalog')
+      ? 'POLICY_APPROVED'
+      : currentPath.startsWith('/deal-room') || currentPath.startsWith('/simulator') || currentPath.startsWith('/auction')
+      ? 'OFFER_GENERATED'
+      : currentPath.startsWith('/checkout')
+      ? 'ORDER_CREATED'
+      : currentPath.startsWith('/audit')
+      ? 'PAID'
+      : 'OFFER_GENERATED');
 
   return (
-    <header className="w-full bg-ink-900 border-b border-ink-700 select-none">
-      {/* Top Header Bar */}
+    <header className="w-full bg-ink-900 border-b border-ink-700 select-none sticky top-0 z-40 shadow-md">
+      {/* Top Main Navigation Bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
-        {/* Brand & Protocol Tag */}
+        {/* Brand */}
         <Link href="/" className="flex items-center gap-3 group">
           <div className="w-8 h-8 rounded bg-ink-800 border border-ink-700 flex items-center justify-center font-display font-black text-signal text-lg shadow-sm group-hover:border-signal transition-colors">
             DF
@@ -71,8 +99,8 @@ export function DealLifecycleNav({ currentStage }: DealLifecycleNavProps) {
               <span className="font-display font-bold text-ink-100 tracking-tight text-base group-hover:text-signal-light transition-colors">
                 Razorpay DealFlow
               </span>
-              <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-signal-bg text-signal border border-signal-border">
-                Protocol v1.0
+              <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-signal-bg text-signal border border-signal-border font-bold">
+                Live Protocol
               </span>
             </div>
             <span className="text-[11px] font-sans text-ink-400 block -mt-0.5">
@@ -81,67 +109,77 @@ export function DealLifecycleNav({ currentStage }: DealLifecycleNavProps) {
           </div>
         </Link>
 
-        {/* Operational Tools Navigation */}
-        <nav className="flex items-center gap-1 sm:gap-2 flex-wrap">
-          {operationalTools.map((tool) => {
-            const isActive = pathname === tool.href;
+        {/* Canonical Routes Tabs */}
+        <nav className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+          {mainRoutes.map((route) => {
+            const isActive =
+              currentPath === route.href ||
+              (route.href === '/merchant-console' &&
+                (currentPath.startsWith('/policy') || currentPath.startsWith('/catalog') || currentPath.startsWith('/approvals'))) ||
+              (route.href === '/deal-room' &&
+                (currentPath.startsWith('/simulator') || currentPath.startsWith('/auction')));
+
             return (
               <Link
-                key={tool.href}
-                href={tool.href}
-                className={`text-xs font-medium px-2.5 py-1 rounded transition-colors ${
+                key={route.href}
+                href={route.href}
+                className={`text-xs font-mono font-medium px-3 py-1.5 rounded transition-colors ${
                   isActive
-                    ? 'bg-ink-800 text-ink-100 border border-ink-600'
+                    ? 'bg-ink-800 text-ink-100 border border-ink-600 font-bold shadow-sm'
                     : 'text-ink-400 hover:text-ink-200 hover:bg-ink-850'
                 }`}
               >
-                {tool.label}
+                {route.label}
               </Link>
             );
           })}
         </nav>
       </div>
 
-      {/* Primary Deal Lifecycle Spine */}
-      <div className="bg-ink-950 border-t border-ink-800 overflow-x-auto scrollbar-none">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between min-w-[700px]">
-          {lifecycleStages.map((stage, idx) => {
-            const isCurrent =
-              currentStage === stage.id ||
-              stage.activePaths.some((p) => pathname?.startsWith(p));
+      {/* The Persistent 6-Stage Deal Lifecycle Stepper */}
+      <div className="bg-ink-950 border-t border-ink-800 overflow-x-auto scrollbar-none py-1.5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between min-w-[860px]">
+          <span className="text-[10px] font-mono text-ink-500 uppercase tracking-wider shrink-0 mr-3">
+            DEAL LIFECYCLE:
+          </span>
 
-            return (
-              <React.Fragment key={stage.id}>
-                <Link
-                  href={stage.href}
-                  className={`flex items-center gap-2.5 py-2.5 px-3 border-b-2 transition-all group ${
-                    isCurrent
-                      ? 'border-signal text-ink-100 bg-ink-900/60'
-                      : 'border-transparent text-ink-400 hover:text-ink-300 hover:border-ink-700'
-                  }`}
-                >
-                  <span
-                    className={`font-mono text-[11px] font-bold px-1.5 py-0.5 rounded ${
+          <div className="flex items-center justify-between flex-1 gap-1">
+            {lifecycleStates.map((state, idx) => {
+              const isCurrent = derivedStage === state.id;
+
+              return (
+                <React.Fragment key={state.id}>
+                  <Link
+                    href={state.href}
+                    className={`flex items-center gap-1.5 py-1 px-2 rounded transition-all group ${
                       isCurrent
-                        ? 'bg-signal text-white'
-                        : 'bg-ink-800 text-ink-500 group-hover:text-ink-400'
+                        ? 'bg-signal-bg border border-signal-border text-signal-light'
+                        : 'text-ink-500 hover:text-ink-300 hover:bg-ink-900'
                     }`}
                   >
-                    {stage.number}
-                  </span>
-                  <span className="text-xs font-medium tracking-wide">
-                    {stage.label}
-                  </span>
-                </Link>
+                    <span
+                      className={`font-mono text-[9px] font-bold px-1 py-0.2 rounded ${
+                        isCurrent
+                          ? 'bg-signal text-white'
+                          : 'bg-ink-800 text-ink-500 group-hover:text-ink-400'
+                      }`}
+                    >
+                      {state.number}
+                    </span>
+                    <span className="font-mono text-[10px] font-bold tracking-tight">
+                      {state.label}
+                    </span>
+                  </Link>
 
-                {idx < lifecycleStages.length - 1 && (
-                  <div className="text-ink-700 font-mono text-xs select-none">
-                    ──→
-                  </div>
-                )}
-              </React.Fragment>
-            );
-          })}
+                  {idx < lifecycleStates.length - 1 && (
+                    <span className="text-ink-800 font-mono text-[10px] select-none">
+                      →
+                    </span>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
         </div>
       </div>
     </header>

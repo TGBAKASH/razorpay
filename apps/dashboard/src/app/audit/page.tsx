@@ -27,7 +27,6 @@ export default function AuditPage() {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [filterOfferId, setFilterOfferId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isRunningDemo, setIsRunningDemo] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
 
   useEffect(() => {
@@ -146,22 +145,22 @@ export default function AuditPage() {
 
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col">
-      <DealLifecycleNav currentStage="AUDIT" />
+      <DealLifecycleNav currentStage="PAID" />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
-        {/* Header Strip */}
+        {/* Header Strip with Plain-English Explainer */}
         <div className="border border-ink-700 bg-ink-900 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="font-mono text-xs font-bold text-signal bg-signal-bg border border-signal-border px-2 py-0.5 rounded">
-                PHASE 05 • CRYPTOGRAPHIC AUDIT TIMELINE
+                VIEW 05 • CRYPTOGRAPHIC AUDIT LEDGER
               </span>
             </div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink-100">
               Immutable Deal Audit Ledger
             </h1>
             <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
-              Complete chronological audit trail. Traces state transitions, initiating actors, policy versions, evaluated rules, and raw gateway I/O.
+              Inspect the append-only cryptographic timeline recording every state transition, policy check, actor, and gateway response.
             </p>
           </div>
 
@@ -198,11 +197,11 @@ export default function AuditPage() {
           {/* Left Column: Stamped Deal Ticket in Audit Context */}
           <div className="lg:col-span-5 space-y-4">
             <div className="flex items-center justify-between border-b border-ink-800 pb-2">
-              <span className="font-mono text-xs font-bold text-ink-300 uppercase">
-                Reconstructed Deal Ticket
-              </span>
+              <h3 className="font-display text-base font-bold text-ink-100">
+                Audited Deal Ticket
+              </h3>
               <span className="font-mono text-[10px] text-signal uppercase font-bold">
-                AUDIT REPRODUCIBLE
+                RECONCILED PAID
               </span>
             </div>
 
@@ -212,9 +211,9 @@ export default function AuditPage() {
           {/* Right Column: Chronological State Transition Log */}
           <div className="lg:col-span-7 space-y-4">
             <div className="flex items-center justify-between border-b border-ink-800 pb-2">
-              <span className="font-mono text-xs font-bold text-ink-300 uppercase">
+              <h3 className="font-display text-base font-bold text-ink-100">
                 State Transition Timeline
-              </span>
+              </h3>
               <span className="font-mono text-[10px] text-ink-500 uppercase">
                 {filteredLogs.length} ENTRIES
               </span>
@@ -259,7 +258,7 @@ export default function AuditPage() {
 
                   <div className="pt-1.5 border-t border-ink-800 flex items-center justify-between text-[10px] font-mono text-ink-500">
                     <span>Rules: {entry.policy_checked}</span>
-                    <span className="text-ink-400 underline">View Raw JSON</span>
+                    <span className="text-ink-400 underline">Inspect Raw JSON →</span>
                   </div>
                 </div>
               ))}
@@ -273,7 +272,7 @@ export default function AuditPage() {
             <div className="bg-ink-900 border border-ink-700 rounded-lg p-6 max-w-2xl w-full max-h-[85vh] overflow-y-auto space-y-4">
               <div className="flex items-center justify-between border-b border-ink-700 pb-3">
                 <h3 className="font-display text-base font-bold text-ink-100">
-                  Audit Entry Detail: {selectedLog.action}
+                  Audit Entry: {selectedLog.action}
                 </h3>
                 <button
                   onClick={() => setSelectedLog(null)}
