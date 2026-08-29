@@ -134,6 +134,7 @@ export async function registerAuctionRoutes(fastify: FastifyInstance) {
         return_terms_days: winning.return_terms_days,
         extras_description: extrasDesc,
         signed_contract: signedContract,
+        checks: negotiationResult.candidate_offers[0]?.evaluation?.checks || [],
       };
     });
 

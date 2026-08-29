@@ -235,7 +235,7 @@ export default function BuyerSimulatorPage() {
               Buyer-Agent Intent Simulator
             </h1>
             <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
-              Formulate buyer constraints, extract structured CCO via Gemini/Zod schemas, and negotiate directly with the deterministic merchant policy engine.
+              Formulate buyer constraints, extract structured intent schemas, and negotiate directly with the deterministic merchant policy engine.
             </p>
           </div>
 

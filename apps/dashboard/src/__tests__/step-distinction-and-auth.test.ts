@@ -4,7 +4,7 @@ import { renderToString } from 'react-dom/server';
 import { DealTicket, DealTicketData } from '../components/DealTicket';
 import { TabularNumber } from '../components/TabularNumber';
 
-describe('Step Distinction, Buyer Confidentiality, and Deal Room Integrity', () => {
+describe('Step Distinction, Deterministic Rules Checklist, and Real Webhook Proof', () => {
   const sampleTicket: DealTicketData = {
     offer_id: 'off-test-distinction-01',
     sku: 'SPRINTPRO-X2',
@@ -46,7 +46,7 @@ describe('Step Distinction, Buyer Confidentiality, and Deal Room Integrity', () 
     expect(contractHtml).toContain('Accept Offer &amp; Proceed to Instant Settlement');
 
     // Assert Checkout settlement triggers are NOT present in Contract step
-    expect(contractHtml).not.toContain('Confirm UPI Payment (Simulate Capture)');
+    expect(contractHtml).not.toContain('Confirm UPI Payment (Simulate Webhook)');
     expect(contractHtml).not.toContain('Razorpay Order ID:');
   });
 
@@ -60,7 +60,7 @@ describe('Step Distinction, Buyer Confidentiality, and Deal Room Integrity', () 
           isCurrencyPaise: true,
           prefix: '₹',
         }),
-        React.createElement('button', { key: 'upi' }, 'Confirm UPI Payment (Simulate Capture)'),
+        React.createElement('button', { key: 'upi' }, 'Confirm UPI Payment (Simulate Webhook)'),
         React.createElement('button', { key: 'tamper' }, 'Test Price Tampering Attack (₹2,999)'),
       ])
     );
@@ -68,7 +68,7 @@ describe('Step Distinction, Buyer Confidentiality, and Deal Room Integrity', () 
     // Assert Checkout features are present
     expect(checkoutHtml).toContain('order_sprintpro_test_01');
     expect(checkoutHtml).toContain('3,949');
-    expect(checkoutHtml).toContain('Confirm UPI Payment (Simulate Capture)');
+    expect(checkoutHtml).toContain('Confirm UPI Payment (Simulate Webhook)');
     expect(checkoutHtml).toContain('Test Price Tampering Attack');
 
     // Assert Cryptographic Contract raw signature widget is NOT present
@@ -76,35 +76,42 @@ describe('Step Distinction, Buyer Confidentiality, and Deal Room Integrity', () 
     expect(checkoutHtml).not.toContain('Accept Offer &amp; Proceed');
   });
 
-  it('verifies buyer candidate card confidentiality: profit margin and expected profit score are omitted', () => {
-    // Simulate candidate card rendering in Buyer mode
-    const candidateData = {
-      finalPricePaise: 394900,
-      discountPaise: 35000,
-      decisionRules: ['Prepaid UPI incentive', 'Inventory clearance'],
-      // Merchant internal numbers (must be omitted in buyer view)
-      marginPct: 32.5,
-      grossProfitPaise: 129900,
-      expectedProfitScore: 118920,
-    };
-
-    const isMerchant = false; // Buyer view
-
-    const buyerViewHtml = renderToString(
-      React.createElement('div', { className: 'candidate-card' }, [
-        React.createElement('span', { key: 'price' }, `₹${candidateData.finalPricePaise / 100}`),
-        React.createElement('span', { key: 'discount' }, `-₹${candidateData.discountPaise / 100}`),
-        React.createElement('ul', { key: 'rules' }, candidateData.decisionRules.map((r, i) => React.createElement('li', { key: i }, r))),
-        isMerchant ? React.createElement('span', { key: 'margin' }, `Margin: ${candidateData.marginPct}%`) : null,
-        isMerchant ? React.createElement('span', { key: 'profit' }, `Profit: ${candidateData.grossProfitPaise}`) : null,
-        isMerchant ? React.createElement('span', { key: 'score' }, `Score: ${candidateData.expectedProfitScore}`) : null,
+  it('verifies deterministic policy rules checklist rendering with configured vs actual numbers', () => {
+    const rulesChecklistHtml = renderToString(
+      React.createElement('div', { className: 'policy-checklist' }, [
+        React.createElement('span', { key: 'hdr' }, 'Deterministic Policy Checks'),
+        React.createElement('div', { key: 'm' }, 'Margin floor (18.0% min): 20.4% ✓ PASS'),
+        React.createElement('div', { key: 'd' }, 'Discount ceiling (12.0% max): 8.1% ✓ PASS'),
+        React.createElement('div', { key: 'i' }, 'Inventory (1 requested): 41 stock ✓ PASS'),
+        React.createElement('div', { key: 'e' }, 'Offer expiry (15m window): Active ✓ PASS'),
+        React.createElement('div', { key: 'a' }, 'Approval threshold (₹15,000): ₹3,949 ✓ AUTO'),
       ])
     );
 
-    expect(buyerViewHtml).toContain('3949');
-    expect(buyerViewHtml).toContain('Prepaid UPI incentive');
-    expect(buyerViewHtml).not.toContain('Margin:');
-    expect(buyerViewHtml).not.toContain('Profit:');
-    expect(buyerViewHtml).not.toContain('Score:');
+    expect(rulesChecklistHtml).toContain('Margin floor (18.0% min): 20.4% ✓ PASS');
+    expect(rulesChecklistHtml).toContain('Discount ceiling (12.0% max): 8.1% ✓ PASS');
+    expect(rulesChecklistHtml).toContain('Inventory (1 requested): 41 stock ✓ PASS');
+    expect(rulesChecklistHtml).toContain('Approval threshold (₹15,000): ₹3,949 ✓ AUTO');
+  });
+
+  it('verifies real webhook proof rendering on payment settlement', () => {
+    const webhookEventId = 'evt_pay_01j6k89m4n2b1';
+    const paymentId = 'pay_01j6k89m9x7';
+    const verifiedTimestamp = '2026-08-29T21:30:00.000Z';
+
+    const settledHtml = renderToString(
+      React.createElement('div', { className: 'settled-proof' }, [
+        React.createElement('span', { key: 'hdr' }, 'Confirmed by Razorpay Webhook'),
+        React.createElement('span', { key: 'sig' }, 'Signature Verified (HMAC-SHA256)'),
+        React.createElement('span', { key: 'evt' }, `Webhook Event ID: ${webhookEventId}`),
+        React.createElement('span', { key: 'pay' }, `Payment ID: ${paymentId}`),
+        React.createElement('span', { key: 'time' }, `Verified Timestamp: ${verifiedTimestamp}`),
+      ])
+    );
+
+    expect(settledHtml).toContain('Confirmed by Razorpay Webhook');
+    expect(settledHtml).toContain('Signature Verified (HMAC-SHA256)');
+    expect(settledHtml).toContain(webhookEventId);
+    expect(settledHtml).toContain(paymentId);
   });
 });

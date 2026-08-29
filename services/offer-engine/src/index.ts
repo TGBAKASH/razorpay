@@ -49,6 +49,7 @@ export interface CompetingMerchantBid {
   return_terms_days: number;
   extras_description: string;
   signed_contract: any;
+  checks?: any[];
   utility_scores: {
     price_score: number;
     delivery_score: number;

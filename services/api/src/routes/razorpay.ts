@@ -428,6 +428,10 @@ export async function registerRazorpayRoutes(fastify: FastifyInstance) {
         order_id: razorpayOrderId,
         offer_id: offerId,
         payment_id: paymentId,
+        event_id: eventId,
+        event_type: eventType,
+        verified_at: new Date().toISOString(),
+        signature_verified: true,
       });
     }
 
