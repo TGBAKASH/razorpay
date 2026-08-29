@@ -20,9 +20,10 @@ export function DealLifecycleNav({ currentStage }: DealLifecycleNavProps) {
   const pathname = usePathname();
   const currentPath = pathname || '/';
 
-  // Primary 5 Canonical App Routes
+  // Primary Canonical App Routes
   const mainRoutes = [
     { label: '01 Overview', href: '/' },
+    { label: '🎬 Guided Demo', href: '/demo' },
     { label: '02 Merchant Console', href: '/merchant-console' },
     { label: '03 Deal Room', href: '/deal-room' },
     { label: '04 Contract & Checkout', href: '/checkout' },

@@ -107,19 +107,26 @@ export default function Home() {
           {/* Dual Clear CTAs */}
           <div className="mt-8 flex flex-wrap items-center gap-4 pt-6 border-t border-ink-800">
             <Link
-              href="/deal-room"
+              href="/demo"
               className="py-3 px-6 bg-signal hover:bg-signal-light text-white font-sans text-sm font-bold rounded transition-colors shadow-lg flex items-center gap-2"
             >
-              <span>Run the Live Demo (Deal Room)</span>
+              <span>Run the Guided Demo (Recorded Presentation)</span>
+              <span className="font-mono">→</span>
+            </Link>
+
+            <Link
+              href="/deal-room"
+              className="py-3 px-6 bg-ink-800 hover:bg-ink-750 text-ink-100 border border-ink-600 font-sans text-sm font-bold rounded transition-colors flex items-center gap-2"
+            >
+              <span>Open Live Deal Room</span>
               <span className="font-mono">→</span>
             </Link>
 
             <Link
               href="/merchant-console"
-              className="py-3 px-6 bg-ink-800 hover:bg-ink-750 text-ink-100 border border-ink-600 font-sans text-sm font-bold rounded transition-colors flex items-center gap-2"
+              className="py-3 px-5 text-ink-400 hover:text-ink-200 font-sans text-sm font-medium transition-colors"
             >
-              <span>Set Up a Merchant (Merchant Console)</span>
-              <span className="font-mono">→</span>
+              Configure Merchant Rules →
             </Link>
           </div>
         </div>

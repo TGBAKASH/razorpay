@@ -73,6 +73,7 @@ describe('apps/dashboard - 5 Canonical Views & Stepper Stepper Navigation', () =
     );
 
     expect(html).toContain('01 Overview');
+    expect(html).toContain('Guided Demo');
     expect(html).toContain('02 Merchant Console');
     expect(html).toContain('03 Deal Room');
     expect(html).toContain('04 Contract &amp; Checkout');

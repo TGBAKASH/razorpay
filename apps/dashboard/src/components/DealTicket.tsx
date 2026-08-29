@@ -20,9 +20,22 @@ export interface DealTicketData {
   merchant_name?: string;
   signature?: string;
   nonce?: string;
-  state?: 'OFFER_CREATED' | 'SIGNED' | 'ACCEPTED' | 'APPROVAL_PENDING' | 'PAID' | 'FAILED' | 'REJECTED' | 'EXPIRED';
   payment_id?: string;
   payment_amount_paise?: number;
+  state?:
+    | 'REQUEST_RECEIVED'
+    | 'OFFER_CREATED'
+    | 'OFFER_GENERATED'
+    | 'POLICY_APPROVED'
+    | 'OFFER_ACCEPTED'
+    | 'ORDER_CREATED'
+    | 'SIGNED'
+    | 'ACCEPTED'
+    | 'APPROVAL_PENDING'
+    | 'PAID'
+    | 'FAILED'
+    | 'REJECTED'
+    | 'EXPIRED';
 }
 
 interface DealTicketProps {
@@ -261,7 +274,7 @@ export function DealTicket({
       </div>
 
       {/* Dynamic Stamp Overlay based on State */}
-      {status === 'SIGNED' && (
+      {(status === 'SIGNED' || status === 'POLICY_APPROVED' || status === 'OFFER_ACCEPTED' || status === 'ORDER_CREATED') && (
         <div className="absolute right-4 bottom-16 pointer-events-none select-none animate-stamp-drop">
           <div className="border-2 border-signal text-signal px-3 py-1 rounded font-mono font-black text-xs uppercase tracking-widest bg-ledger/90 shadow-sm">
             ✓ POLICY APPROVED
