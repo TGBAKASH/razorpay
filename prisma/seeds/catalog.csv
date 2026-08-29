@@ -1,0 +1,5 @@
+sku,name,category,cost_paise,list_price_paise,inventory_qty,movement_rate,expiry_date,warehouse_location,clearance_flag
+SPRINTPRO-X2,SprintPro X2 Running Shoes,Footwear,265000,429900,41,slow,,BLR-WH-01,false
+GIFTBOX-CORP-A,Corporate Executive Gift Box - Custom Brand,Corporate Gifting,2200000,3200000,50,normal,,BLR-WH-01,false
+GIFTBOX-CORP-B,Corporate Standard Gift Box - Bulk Pack,Corporate Gifting,2100000,3100000,100,fast,,HYD-WH-01,false
+GIFTBOX-CORP-C,Corporate Luxe Gift Box - 15 Day Replacement,Corporate Gifting,2300000,3300000,35,normal,,BLR-WH-02,false

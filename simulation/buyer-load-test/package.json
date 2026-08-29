@@ -1,0 +1,26 @@
+{
+  "name": "@razorpay-dealflow/buyer-load-test",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "simulate": "tsx src/cli.ts",
+    "simulate:500": "tsx src/cli.ts 500",
+    "simulate:1000": "tsx src/cli.ts 1000"
+  },
+  "dependencies": {
+    "@razorpay-dealflow/adapters": "^0.1.0",
+    "@razorpay-dealflow/policy-engine": "^0.1.0",
+    "@razorpay-dealflow/offer-engine": "^0.1.0",
+    "@razorpay-dealflow/contract-service": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

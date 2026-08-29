@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "vitest.config.ts",
+    "apps/**/*",
+    "services/**/*",
+    "simulation/**/*"
+  ],
+  "exclude": ["node_modules", "**/dist", "**/.next"]
+}

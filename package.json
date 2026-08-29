@@ -1,0 +1,38 @@
+{
+  "name": "razorpay-dealflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The negotiation layer for agentic commerce",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "simulation/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:api": "npm run dev --workspace=@razorpay-dealflow/api",
+    "dev:dashboard": "npm run dev --workspace=@razorpay-dealflow/dashboard",
+    "simulate": "npm run simulate --workspace=@razorpay-dealflow/buyer-load-test 500",
+    "reset-demo": "tsx services/api/src/scripts/reset-demo.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "seed": "tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@prisma/client": "^6.4.1",
+    "@types/node": "^22.13.4",
+    "eslint": "^9.20.1",
+    "prisma": "^6.4.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}

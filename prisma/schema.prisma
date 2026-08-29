@@ -1,0 +1,201 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. Merchant definition
+model Merchant {
+  id          String           @id @default(uuid())
+  name        String
+  slug        String           @unique
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  policies    MerchantPolicy[]
+  products    Product[]
+  budgets     PromotionBudget[]
+  offers      Offer[]
+  contracts   OfferContract[]
+
+  @@map("merchants")
+}
+
+// 2. Versioned Merchant Policy (never mutate in place, always insert a new version)
+model MerchantPolicy {
+  id                             String   @id @default(uuid())
+  merchantId                     String   @map("merchant_id")
+  policyVersion                  String   @map("policy_version") // e.g. "v1", "v2"
+  minMarginPct                   Float    @map("min_margin_pct") // e.g. 18.0
+  maxDiscountPct                 Float    @map("max_discount_pct") // e.g. 12.0
+  freeDeliveryAbovePaise         Int      @map("free_delivery_above_paise") // e.g. 149900 (₹1,499)
+  noDiscountFastMoving           Boolean  @default(true) @map("no_discount_fast_moving")
+  clearWithinDays                Int      @default(30) @map("clear_within_days")
+  prepaidDiscountOnHighCodRisk   Boolean  @default(true) @map("prepaid_discount_on_high_cod_risk")
+  humanApprovalAbovePaise        Int      @map("human_approval_above_paise") // e.g. 1500000 (₹15,000)
+  isActive                       Boolean  @default(true) @map("is_active")
+  createdAt                      DateTime @default(now()) @map("created_at")
+
+  merchant                       Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@unique([merchantId, policyVersion])
+  @@index([merchantId, isActive])
+  @@map("merchant_policies")
+}
+
+// 3. Product / Catalog Item
+model Product {
+  id                String    @id @default(uuid())
+  merchantId        String    @map("merchant_id")
+  sku               String
+  name              String
+  category          String
+  costPaise         Int       @map("cost_paise") // Integer paise (e.g. 265000 = ₹2,650)
+  listPricePaise    Int       @map("list_price_paise") // Integer paise (e.g. 429900 = ₹4,299)
+  inventoryQty      Int       @map("inventory_qty") // e.g. 41
+  movementRate      String    @map("movement_rate") // "fast" | "normal" | "slow"
+  expiryDate        DateTime? @map("expiry_date")
+  warehouseLocation String    @map("warehouse_location") // e.g. "BLR-WH-01"
+  clearanceFlag     Boolean   @default(false) @map("clearance_flag")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  merchant          Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@unique([merchantId, sku])
+  @@index([merchantId, category])
+  @@map("products")
+}
+
+// 4. Promotion Budget
+model PromotionBudget {
+  id               String   @id @default(uuid())
+  merchantId       String   @map("merchant_id")
+  name             String
+  totalBudgetPaise Int      @map("total_budget_paise") // Integer paise (e.g. 5000000 = ₹50,000)
+  spentBudgetPaise Int      @default(0) @map("spent_budget_paise")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  merchant         Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("promotion_budgets")
+}
+
+// 5. Negotiated Offer
+model Offer {
+  id                    String         @id @default(uuid())
+  merchantId            String         @map("merchant_id")
+  buyerAgentId          String         @map("buyer_agent_id")
+  sku                   String
+  quantity              Int
+  finalPricePaise       Int            @map("final_price_paise")
+  discountPaise         Int            @map("discount_paise")
+  discountReason        Json           @map("discount_reason") // string[]
+  deliveryPromise       DateTime       @map("delivery_promise")
+  returnTermsDays       Int            @map("return_terms_days")
+  paymentMethodsAllowed Json           @map("payment_methods_allowed") // string[]
+  expiresAt             DateTime       @map("expires_at")
+  policyVersion         String         @map("policy_version")
+  status                String         @default("OFFER_GENERATED") // REQUEST_RECEIVED, OFFER_GENERATED, POLICY_APPROVED, APPROVAL_PENDING, OFFER_ACCEPTED, ORDER_CREATED, PAYMENT_ATTEMPTED, PAID, FAILED, EXPIRED, REFUNDED, FLAGGED
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+
+  merchant              Merchant       @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  contract              OfferContract?
+  order                 RazorpayOrder?
+  auditLogs             AuditLogEntry[]
+
+  @@index([merchantId, status])
+  @@index([buyerAgentId])
+  @@map("offers")
+}
+
+// 6. Hardened Signed Offer Contract
+model OfferContract {
+  id               String         @id @default(uuid())
+  offerId          String         @unique @map("offer_id")
+  merchantId       String         @map("merchant_id")
+  buyerAgentId     String         @map("buyer_agent_id")
+  canonicalPayload Json           @map("canonical_payload")
+  signature        String
+  signingKeyId     String         @map("signing_key_id")
+  nonce            String         @unique
+  status           String         @default("POLICY_APPROVED") // POLICY_APPROVED, CONSUMED, REJECTED, EXPIRED
+  signedAt         DateTime       @default(now()) @map("signed_at")
+  consumedAt       DateTime?      @map("consumed_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  offer            Offer          @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  merchant         Merchant       @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  order            RazorpayOrder?
+
+  @@index([merchantId, status])
+  @@map("offer_contracts")
+}
+
+// 7. Razorpay Order Mapping (1:1 with OfferContract)
+model RazorpayOrder {
+  id              String         @id @default(uuid())
+  offerId         String         @unique @map("offer_id")
+  offerContractId String         @unique @map("offer_contract_id")
+  razorpayOrderId String         @unique @map("razorpay_order_id")
+  amountPaise     Int            @map("amount_paise")
+  currency        String         @default("INR")
+  status          String         @default("CREATED") // CREATED, ATTEMPTED, PAID, FAILED, FLAGGED
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  offer           Offer          @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  contract        OfferContract  @relation(fields: [offerContractId], references: [id], onDelete: Cascade)
+  paymentEvents   PaymentEvent[]
+
+  @@map("razorpay_orders")
+}
+
+// 8. Payment & Webhook Events
+model PaymentEvent {
+  id                String         @id @default(uuid())
+  razorpayOrderId   String         @map("razorpay_order_id")
+  razorpayPaymentId String?        @map("razorpay_payment_id")
+  razorpayEventId   String?        @unique @map("razorpay_event_id")
+  eventType         String         @map("event_type") // payment.captured, payment.failed, refund.processed
+  amountPaise       Int            @map("amount_paise")
+  currency          String         @default("INR")
+  method            String?
+  status            String
+  rawPayload        Json           @map("raw_payload")
+  createdAt         DateTime       @default(now()) @map("created_at")
+
+  order             RazorpayOrder  @relation(fields: [razorpayOrderId], references: [razorpayOrderId], onDelete: Cascade)
+
+  @@index([razorpayOrderId])
+  @@index([eventType])
+  @@map("payment_events")
+}
+
+// 9. Comprehensive Audit Log
+model AuditLogEntry {
+  id            String   @id @default(uuid())
+  offerId       String?  @map("offer_id")
+  actor         String   // "buyer_agent:<id>", "system", "human:<name>"
+  action        String   // "OFFER_GENERATED", "POLICY_CHECK", "CONTRACT_SIGNED", "ORDER_CREATED", "PAYMENT_CAPTURED", etc.
+  inputData     Json     @map("input_data")
+  policyChecked String?  @map("policy_checked")
+  policyVersion String?  @map("policy_version")
+  result        String   // "PASS", "FAIL", "APPROVAL_REQUIRED", "SUCCESS"
+  reason        String
+  rawApiPayload Json?    @map("raw_api_payload")
+  timestamp     DateTime @default(now())
+
+  offer         Offer?   @relation(fields: [offerId], references: [id], onDelete: SetNull)
+
+  @@index([offerId])
+  @@index([actor])
+  @@index([action])
+  @@map("audit_log_entries")
+}
