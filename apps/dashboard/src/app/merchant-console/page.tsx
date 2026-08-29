@@ -260,30 +260,52 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
     }
   }
 
+  if (user?.role !== 'merchant') {
+    return (
+      <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col justify-between">
+        <DealLifecycleNav currentStage="POLICY_APPROVED" />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full flex-1 flex items-center justify-center">
+          <div className="bg-ink-900 border border-amber-800/80 rounded-lg p-8 max-w-md w-full text-center space-y-4 shadow-xl">
+            <div className="w-12 h-12 rounded-full bg-amber-950/80 border border-amber-700 flex items-center justify-center text-xl mx-auto text-amber-400 font-mono">
+              🔒
+            </div>
+            <div>
+              <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">
+                HTTP 403 • ACCESS FORBIDDEN
+              </span>
+              <h2 className="text-lg font-bold text-ink-100 font-display mt-2">
+                Merchant Console Restricted
+              </h2>
+              <p className="text-xs text-ink-400 mt-2 font-sans leading-relaxed">
+                You are currently browsing DealFlow as a <strong className="text-ink-200">Buyer</strong> ({user?.email || 'buyer-agent'}).
+                Merchant governance rules, inventory cost catalogs, and human order review queues are restricted to merchants.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <Link
+                href="/deal-room"
+                className="w-full py-2.5 bg-signal hover:bg-signal-hover text-white text-xs font-mono font-bold rounded shadow transition-colors"
+              >
+                ← Return to Deal Room
+              </Link>
+              <button
+                onClick={() => setRole('merchant')}
+                className="w-full py-2 bg-ink-950 hover:bg-ink-800 text-amber-300 hover:text-white border border-ink-700 text-xs font-mono rounded transition-colors"
+              >
+                Switch Session Role to Merchant
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col">
       <DealLifecycleNav currentStage="POLICY_APPROVED" />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
-        {user?.role !== 'merchant' && (
-          <div className="bg-amber-950/80 border border-amber-700/80 rounded-lg p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-amber-300 font-mono font-bold text-xs uppercase tracking-wider">
-                <span>🔒</span>
-                <span>Merchant Governance Access Restricted</span>
-              </div>
-              <p className="text-xs text-ink-300 font-sans">
-                You are currently viewing DealFlow as a <strong className="text-white">Buyer</strong>. Merchant policies, cost catalogs, and internal approval queues are reserved for merchants.
-              </p>
-            </div>
-            <button
-              onClick={() => setRole('merchant')}
-              className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-mono font-bold text-xs rounded transition-colors shadow shrink-0 self-start sm:self-auto"
-            >
-              Switch Role to Merchant →
-            </button>
-          </div>
-        )}
 
         {/* Header Strip with Plain-English Explainer */}
         <div className="border border-ink-700 bg-ink-900 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">

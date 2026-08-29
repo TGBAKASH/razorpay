@@ -16,6 +16,7 @@ import { stateMachine } from '../services/state-machine.js';
 import { importCatalogFromCsv } from '../importers/catalog-csv-importer.js';
 import { CATALOG_MERCHANTS } from '../data/seed-catalog.js';
 import { prisma } from '../db.js';
+import { requireMerchantRole } from '../middleware/role-guard.js';
 
 export const activeContracts = new Map<string, SignedOfferContract>();
 export const negotiationFeed: {
@@ -301,6 +302,7 @@ export async function registerOfferRoutes(fastify: FastifyInstance) {
 
   // 2. Human Approval endpoint
   fastify.post('/api/offers/:id/human-approve', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!requireMerchantRole(request, reply)) return;
     const params = request.params as { id: string };
     const offerId = params.id;
     const body = request.body as { approver_name?: string; notes?: string };
@@ -348,6 +350,7 @@ export async function registerOfferRoutes(fastify: FastifyInstance) {
 
   // 3. Human Reject endpoint
   fastify.post('/api/offers/:id/human-reject', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!requireMerchantRole(request, reply)) return;
     const params = request.params as { id: string };
     const offerId = params.id;
     const body = request.body as { approver_name?: string; rejection_reason?: string };
@@ -393,7 +396,8 @@ export async function registerOfferRoutes(fastify: FastifyInstance) {
   });
 
   // 3b. Pending Approvals Queue endpoint (Strictly excludes approved/rejected/failed orders)
-  fastify.get('/api/offers/pending-approvals', async (_request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/api/offers/pending-approvals', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!requireMerchantRole(request, reply)) return;
     const pendingContracts = Array.from(activeContracts.values()).filter((c) => {
       const offerId = c.canonical_payload?.offer_id || c.offer_id;
       const contractStatus = (c.status as string) || '';
@@ -617,6 +621,7 @@ export async function registerOfferRoutes(fastify: FastifyInstance) {
   });
 
   fastify.post('/api/merchants/:slug/policy', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!requireMerchantRole(request, reply)) return;
     const params = request.params as { slug: string };
     const merchant = CATALOG_MERCHANTS.find((m) => m.slug === params.slug);
     if (!merchant) {
@@ -667,6 +672,7 @@ export async function registerOfferRoutes(fastify: FastifyInstance) {
 
   // 6. Catalog CSV Import Endpoint
   fastify.post('/api/catalog/import-csv', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!requireMerchantRole(request, reply)) return;
     const body = request.body as { csv_content: string; merchant_slug?: string };
     if (!body || !body.csv_content) {
       return reply.status(400).send({ success: false, error: 'csv_content string is required' });

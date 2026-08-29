@@ -7,21 +7,29 @@ import { API_BASE_URL } from '../lib/config';
 import { useAuth, UserRole } from './AuthContext';
 
 export function DealLifecycleNav(_props?: { currentStage?: string }) {
-  const pathname = usePathname();
-  const currentPath = pathname || '/';
-  const { user, login, setRole } = useAuth();
+  let currentPath = '/';
+  try {
+    currentPath = usePathname() || '/';
+  } catch {}
+
+  const { user, login } = useAuth();
   const [isResetting, setIsResetting] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [tempEmail, setTempEmail] = useState(user?.email || 'akash@dealflow.ai');
   const [tempRole, setTempRole] = useState<UserRole>(user?.role || 'buyer');
 
-  // The 4 Canonical Primary Navigation Items
-  const mainRoutes = [
-    { label: '01 Overview', href: '/' },
-    { label: '02 Merchant Console', href: '/merchant-console' },
-    { label: '03 Deal Room', href: '/deal-room' },
-    { label: '04 Audit Ledger', href: '/audit' },
-  ];
+  const isMerchant = user?.role === 'merchant';
+
+  // Role-Specific Navigation Links
+  const mainRoutes = isMerchant
+    ? [
+        { label: '01 Merchant Console', href: '/merchant-console' },
+        { label: '02 Audit Ledger', href: '/audit' },
+      ]
+    : [
+        { label: '01 Deal Room', href: '/deal-room' },
+        { label: '02 My Orders', href: '/orders' },
+      ];
 
   const handleResetDemoData = async () => {
     setIsResetting(true);
@@ -32,11 +40,11 @@ export function DealLifecycleNav(_props?: { currentStage?: string }) {
       }
       await fetch(`${API_BASE_URL}/api/demo/reset`, { method: 'POST' }).catch(() => {});
       setTimeout(() => {
-        window.location.reload();
+        if (typeof window !== 'undefined') window.location.reload();
       }, 600);
     } catch {
       setTimeout(() => {
-        window.location.reload();
+        if (typeof window !== 'undefined') window.location.reload();
       }, 600);
     } finally {
       setIsResetting(false);
@@ -45,17 +53,24 @@ export function DealLifecycleNav(_props?: { currentStage?: string }) {
 
   const handleSaveAuth = (e: React.FormEvent) => {
     e.preventDefault();
-    login(tempEmail.trim() || 'user@dealflow.ai', tempRole);
+    const cleanEmail = tempEmail.trim() || 'user@dealflow.ai';
+    login(cleanEmail, tempRole);
     setShowAuthModal(false);
+    // Route immediately to the role's home view
+    if (typeof window !== 'undefined') {
+      window.location.href = tempRole === 'merchant' ? '/merchant-console' : '/deal-room';
+    }
   };
+
+  const roleHomeHref = isMerchant ? '/merchant-console' : '/deal-room';
 
   return (
     <header className="w-full bg-ink-900 border-b border-ink-700 select-none sticky top-0 z-40 shadow-sm">
       {/* Top Main Navigation Bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
-        {/* Brand */}
+        {/* Brand Link to Role Home */}
         <Link
-          href="/"
+          href={roleHomeHref}
           className="flex items-center gap-3 group focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none rounded"
         >
           <div className="w-8 h-8 rounded bg-ink-800 border border-ink-700 flex items-center justify-center font-display font-black text-signal text-lg shadow-sm group-hover:border-signal transition-colors">
@@ -67,7 +82,7 @@ export function DealLifecycleNav(_props?: { currentStage?: string }) {
                 Razorpay DealFlow
               </span>
               <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-signal-bg text-signal border border-signal-border font-bold">
-                Live
+                {isMerchant ? 'Merchant Portal' : 'Buyer Agent'}
               </span>
             </div>
             <span className="text-[11px] font-sans text-ink-400 block -mt-0.5 hidden sm:block">
@@ -76,7 +91,7 @@ export function DealLifecycleNav(_props?: { currentStage?: string }) {
           </div>
         </Link>
 
-        {/* 4 Canonical Routes */}
+        {/* Role-Specific Nav Links */}
         <nav className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none">
           {mainRoutes.map((route) => {
             const isActive =
@@ -206,8 +221,8 @@ export function DealLifecycleNav(_props?: { currentStage?: string }) {
                 </div>
                 <p className="text-[11px] text-ink-500 mt-1">
                   {tempRole === 'buyer'
-                    ? 'Buyer role: Confidential merchant margins & internal profit scores are hidden.'
-                    : 'Merchant role: Full access to Merchant Console, policies, catalog, and profit metrics.'}
+                    ? 'Buyer role: Deal Room and My Orders with zero merchant-confidential margins.'
+                    : 'Merchant role: Merchant Console and full Audit Ledger with policy and margin detail.'}
                 </p>
               </div>
 
@@ -223,7 +238,7 @@ export function DealLifecycleNav(_props?: { currentStage?: string }) {
                   type="submit"
                   className="px-4 py-1.5 bg-signal hover:bg-signal-hover text-white text-xs font-mono font-bold rounded shadow"
                 >
-                  Save Session
+                  Save & Switch View
                 </button>
               </div>
             </form>

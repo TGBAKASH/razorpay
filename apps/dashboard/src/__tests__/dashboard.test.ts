@@ -50,14 +50,13 @@ describe('apps/dashboard - 5 Canonical Views & Stepper Stepper Navigation', () =
     expect(html).toContain('HMAC-SHA256');
   });
 
-  it('renders the 4 canonical primary route links in DealLifecycleNav', () => {
+  it('renders role-split navigation links in DealLifecycleNav', () => {
     const html = renderToString(
       React.createElement(DealLifecycleNav)
     );
 
-    expect(html).toContain('01 Overview');
-    expect(html).toContain('02 Merchant Console');
-    expect(html).toContain('03 Deal Room');
-    expect(html).toContain('04 Audit Ledger');
+    // Default buyer session renders Deal Room and My Orders
+    expect(html).toContain('01 Deal Room');
+    expect(html).toContain('02 My Orders');
   });
 });
