@@ -150,14 +150,14 @@ export default function ScenariosPage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="font-mono text-xs font-bold text-signal bg-signal-bg border border-signal-border px-2 py-0.5 rounded">
-                VIEW 06 • INVARIANT TESTBED & FAILURE MODES
+                VIEW 06 • STRESS TEST: WHAT CAN GO WRONG
               </span>
             </div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink-100">
-              Interactive Invariant Verification Desk
+              Interactive Stress Test Desk
             </h1>
             <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
-              Trigger 8 live edge-case scenarios to verify that DealFlow rejects tampering, catches inventory races, and respects buyer mandates.
+              Trigger 8 live edge-case scenarios to verify that DealFlow handles errors safely, catches inventory shortages, and blocks tampered prices.
             </p>
           </div>
 
@@ -167,7 +167,7 @@ export default function ScenariosPage() {
               disabled={batchLoading}
               className="py-2 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-bold rounded transition-colors shadow disabled:opacity-50"
             >
-              {batchLoading ? 'Triggering All 8 Stations...' : 'Run All 8 Invariant Tests →'}
+              {batchLoading ? 'Running All 8 Stress Tests...' : 'Run All 8 Stress Tests →'}
             </button>
           </div>
         </div>

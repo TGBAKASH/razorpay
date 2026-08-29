@@ -50,22 +50,22 @@ describe('apps/dashboard - 5 Canonical Views & Stepper Stepper Navigation', () =
     expect(html).toContain('HMAC-SHA256');
   });
 
-  it('renders DealLifecycleNav with all 6 exact deal lifecycle states', () => {
+  it('renders DealLifecycleNav with all 6 plain-language lifecycle stages', () => {
     const html = renderToString(
       React.createElement(DealLifecycleNav, {
         currentStage: 'REQUEST_RECEIVED',
       })
     );
 
-    expect(html).toContain('REQUEST_RECEIVED');
-    expect(html).toContain('OFFER_GENERATED');
-    expect(html).toContain('POLICY_APPROVED');
-    expect(html).toContain('OFFER_ACCEPTED');
-    expect(html).toContain('ORDER_CREATED');
-    expect(html).toContain('PAID');
+    expect(html).toContain('Request');
+    expect(html).toContain('Offer made');
+    expect(html).toContain('Approved');
+    expect(html).toContain('Accepted');
+    expect(html).toContain('Order placed');
+    expect(html).toContain('Paid');
   });
 
-  it('renders the 5 canonical route links in DealLifecycleNav', () => {
+  it('renders the 5 canonical real product route links in DealLifecycleNav', () => {
     const html = renderToString(
       React.createElement(DealLifecycleNav, {
         currentStage: 'REQUEST_RECEIVED',
@@ -73,7 +73,6 @@ describe('apps/dashboard - 5 Canonical Views & Stepper Stepper Navigation', () =
     );
 
     expect(html).toContain('01 Overview');
-    expect(html).toContain('Guided Demo');
     expect(html).toContain('02 Merchant Console');
     expect(html).toContain('03 Deal Room');
     expect(html).toContain('04 Contract &amp; Checkout');

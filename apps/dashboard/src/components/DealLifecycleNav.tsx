@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { API_BASE_URL } from '../lib/config';
 
 export type LifecycleStage =
   | 'REQUEST_RECEIVED'
@@ -19,64 +20,64 @@ interface DealLifecycleNavProps {
 export function DealLifecycleNav({ currentStage }: DealLifecycleNavProps) {
   const pathname = usePathname();
   const currentPath = pathname || '/';
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
 
-  // Primary Canonical App Routes
+  // The 5 Canonical Real Product Routes
   const mainRoutes = [
     { label: '01 Overview', href: '/' },
-    { label: '🎬 Guided Demo', href: '/demo' },
     { label: '02 Merchant Console', href: '/merchant-console' },
     { label: '03 Deal Room', href: '/deal-room' },
     { label: '04 Contract & Checkout', href: '/checkout' },
     { label: '05 Audit Ledger', href: '/audit' },
-    { label: '06 Invariant Testbed', href: '/scenarios' },
   ];
 
-  // The 6 Exact Deal Lifecycle States (The Living Stepper)
+  // The 6 Exact Deal Lifecycle States (Clean Human Names)
   const lifecycleStates: { id: LifecycleStage; number: string; label: string; href: string }[] = [
     {
       id: 'REQUEST_RECEIVED',
       number: '01',
-      label: 'REQUEST_RECEIVED',
+      label: 'Request',
       href: '/deal-room',
     },
     {
       id: 'OFFER_GENERATED',
       number: '02',
-      label: 'OFFER_GENERATED',
+      label: 'Offer made',
       href: '/deal-room',
     },
     {
       id: 'POLICY_APPROVED',
       number: '03',
-      label: 'POLICY_APPROVED',
+      label: 'Approved',
       href: '/merchant-console',
     },
     {
       id: 'OFFER_ACCEPTED',
       number: '04',
-      label: 'OFFER_ACCEPTED',
+      label: 'Accepted',
       href: '/checkout',
     },
     {
       id: 'ORDER_CREATED',
       number: '05',
-      label: 'ORDER_CREATED',
+      label: 'Order placed',
       href: '/checkout',
     },
     {
       id: 'PAID',
       number: '06',
-      label: 'PAID',
+      label: 'Paid',
       href: '/audit',
     },
   ];
 
-  // Determine which lifecycle stage to highlight based on path if not explicitly provided
+  // Determine active stage from path
   const derivedStage: LifecycleStage =
     currentStage ||
     (currentPath === '/'
       ? 'REQUEST_RECEIVED'
-      : currentPath.startsWith('/merchant-console') || currentPath.startsWith('/policy') || currentPath.startsWith('/catalog')
+      : currentPath.startsWith('/merchant-console') || currentPath.startsWith('/policy') || currentPath.startsWith('/catalog') || currentPath.startsWith('/approvals')
       ? 'POLICY_APPROVED'
       : currentPath.startsWith('/deal-room') || currentPath.startsWith('/simulator') || currentPath.startsWith('/auction')
       ? 'OFFER_GENERATED'
@@ -85,6 +86,31 @@ export function DealLifecycleNav({ currentStage }: DealLifecycleNavProps) {
       : currentPath.startsWith('/audit')
       ? 'PAID'
       : 'OFFER_GENERATED');
+
+  const handleResetDemoData = async () => {
+    setIsResetting(true);
+    setResetMessage(null);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+      await fetch(`${API_BASE_URL}/api/demo/reset`, { method: 'POST' }).catch(() => {});
+      setResetMessage('Demo data reset.');
+      setTimeout(() => {
+        setResetMessage(null);
+        window.location.reload();
+      }, 700);
+    } catch {
+      setResetMessage('Demo data reset.');
+      setTimeout(() => {
+        setResetMessage(null);
+        window.location.reload();
+      }, 700);
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   return (
     <header className="w-full bg-ink-900 border-b border-ink-700 select-none sticky top-0 z-40 shadow-md">
@@ -113,36 +139,48 @@ export function DealLifecycleNav({ currentStage }: DealLifecycleNavProps) {
           </div>
         </Link>
 
-        {/* Canonical Routes Tabs - Responsive Scroll Container on Phone */}
-        <nav className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto max-w-full pb-0.5 sm:pb-0 scrollbar-none">
-          {mainRoutes.map((route) => {
-            const isActive =
-              currentPath === route.href ||
-              (route.href === '/merchant-console' &&
-                (currentPath.startsWith('/policy') || currentPath.startsWith('/catalog') || currentPath.startsWith('/approvals'))) ||
-              (route.href === '/deal-room' &&
-                (currentPath.startsWith('/simulator') || currentPath.startsWith('/auction')));
+        {/* Canonical 5 Routes + Reset Demo Action */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <nav className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto max-w-full pb-0.5 sm:pb-0 scrollbar-none">
+            {mainRoutes.map((route) => {
+              const isActive =
+                currentPath === route.href ||
+                (route.href === '/merchant-console' &&
+                  (currentPath.startsWith('/policy') || currentPath.startsWith('/catalog') || currentPath.startsWith('/approvals'))) ||
+                (route.href === '/deal-room' &&
+                  (currentPath.startsWith('/simulator') || currentPath.startsWith('/auction')));
 
-            return (
-              <Link
-                key={route.href}
-                href={route.href}
-                className={`text-xs font-mono font-medium px-2.5 sm:px-3 py-1 sm:py-1.5 rounded whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none ${
-                  isActive
-                    ? 'bg-ink-800 text-ink-100 border border-ink-600 font-bold shadow-sm'
-                    : 'text-ink-400 hover:text-ink-200 hover:bg-ink-850'
-                }`}
-              >
-                {route.label}
-              </Link>
-            );
-          })}
-        </nav>
+              return (
+                <Link
+                  key={route.href}
+                  href={route.href}
+                  className={`text-xs font-mono font-medium px-2.5 sm:px-3 py-1 sm:py-1.5 rounded whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none ${
+                    isActive
+                      ? 'bg-ink-800 text-ink-100 border border-ink-600 font-bold shadow-sm'
+                      : 'text-ink-400 hover:text-ink-200 hover:bg-ink-850'
+                  }`}
+                >
+                  {route.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <button
+            onClick={handleResetDemoData}
+            disabled={isResetting}
+            title="Reset demo data to start fresh for a new take"
+            className="text-[11px] font-mono py-1 px-2.5 bg-ink-950 hover:bg-ink-800 text-ink-400 hover:text-ink-200 border border-ink-800 hover:border-ink-600 rounded transition-colors flex items-center gap-1 focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none disabled:opacity-50"
+          >
+            <span>{isResetting ? '⏳' : '↺'}</span>
+            <span>{resetMessage || 'Reset Demo'}</span>
+          </button>
+        </div>
       </div>
 
       {/* The Persistent 6-Stage Deal Lifecycle Stepper */}
       <div className="bg-ink-950 border-t border-ink-800 overflow-x-auto scrollbar-none py-1 sm:py-1.5">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 flex items-center justify-between min-w-[780px] sm:min-w-[860px]">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 flex items-center justify-between min-w-[720px] sm:min-w-[800px]">
           <span className="text-[9px] sm:text-[10px] font-mono text-ink-500 uppercase tracking-wider shrink-0 mr-2 sm:mr-3">
             DEAL LIFECYCLE:
           </span>

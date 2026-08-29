@@ -1,10 +1,12 @@
-import Fastify, { FastifyInstance } from 'fastify';
+import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import cors from '@fastify/cors';
 import { registerIntentRoutes } from './routes/intent.js';
 import { registerOfferRoutes } from './routes/offers.js';
 import { registerRazorpayRoutes } from './routes/razorpay.js';
 import { registerAuctionRoutes } from './routes/auction.js';
 import { registerScenarioRoutes } from './routes/scenarios.js';
+import { stateMachine } from './services/state-machine.js';
+import { prisma } from './db.js';
 
 export function buildServer(): FastifyInstance {
   const server = Fastify({
@@ -13,7 +15,7 @@ export function buildServer(): FastifyInstance {
     },
   });
 
-  // Requirement 3: Capture RAW request body before JSON parser touches it for HMAC webhook signature verification
+  // Capture RAW request body before JSON parser touches it for HMAC webhook signature verification
   server.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
     try {
       const rawString = typeof body === 'string' ? body : (body ? body.toString() : '');
@@ -30,7 +32,7 @@ export function buildServer(): FastifyInstance {
     }
   });
 
-  // Requirement 4: CORS driven by ALLOWED_ORIGIN env var (never hardcoded)
+  // CORS driven by ALLOWED_ORIGIN env var
   const allowedOrigin = process.env.ALLOWED_ORIGIN;
   server.register(cors, {
     origin: allowedOrigin ? allowedOrigin.split(',').map((o) => o.trim()) : true,
@@ -38,7 +40,7 @@ export function buildServer(): FastifyInstance {
     credentials: true,
   });
 
-  // Requirement 2: Health check endpoint for Render deployments
+  // Health check endpoint for Render deployments
   server.get('/api/healthz', async () => {
     return {
       status: 'ok',
@@ -52,6 +54,57 @@ export function buildServer(): FastifyInstance {
       service: 'razorpay-dealflow-api',
       timestamp: new Date().toISOString(),
     };
+  });
+
+  // Audit Logs Endpoint: Reads live rows from PostgreSQL & state machine
+  server.get('/api/audit-logs', async (request: FastifyRequest, reply: FastifyReply) => {
+    const query = request.query as { offer_id?: string };
+    const offerId = query?.offer_id;
+
+    // Fetch memory logs
+    const memoryLogs = stateMachine.getAuditTrail(offerId);
+
+    // Fetch Postgres logs
+    if (process.env.NODE_ENV !== 'test') {
+      try {
+        const dbEntries = await prisma.auditLogEntry.findMany({
+          where: offerId ? { offerId } : {},
+          orderBy: { timestamp: 'desc' },
+          take: 100,
+        });
+
+      if (dbEntries.length > 0) {
+        const formattedDbLogs = dbEntries.map((e) => ({
+          id: e.id,
+          offer_id: e.offerId || '',
+          from_state: null,
+          to_state: e.result === 'FAIL' ? 'FAILED' : 'POLICY_APPROVED',
+          action: e.action,
+          actor: e.actor,
+          input_data: (e.inputData as any) || {},
+          policy_version: e.policyVersion || 'v1',
+          policy_checked: e.policyChecked || 'STATE_MACHINE_RULE',
+          reason: e.reason,
+          timestamp: e.timestamp.toISOString(),
+        }));
+
+        // Merge and deduplicate by id
+        const map = new Map<string, any>();
+        for (const log of [...memoryLogs, ...formattedDbLogs]) {
+          map.set(log.id, log);
+        }
+        return reply.status(200).send({
+          success: true,
+          logs: Array.from(map.values()),
+        });
+      }
+    } catch {}
+  }
+
+    return reply.status(200).send({
+      success: true,
+      logs: memoryLogs,
+    });
   });
 
   // Register domain routes

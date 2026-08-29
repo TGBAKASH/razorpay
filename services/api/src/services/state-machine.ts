@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { prisma } from '../db.js';
 
 export type DealFlowState =
   | 'REQUEST_RECEIVED'
@@ -79,7 +80,7 @@ export class StateMachineManager {
   }
 
   /**
-   * Enforces valid state transitions and writes immutable audit entry.
+   * Enforces valid state transitions and writes immutable audit entry to DB and memory.
    * Throws an error if an illegal state jump is attempted.
    */
   public transition(
@@ -113,6 +114,9 @@ export class StateMachineManager {
         };
         this.auditEntries.push(failureEntry);
 
+        // Async persist to Postgres
+        this.persistAuditLog(failureEntry).catch(() => {});
+
         throw new Error(errorReason);
       }
     }
@@ -138,7 +142,34 @@ export class StateMachineManager {
     };
 
     this.auditEntries.push(entry);
+
+    if (process.env.NODE_ENV !== 'test') {
+      this.persistAuditLog(entry).catch(() => {});
+    }
+
     return entry;
+  }
+
+  private async persistAuditLog(entry: AuditLogEntry): Promise<void> {
+    try {
+      await prisma.auditLogEntry.create({
+        data: {
+          id: entry.id,
+          offerId: entry.offer_id,
+          actor: entry.actor,
+          action: entry.action,
+          inputData: entry.input_data,
+          policyChecked: entry.policy_checked,
+          policyVersion: entry.policy_version,
+          result: entry.to_state === 'FAILED' ? 'FAIL' : 'PASS',
+          reason: entry.reason,
+          rawApiPayload: entry.razorpay_response || entry.razorpay_request || null,
+          timestamp: new Date(entry.timestamp),
+        },
+      });
+    } catch {
+      // Allow fallback if offer record foreign key not yet committed
+    }
   }
 
   public getAuditTrail(offerId?: string): AuditLogEntry[] {

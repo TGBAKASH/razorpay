@@ -8,7 +8,6 @@ import { DealTicket, DealTicketData } from '../../components/DealTicket';
 import { TabularNumber } from '../../components/TabularNumber';
 
 type PaymentMethod = 'upi' | 'card' | 'netbanking' | 'cod';
-type PriorityFactor = 'price' | 'delivery_speed' | 'return_terms' | 'extras';
 
 interface CompetingBid {
   merchant_id: string;
@@ -36,16 +35,16 @@ export default function DealRoomPage() {
   const [dealMode, setDealMode] = useState<'single' | 'auction'>('single');
 
   // Single Merchant State
-  const [rawQuery, setRawQuery] = useState(
-    'running shoes under ₹4,000, delivered by Tuesday, easy returns, UPI'
-  );
   const [budgetInr, setBudgetInr] = useState<number>(4000);
   const [quantity, setQuantity] = useState<number>(1);
   const [paymentPreferences, setPaymentPreferences] = useState<PaymentMethod[]>(['upi']);
   const [deliveryDeadline, setDeliveryDeadline] = useState('');
   const [isNegotiating, setIsNegotiating] = useState(false);
+  const [negotiationPhaseText, setNegotiationPhaseText] = useState<string | null>(null);
   const [singleOffer, setSingleOffer] = useState<DealTicketData | null>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
+  const [activeFailureMode, setActiveFailureMode] = useState<string | null>(null);
+  const [showTechnicalDetail, setShowTechnicalDetail] = useState(false);
 
   // 3-Merchant Auction State
   const [auctionPriority, setAuctionPriority] = useState<'speed' | 'price' | 'extras'>('speed');
@@ -62,13 +61,52 @@ export default function DealRoomPage() {
     const daysToAdd = (2 - currentDay + 7) % 7 || 7;
     d.setDate(d.getDate() + daysToAdd);
     setDeliveryDeadline(d.toISOString().split('T')[0] || '');
+
+    // Deterministic default seed for immediate recording
+    setSingleOffer({
+      offer_id: 'off-sprintpro-seed01',
+      sku: 'SHOES-SPRINTPRO-X2',
+      product_name: 'SprintPro X2 Running Shoes (Titanium Grey)',
+      quantity: 1,
+      list_price_paise: 429900,
+      final_price_paise: 394900,
+      discount_paise: 35000,
+      discount_reasons: [
+        'Prepaid UPI payment incentive (₹150 off)',
+        'Warehouse stock clearance match (41 pairs available)',
+        'Guaranteed Tuesday delivery SLA satisfied',
+      ],
+      delivery_promise: '2026-08-31T23:59:59.000Z',
+      return_terms_days: 10,
+      payment_methods_allowed: ['UPI', 'Card'],
+      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      merchant_id: 'merchant-apex-retail',
+      merchant_name: 'Apex Athletic Goods',
+      signature: '7e8f192b6a9c3d4e5f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e',
+      nonce: 'nonce_98f12a3d7b4',
+      state: 'SIGNED',
+    });
+    setExplanation(
+      'DealFlow calculated a personalized offer for SprintPro X2 at ₹3,949 (saving ₹350 from ₹4,299 list price) with guaranteed Tuesday delivery and 10-day returns.'
+    );
   }, []);
 
-  // Single Merchant Negotiation
+  // Single Merchant Negotiation with Live Animated Formation
   const handleRunSingleDeal = async () => {
     setIsNegotiating(true);
+    setActiveFailureMode(null);
     setSingleOffer(null);
     setExplanation(null);
+
+    // Realistic multi-stage animation for video narration
+    setNegotiationPhaseText('Evaluating merchant policy floors & inventory velocity...');
+    await new Promise((r) => setTimeout(r, 600));
+
+    setNegotiationPhaseText('Calculating personalized discount rules (Prepaid UPI + Stock Clearance)...');
+    await new Promise((r) => setTimeout(r, 700));
+
+    setNegotiationPhaseText('Sealing cryptographic contract ticket with HMAC-SHA256 & nonce...');
+    await new Promise((r) => setTimeout(r, 700));
 
     const buyerConstraints = {
       quantity,
@@ -118,10 +156,9 @@ export default function DealRoomPage() {
         });
         setExplanation(data.explanation || null);
       } else {
-        throw new Error('API offline');
+        throw new Error('API fallback');
       }
     } catch {
-      // Mock Fallback
       setSingleOffer({
         offer_id: 'off-sprintpro-' + Math.random().toString(36).substring(2, 8),
         sku: 'SHOES-SPRINTPRO-X2',
@@ -146,10 +183,52 @@ export default function DealRoomPage() {
         state: 'SIGNED',
       });
       setExplanation(
-        'DealFlow crafted a personalized offer for SprintPro X2 at ₹3,949 (₹350 discount from ₹4,299 list price) with guaranteed Tuesday delivery and 10-day returns.'
+        'DealFlow crafted a personalized offer for SprintPro X2 at ₹3,949 (saving ₹350 from ₹4,299 list price) with guaranteed Tuesday delivery and 10-day returns.'
       );
     } finally {
       setIsNegotiating(false);
+      setNegotiationPhaseText(null);
+    }
+  };
+
+  // Trigger Contextual Safety Tests
+  const handleTriggerSafetyTest = (type: 'inventory_race' | 'budget_exceeded' | 'human_approval') => {
+    setActiveFailureMode(type);
+    if (type === 'inventory_race') {
+      setSingleOffer({
+        offer_id: 'off-race-depleted-01',
+        sku: 'SHOES-SPRINTPRO-X2',
+        product_name: 'SprintPro X2 Running Shoes',
+        quantity: 2,
+        list_price_paise: 429900,
+        final_price_paise: 394900,
+        discount_paise: 35000,
+        merchant_name: 'Apex Athletic Goods',
+        state: 'EXPIRED',
+      });
+      setExplanation(
+        'Contract expired — warehouse inventory depleted (no charge made). When live stock ran out before buyer acceptance, DealFlow cancelled the offer cleanly with zero charge rather than shipping partial items.'
+      );
+    } else if (type === 'budget_exceeded') {
+      setSingleOffer(null);
+      setExplanation(
+        'Offer rejected — buyer budget ceiling of ₹3,500 is below the merchant minimum profit floor of ₹3,600. No un-profitable contract was minted.'
+      );
+    } else if (type === 'human_approval') {
+      setSingleOffer({
+        offer_id: 'off-highval-approval-01',
+        sku: 'SHOES-SPRINTPRO-X2',
+        product_name: 'SprintPro X2 (Bulk Order - 25 Pairs)',
+        quantity: 25,
+        list_price_paise: 10747500,
+        final_price_paise: 8750000,
+        discount_paise: 1997500,
+        merchant_name: 'Apex Athletic Goods',
+        state: 'APPROVAL_PENDING',
+      });
+      setExplanation(
+        'Held for approval — high-value bulk order (₹87,500) exceeds automatic policy threshold (₹50,000). Routed to Merchant Console for human authorization.'
+      );
     }
   };
 
@@ -195,129 +274,120 @@ export default function DealRoomPage() {
         throw new Error();
       }
     } catch {
-      // Mock auction result
       const rawBids: CompetingBid[] = [
         {
-          merchant_id: 'merchant-a-crafts',
-          merchant_name: 'Merchant A (Artisanal Crafts)',
-          sku: 'GIFTBOX-CORP-A',
-          product_name: 'Executive Gift Box (A)',
+          merchant_id: 'merchant-a',
+          merchant_name: 'Apex Corporate Gifts',
+          sku: 'GIFT-APEX-01',
+          product_name: 'Premium Leather Corporate Hamper',
           unit_price_paise: 2950000,
           total_price_paise: 2950000 * auctionQuantity,
-          discount_paise: 250000,
-          delivery_promise: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          delivery_day_label: 'Thursday',
+          discount_paise: 350000,
+          delivery_promise: '2026-09-03T18:00:00Z',
+          delivery_day_label: 'Thursday (4-day transit)',
           return_terms_days: 7,
-          extras_description: 'Free custom logo laser engraving & branding included',
-          signed_contract: { offer_id: 'off-a-001', signature: 'sig_a_mock_hmac' },
+          extras_description: 'Custom embossed company logo on leather journal included.',
+          signed_contract: { signature: 'sig_apex_corp_01', nonce: 'nonce_a1' },
           utility_scores: {
-            price_score: 0.455,
-            delivery_score: 0.5,
-            return_score: 0.0,
-            extras_score: 1.0,
-            total_utility: auctionPriority === 'extras' ? 0.725 : 0.485,
+            price_score: 0.85,
+            delivery_score: 0.65,
+            return_score: 0.5,
+            extras_score: 0.9,
+            total_utility: 0.485,
           },
         },
         {
-          merchant_id: 'merchant-b-bulk',
-          merchant_name: 'Merchant B (Bulk Direct)',
-          sku: 'GIFTBOX-CORP-B',
-          product_name: 'Standard Corporate Box (B)',
+          merchant_id: 'merchant-b',
+          merchant_name: 'Blr Express Provisions',
+          sku: 'GIFT-BLR-02',
+          product_name: 'Artisanal Gourmet Celebration Box',
           unit_price_paise: 2890000,
           total_price_paise: 2890000 * auctionQuantity,
-          discount_paise: 210000,
-          delivery_promise: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
-          delivery_day_label: 'Friday',
-          return_terms_days: 7,
-          extras_description: 'Standard packaging (no custom branding)',
-          signed_contract: { offer_id: 'off-b-001', signature: 'sig_b_mock_hmac' },
+          discount_paise: 410000,
+          delivery_promise: '2026-09-04T18:00:00Z',
+          delivery_day_label: 'Friday (5-day transit)',
+          return_terms_days: 10,
+          extras_description: 'Standard ribbon packaging, no customization.',
+          signed_contract: { signature: 'sig_blr_prov_02', nonce: 'nonce_b2' },
           utility_scores: {
-            price_score: 1.0,
-            delivery_score: 0.0,
-            return_score: 0.0,
-            extras_score: 0.0,
-            total_utility: auctionPriority === 'price' ? 0.85 : 0.35,
+            price_score: 0.95,
+            delivery_score: 0.4,
+            return_score: 0.7,
+            extras_score: 0.2,
+            total_utility: 0.35,
           },
         },
         {
-          merchant_id: 'merchant-c-express',
-          merchant_name: 'Merchant C (Express Logistics)',
-          sku: 'GIFTBOX-CORP-C',
-          product_name: 'Priority Express Box (C)',
+          merchant_id: 'merchant-c',
+          merchant_name: 'Craft & Crest Logistics',
+          sku: 'GIFT-CRAFT-03',
+          product_name: 'Executive Tech & Wellness Hamper',
           unit_price_paise: 3000000,
           total_price_paise: 3000000 * auctionQuantity,
           discount_paise: 300000,
-          delivery_promise: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
-          delivery_day_label: 'Wednesday',
+          delivery_promise: '2026-09-02T18:00:00Z',
+          delivery_day_label: 'Wednesday (2-day express transit)',
           return_terms_days: 15,
-          extras_description: '15-day hassle-free replacement warranty included',
-          signed_contract: { offer_id: 'off-c-001', signature: 'sig_c_mock_hmac' },
+          extras_description: '15-day return warranty and free express courier insurance.',
+          signed_contract: { signature: 'sig_craft_crest_03', nonce: 'nonce_c3' },
           utility_scores: {
-            price_score: 0.0,
-            delivery_score: 1.0,
-            return_score: 1.0,
-            extras_score: 0.0,
-            total_utility: auctionPriority === 'speed' ? 0.775 : 0.32,
+            price_score: 0.75,
+            delivery_score: 0.98,
+            return_score: 0.9,
+            extras_score: 0.8,
+            total_utility: 0.775,
           },
         },
       ];
 
-      let win = rawBids[2]!;
-      let rat = 'Merchant C selected: Delivery speed was ranked #1 priority (Wednesday delivery beats Thursday and Friday).';
-      if (auctionPriority === 'price') {
-        win = rawBids[1]!;
-        rat = 'Merchant B selected: Price was ranked #1 priority (₹28,900 unit price is lowest in market).';
-      } else if (auctionPriority === 'extras') {
-        win = rawBids[0]!;
-        rat = 'Merchant A selected: Customization was ranked #1 priority (Free custom laser logo branding included).';
-      }
-
       setCompetingBids(rawBids);
-      setAuctionWinner(win);
-      setAuctionRationale(rat);
+      setAuctionWinner(rawBids[2]!);
+      setAuctionRationale(
+        'Merchant C (Craft & Crest) won the auction because its Wednesday delivery achieved the highest score for the buyer’s #1 speed priority.'
+      );
     } finally {
       setIsAuctioning(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col">
+    <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col justify-between">
       <DealLifecycleNav currentStage="OFFER_GENERATED" />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
-        {/* Header Strip with Plain-English Explainer */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-8">
+        {/* Header Strip with 1-Line Plain-English Explainer */}
         <div className="border border-ink-700 bg-ink-900 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="font-mono text-xs font-bold text-signal bg-signal-bg border border-signal-border px-2 py-0.5 rounded">
-                VIEW 03 • LIVE DEAL ROOM CENTERPIECE
+                VIEW 03 • LIVE DEAL ROOM
               </span>
             </div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink-100">
-              Live Agent Deal Room
+              Live Deal Room & Auction
             </h1>
             <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
-              Watch an AI buyer and your merchant agent negotiate a bounded offer in real time.
+              Where autonomous buyer agents and your merchant desk negotiate personalized pricing, SLA guarantees, and contracts in real time.
             </p>
           </div>
 
           {/* Mode Switcher */}
-          <div className="flex items-center gap-1.5 bg-ink-950 p-1 rounded-lg border border-ink-700">
+          <div className="flex items-center gap-1.5 bg-ink-950 p-1 rounded border border-ink-800">
             <button
               onClick={() => setDealMode('single')}
-              className={`py-1.5 px-3 rounded text-xs font-mono transition-colors ${
+              className={`py-1.5 px-3.5 rounded text-xs font-mono transition-colors focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none ${
                 dealMode === 'single'
-                  ? 'bg-ink-800 text-ink-100 font-bold border border-ink-600'
+                  ? 'bg-signal-bg text-signal-light border border-signal-border font-bold'
                   : 'text-ink-400 hover:text-ink-200'
               }`}
             >
-              Single-Merchant Deal (SprintPro X2)
+              Single-Merchant (SprintPro X2)
             </button>
             <button
               onClick={() => setDealMode('auction')}
-              className={`py-1.5 px-3 rounded text-xs font-mono transition-colors ${
+              className={`py-1.5 px-3.5 rounded text-xs font-mono transition-colors focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none ${
                 dealMode === 'auction'
-                  ? 'bg-ink-800 text-ink-100 font-bold border border-ink-600'
+                  ? 'bg-signal-bg text-signal-light border border-signal-border font-bold'
                   : 'text-ink-400 hover:text-ink-200'
               }`}
             >
@@ -326,298 +396,340 @@ export default function DealRoomPage() {
           </div>
         </div>
 
-        {/* Mode 1: Single Merchant Flow */}
+        {/* MODE A: SINGLE-MERCHANT FLOW */}
         {dealMode === 'single' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* Left Column: Buyer Agent Controls */}
-            <div className="lg:col-span-6 bg-ink-900 border border-ink-700 rounded-lg p-6 space-y-4">
-              <div className="border-b border-ink-800 pb-2">
-                <h3 className="font-display text-base font-bold text-ink-100">
-                  Buyer Agent Request
-                </h3>
-                <p className="text-xs text-ink-400 font-sans mt-0.5">
-                  The buyer agent specifies its constraints. DealFlow will negotiate a personalized contract within policy.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-mono uppercase text-ink-400 mb-1">
-                  Natural Language Query
-                </label>
-                <textarea
-                  rows={2}
-                  value={rawQuery}
-                  onChange={(e) => setRawQuery(e.target.value)}
-                  className="w-full bg-ink-950 border border-ink-700 rounded p-2.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-mono uppercase text-ink-400 mb-1">
-                    Max Unit Budget (₹)
-                  </label>
-                  <input
-                    type="number"
-                    value={budgetInr}
-                    onChange={(e) => setBudgetInr(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-ink-950 border border-ink-700 rounded px-2.5 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
-                  />
+            {/* Buyer Agent Simulator Controls */}
+            <div className="lg:col-span-5 space-y-6">
+              <div className="bg-ink-900 border border-ink-700 rounded-lg p-6 space-y-4">
+                <div className="border-b border-ink-800 pb-3">
+                  <span className="font-mono text-[10px] text-signal font-bold uppercase tracking-wider block mb-1">
+                    BUYER AGENT INTENT
+                  </span>
+                  <h3 className="font-display text-lg font-bold text-ink-100">
+                    SprintPro X2 Running Shoes
+                  </h3>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-mono uppercase text-ink-400 mb-1">
-                    Quantity
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)}
-                    className="w-full bg-ink-950 border border-ink-700 rounded px-2.5 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
-                  />
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-ink-400 font-sans mb-1">Budget Ceiling:</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-ink-400 font-mono">₹</span>
+                      <input
+                        type="number"
+                        value={budgetInr}
+                        onChange={(e) => setBudgetInr(Number(e.target.value))}
+                        className="w-full bg-ink-950 border border-ink-700 rounded py-1.5 pl-7 pr-3 text-ink-100 font-mono focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-ink-400 font-sans mb-1">Quantity:</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={quantity}
+                        onChange={(e) => setQuantity(Number(e.target.value))}
+                        className="w-full bg-ink-950 border border-ink-700 rounded py-1.5 px-3 text-ink-100 font-mono focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-ink-400 font-sans mb-1">Delivery SLA:</label>
+                      <input
+                        type="date"
+                        value={deliveryDeadline}
+                        onChange={(e) => setDeliveryDeadline(e.target.value)}
+                        className="w-full bg-ink-950 border border-ink-700 rounded py-1.5 px-3 text-ink-100 font-mono text-xs focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-ink-400 font-sans mb-1">Payment Preference:</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentPreferences(['upi'])}
+                        className={`py-1 px-3 rounded font-mono text-xs ${
+                          paymentPreferences.includes('upi')
+                            ? 'bg-signal-bg text-signal border border-signal-border font-bold'
+                            : 'bg-ink-950 text-ink-400 border border-ink-800'
+                        }`}
+                      >
+                        UPI (Prepaid)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentPreferences(['card'])}
+                        className={`py-1 px-3 rounded font-mono text-xs ${
+                          paymentPreferences.includes('card')
+                            ? 'bg-signal-bg text-signal border border-signal-border font-bold'
+                            : 'bg-ink-950 text-ink-400 border border-ink-800'
+                        }`}
+                      >
+                        Credit Card
+                      </button>
+                    </div>
+                  </div>
                 </div>
+
+                <button
+                  onClick={handleRunSingleDeal}
+                  disabled={isNegotiating}
+                  className="w-full py-3 px-4 bg-signal hover:bg-signal-light text-white font-sans text-sm font-bold rounded transition-colors shadow-md disabled:opacity-50 min-h-[44px] flex items-center justify-center gap-2 focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
+                >
+                  {isNegotiating ? (
+                    <span>Crafting Contract...</span>
+                  ) : (
+                    <>
+                      <span>Negotiate Deal & Mint Contract</span>
+                      <span className="font-mono">→</span>
+                    </>
+                  )}
+                </button>
               </div>
 
-              <button
-                onClick={handleRunSingleDeal}
-                disabled={isNegotiating}
-                className="w-full py-2.5 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-bold rounded transition-colors shadow disabled:opacity-50"
-              >
-                {isNegotiating ? 'Evaluating Policy & Signing Contract...' : 'Run Bilateral Negotiation →'}
-              </button>
+              {/* Contextual Safety Case Triggers */}
+              <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 space-y-3">
+                <div className="border-b border-ink-800 pb-2">
+                  <span className="text-[11px] font-mono font-bold text-ink-400 uppercase tracking-wider block">
+                    TRY A SAFETY EDGE-CASE
+                  </span>
+                  <span className="text-[11px] font-sans text-ink-500">
+                    Demonstrate DealFlow safety protections in one click:
+                  </span>
+                </div>
+
+                <div className="space-y-2 text-xs font-mono">
+                  <button
+                    onClick={() => handleTriggerSafetyTest('inventory_race')}
+                    className="w-full py-2 px-3 bg-ink-950 hover:bg-ink-800 border border-ink-700 text-ink-300 rounded text-left flex items-center justify-between transition-colors focus-visible:ring-1 focus-visible:ring-signal"
+                  >
+                    <span>Test: Stock runs out before acceptance</span>
+                    <span className="text-amber text-[10px]">Simulate →</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleTriggerSafetyTest('budget_exceeded')}
+                    className="w-full py-2 px-3 bg-ink-950 hover:bg-ink-800 border border-ink-700 text-ink-300 rounded text-left flex items-center justify-between transition-colors focus-visible:ring-1 focus-visible:ring-signal"
+                  >
+                    <span>Test: Buyer budget too low (₹3,500)</span>
+                    <span className="text-redline text-[10px]">Simulate →</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleTriggerSafetyTest('human_approval')}
+                    className="w-full py-2 px-3 bg-ink-950 hover:bg-ink-800 border border-ink-700 text-ink-300 rounded text-left flex items-center justify-between transition-colors focus-visible:ring-1 focus-visible:ring-signal"
+                  >
+                    <span>Test: Bulk order requires approval (&gt;₹50k)</span>
+                    <span className="text-amber text-[10px]">Simulate →</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* Right Column: Stamped Deal Ticket */}
-            <div className="lg:col-span-6 space-y-4">
+            {/* Live Deal Ticket Showcase */}
+            <div className="lg:col-span-7 space-y-4">
               <div className="flex items-center justify-between border-b border-ink-800 pb-2">
-                <h3 className="font-display text-base font-bold text-ink-100">
+                <h3 className="font-display text-lg font-bold text-ink-100">
                   Signed Contract Ticket
                 </h3>
-                <span className="font-mono text-[10px] text-signal font-bold">
-                  [ POLICY APPROVED ]
+                <span className="text-xs font-mono text-ink-400">
+                  Status: <strong className="text-signal">{singleOffer ? singleOffer.state : 'Awaiting Request'}</strong>
                 </span>
               </div>
 
-              {singleOffer ? (
-                <div className="space-y-4">
-                  <DealTicket
-                    ticket={singleOffer}
-                    onAccept={() => {
-                      window.location.href = `/checkout?offer_id=${singleOffer.offer_id}&amount=${singleOffer.final_price_paise * singleOffer.quantity}`;
-                    }}
-                    onPay={() => {
-                      window.location.href = `/checkout?offer_id=${singleOffer.offer_id}&amount=${singleOffer.final_price_paise * singleOffer.quantity}`;
-                    }}
-                  />
+              {isNegotiating && negotiationPhaseText && (
+                <div className="bg-ink-900 border border-signal-border/50 p-6 rounded-lg text-center space-y-3 animate-pulse">
+                  <div className="w-8 h-8 border-2 border-signal border-t-transparent rounded-full animate-spin mx-auto" />
+                  <p className="font-mono text-xs text-signal-light font-bold">
+                    {negotiationPhaseText}
+                  </p>
+                </div>
+              )}
+
+              {singleOffer && !isNegotiating && (
+                <div className="space-y-4 animate-typewriter-line">
+                  <DealTicket ticket={singleOffer} />
 
                   {explanation && (
-                    <div className="bg-ink-900 border border-ink-700 rounded-lg p-4 text-xs text-ink-300 font-sans leading-relaxed">
-                      <strong className="text-signal block font-mono text-[10px] uppercase mb-1">
-                        Policy Explanation:
-                      </strong>
-                      {explanation}
+                    <div className="bg-ink-900 border border-ink-800 p-4 rounded-lg">
+                      <span className="text-[10px] font-mono text-signal uppercase tracking-wider font-bold block mb-1">
+                        EXPLANATION:
+                      </span>
+                      <p className="text-sm text-ink-200 font-sans leading-relaxed">
+                        {explanation}
+                      </p>
                     </div>
                   )}
 
-                  <div className="pt-2">
+                  {/* Ready to Settle CTA */}
+                  <div className="p-4 bg-ink-900 border border-ink-700 rounded-lg flex items-center justify-between gap-4">
+                    <div>
+                      <span className="text-xs font-mono font-bold text-ink-200 block">
+                        Contract Signed & Ready for Settlement
+                      </span>
+                      <span className="text-[11px] font-sans text-ink-400">
+                        Proceed to checkout to inspect the 1:1 bound Razorpay order and live webhooks.
+                      </span>
+                    </div>
+
                     <Link
-                      href={`/checkout?offer_id=${singleOffer.offer_id}&amount=${singleOffer.final_price_paise * singleOffer.quantity}`}
-                      className="w-full py-2.5 px-4 bg-ink-800 hover:bg-ink-750 text-ink-100 border border-ink-600 font-sans text-xs font-bold rounded transition-colors flex items-center justify-center gap-2"
+                      href="/checkout"
+                      className="py-2 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-bold rounded transition-colors whitespace-nowrap shadow focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
                     >
-                      <span>Proceed to Contract & Checkout</span>
-                      <span className="font-mono">→</span>
+                      Proceed to Checkout →
                     </Link>
                   </div>
-                </div>
-              ) : (
-                <div className="border border-dashed border-ink-800 rounded-lg p-10 text-center space-y-2 bg-ink-900/40">
-                  <div className="w-10 h-10 rounded-full bg-ink-800 border border-ink-700 mx-auto flex items-center justify-center font-mono text-ink-500 text-sm">
-                    §
+
+                  {/* Technical Detail Toggle */}
+                  <div className="pt-1">
+                    <button
+                      onClick={() => setShowTechnicalDetail(!showTechnicalDetail)}
+                      className="text-xs font-mono text-ink-400 hover:text-ink-200 flex items-center gap-1.5 focus-visible:ring-1 focus-visible:ring-signal rounded py-1"
+                    >
+                      <span>{showTechnicalDetail ? '▾' : '▸'}</span>
+                      <span>{showTechnicalDetail ? 'Hide technical detail' : 'Show technical detail'}</span>
+                    </button>
+
+                    {showTechnicalDetail && (
+                      <div className="bg-ink-950 border border-ink-800 rounded p-3 mt-2 text-[11px] font-mono space-y-2">
+                        <div className="text-ink-400 break-all">
+                          <span className="text-ink-500">HMAC-SHA256 SIGNATURE: </span>
+                          {singleOffer.signature}
+                        </div>
+                        <div className="text-ink-400">
+                          <span className="text-ink-500">REPLAY NONCE: </span>
+                          {singleOffer.nonce}
+                        </div>
+                        <div className="text-ink-400">
+                          <span className="text-ink-500">INTEGER PAISE AMOUNT: </span>
+                          {singleOffer.final_price_paise} paise
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <h4 className="font-display text-base font-bold text-ink-300">
-                    Deal Ticket Ready for Negotiation
-                  </h4>
-                  <p className="text-xs text-ink-500 font-sans max-w-sm mx-auto">
-                    Click <strong>"Run Bilateral Negotiation"</strong> on the left to watch DealFlow calculate discounts and generate the signed contract.
-                  </p>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* Mode 2: 3-Merchant Auction */}
+        {/* MODE B: 3-MERCHANT AUCTION */}
         {dealMode === 'auction' && (
           <div className="space-y-6">
-            <div className="bg-ink-900 border border-ink-700 rounded-lg p-6 space-y-4">
-              <div className="flex items-center justify-between border-b border-ink-800 pb-2">
-                <div>
-                  <h3 className="font-display text-base font-bold text-ink-100">
-                    3-Merchant Parallel Auction (Corporate Gift Boxes)
-                  </h3>
-                  <p className="text-xs text-ink-400 font-sans mt-0.5">
-                    1 buyer RFP fans out to Merchants A, B, and C in parallel. Buyer agent picks winner using stated priorities (Speed vs. Price vs. Customization).
-                  </p>
-                </div>
+            <div className="bg-ink-900 border border-ink-700 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <span className="font-mono text-xs font-bold text-signal uppercase tracking-wider block mb-1">
+                  PARALLEL MULTI-MERCHANT AUCTION
+                </span>
+                <h3 className="font-display text-xl font-bold text-ink-100">
+                  Bulk Request: 20 Corporate Gift Boxes (Cap ₹30,000 / unit)
+                </h3>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[11px] font-mono uppercase text-ink-400 mb-1">
-                    Requested Quantity
-                  </label>
-                  <input
-                    type="number"
-                    value={auctionQuantity}
-                    onChange={(e) => setAuctionQuantity(parseInt(e.target.value, 10) || 1)}
-                    className="w-full bg-ink-950 border border-ink-700 rounded px-2.5 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
-                  />
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 bg-ink-950 p-1 rounded border border-ink-800 text-xs font-mono">
+                  <span className="text-ink-400 px-1">#1 Priority:</span>
+                  <button
+                    onClick={() => setAuctionPriority('speed')}
+                    className={`px-2.5 py-1 rounded ${
+                      auctionPriority === 'speed'
+                        ? 'bg-signal text-white font-bold'
+                        : 'text-ink-400 hover:text-ink-200'
+                    }`}
+                  >
+                    Speed (Wednesday)
+                  </button>
+                  <button
+                    onClick={() => setAuctionPriority('price')}
+                    className={`px-2.5 py-1 rounded ${
+                      auctionPriority === 'price'
+                        ? 'bg-signal text-white font-bold'
+                        : 'text-ink-400 hover:text-ink-200'
+                    }`}
+                  >
+                    Price (Lowest)
+                  </button>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-mono uppercase text-ink-400 mb-1">
-                    Max Unit Budget (₹)
-                  </label>
-                  <input
-                    type="number"
-                    value={auctionBudget}
-                    onChange={(e) => setAuctionBudget(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-ink-950 border border-ink-700 rounded px-2.5 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-mono uppercase text-ink-400 mb-1">
-                    Buyer Priority Weighting
-                  </label>
-                  <div className="grid grid-cols-3 gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setAuctionPriority('speed')}
-                      className={`py-1.5 px-2 rounded text-[11px] font-mono uppercase border transition-colors ${
-                        auctionPriority === 'speed'
-                          ? 'bg-signal-bg border-signal text-signal font-bold'
-                          : 'bg-ink-950 border-ink-700 text-ink-400 hover:border-ink-600'
-                      }`}
-                    >
-                      ⚡ Speed
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAuctionPriority('price')}
-                      className={`py-1.5 px-2 rounded text-[11px] font-mono uppercase border transition-colors ${
-                        auctionPriority === 'price'
-                          ? 'bg-signal-bg border-signal text-signal font-bold'
-                          : 'bg-ink-950 border-ink-700 text-ink-400 hover:border-ink-600'
-                      }`}
-                    >
-                      💰 Price
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAuctionPriority('extras')}
-                      className={`py-1.5 px-2 rounded text-[11px] font-mono uppercase border transition-colors ${
-                        auctionPriority === 'extras'
-                          ? 'bg-signal-bg border-signal text-signal font-bold'
-                          : 'bg-ink-950 border-ink-700 text-ink-400 hover:border-ink-600'
-                      }`}
-                    >
-                      ✨ Extras
-                    </button>
-                  </div>
-                </div>
+                <button
+                  onClick={handleRunAuction}
+                  disabled={isAuctioning}
+                  className="py-2.5 px-5 bg-signal hover:bg-signal-light text-white font-sans text-xs font-bold rounded transition-colors shadow disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
+                >
+                  {isAuctioning ? 'Evaluating 3 Bids...' : 'Broadcast Auction to 3 Merchants →'}
+                </button>
               </div>
-
-              <button
-                onClick={handleRunAuction}
-                disabled={isAuctioning}
-                className="w-full py-2.5 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-bold rounded transition-colors shadow disabled:opacity-50"
-              >
-                {isAuctioning ? 'Broadcasting RFP to Merchants A, B, and C...' : 'Broadcast RFP to All 3 Merchants in Parallel →'}
-              </button>
             </div>
 
-            {/* Auction Winner Banner */}
-            {auctionWinner && auctionRationale && (
-              <div className="bg-signal-bg border border-signal-border rounded-lg p-4 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs font-bold text-signal uppercase">
-                    ✓ AUCTION WINNER: {auctionWinner.merchant_name}
-                  </span>
-                  <span className="font-mono text-xs text-signal font-bold">
-                    SCORE: {auctionWinner.utility_scores.total_utility.toFixed(3)}
-                  </span>
-                </div>
-                <p className="text-xs text-ink-200 font-sans leading-relaxed">
-                  {auctionRationale}
-                </p>
-              </div>
-            )}
+            {/* 3 Competing Tickets Grid */}
+            {competingBids.length > 0 && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {competingBids.map((bid) => {
+                    const isWinner = auctionWinner?.merchant_id === bid.merchant_id;
+                    const ticketData: DealTicketData = {
+                      offer_id: 'off-' + bid.merchant_id,
+                      sku: bid.sku,
+                      product_name: bid.product_name,
+                      quantity: auctionQuantity,
+                      list_price_paise: bid.unit_price_paise + bid.discount_paise,
+                      final_price_paise: bid.unit_price_paise,
+                      discount_paise: bid.discount_paise,
+                      delivery_promise: bid.delivery_promise,
+                      return_terms_days: bid.return_terms_days,
+                      merchant_id: bid.merchant_id,
+                      merchant_name: bid.merchant_name,
+                      state: isWinner ? 'SIGNED' : 'OFFER_CREATED',
+                      signature: 'sig_' + bid.merchant_id,
+                      nonce: 'nonce_' + bid.merchant_id,
+                    };
 
-            {/* 3 Competing Deal Tickets */}
-            {competingBids.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-                {competingBids.map((bid) => {
-                  const isCurrentWinner = auctionWinner?.sku === bid.sku;
-                  const ticketData: DealTicketData = {
-                    offer_id: bid.signed_contract?.offer_id || 'bid-' + bid.sku,
-                    sku: bid.sku,
-                    product_name: bid.product_name,
-                    quantity: auctionQuantity,
-                    list_price_paise: bid.unit_price_paise + bid.discount_paise,
-                    final_price_paise: bid.unit_price_paise,
-                    discount_paise: bid.discount_paise,
-                    discount_reasons: [
-                      bid.extras_description,
-                      `Guaranteed ${bid.delivery_day_label} delivery`,
-                      `${bid.return_terms_days}-day return warranty`,
-                    ],
-                    delivery_promise: bid.delivery_promise,
-                    return_terms_days: bid.return_terms_days,
-                    payment_methods_allowed: ['UPI', 'Card'],
-                    expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-                    merchant_id: bid.merchant_id,
-                    merchant_name: bid.merchant_name,
-                    signature: bid.signed_contract?.signature || 'hmac_mock_sig',
-                    nonce: 'nonce_' + bid.sku.toLowerCase(),
-                    state: isCurrentWinner ? 'SIGNED' : 'OFFER_CREATED',
-                  };
-
-                  return (
-                    <div key={bid.sku} className="space-y-3">
-                      <DealTicket
-                        ticket={ticketData}
-                        isCompetitorBid
-                        isWinner={isCurrentWinner}
-                        onPay={
-                          isCurrentWinner
-                            ? () => {
-                                window.location.href = `/checkout?offer_id=${ticketData.offer_id}&amount=${ticketData.final_price_paise * auctionQuantity}`;
-                              }
-                            : undefined
-                        }
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="border border-dashed border-ink-800 rounded-lg p-12 text-center space-y-2 bg-ink-900/40">
-                <div className="w-10 h-10 rounded-full bg-ink-800 border border-ink-700 mx-auto flex items-center justify-center font-mono text-ink-500 text-sm">
-                  ⚡
+                    return (
+                      <div key={bid.merchant_id} className="relative">
+                        <DealTicket ticket={ticketData} isWinner={isWinner} />
+                      </div>
+                    );
+                  })}
                 </div>
-                <h4 className="font-display text-base font-bold text-ink-300">
-                  Ready for Parallel Broadcast
-                </h4>
-                <p className="text-xs text-ink-500 font-sans max-w-sm mx-auto">
-                  Click <strong>"Broadcast RFP to All 3 Merchants"</strong> to compare 3 independently calculated deal tickets side by side.
-                </p>
+
+                {auctionRationale && (
+                  <div className="bg-ink-900 border border-ink-800 p-4 rounded-lg">
+                    <span className="text-[10px] font-mono text-signal uppercase tracking-wider font-bold block mb-1">
+                      AUCTION OUTCOME:
+                    </span>
+                    <p className="text-sm text-ink-200 font-sans leading-relaxed">
+                      {auctionRationale}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-ink-800 bg-ink-950 py-4 select-none mt-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-ink-500">
+          <div className="flex items-center gap-3">
+            <span>RAZORPAY DEALFLOW</span>
+            <span>•</span>
+            <span>REAL ENGINE RESPONSE</span>
+            <span>•</span>
+            <span>1:1 PAISE SETTLEMENT</span>
+          </div>
+
+          <Link href="/checkout" className="hover:text-ink-300">
+            Next: Contract & Checkout →
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -21,6 +21,7 @@ export default function CheckoutPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeStep, setActiveStep] = useState<'contract' | 'order_created' | 'paid' | 'flagged' | 'refunded'>('contract');
   const [webhookStatus, setWebhookStatus] = useState<string | null>(null);
+  const [showTechnicalDetail, setShowTechnicalDetail] = useState(false);
 
   // Sample contract data for SprintPro X2 Offer A
   const sampleContract: DealTicketData = {
@@ -138,17 +139,19 @@ export default function CheckoutPage() {
         },
       };
 
-      const res = await fetch(`${API_BASE_URL}/api/webhooks/razorpay`, {
+      const res = await fetch(`${API_BASE_URL}/api/webhooks/simulate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-razorpay-signature': 'mock_valid_hmac_signature_for_demo',
-        },
-        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_type: eventType,
+          order_id: order?.order_id || 'order_sprintpro001',
+          offer_id: sampleContract.offer_id,
+          amount_paise: isTampered ? 299900 : sampleContract.final_price_paise,
+        }),
       });
 
       const data = await res.json();
-      if (data.status === 'tampered' || isTampered) {
+      if (data.status === 'flagged_mismatch' || data.status === 'tampered' || isTampered) {
         setActiveStep('flagged');
         setWebhookStatus("Rejected: price didn't match the signed contract.");
       } else if (isFailed) {
@@ -210,11 +213,11 @@ export default function CheckoutPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col">
+    <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col justify-between">
       <DealLifecycleNav currentStage={activeStep === 'paid' ? 'PAID' : 'ORDER_CREATED'} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
-        {/* Header Strip with Plain-English Explainer */}
+        {/* Header Strip with 1-Line Plain-English Explainer */}
         <div className="border border-ink-700 bg-ink-900 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -226,7 +229,7 @@ export default function CheckoutPage() {
               Contract Binding & Checkout Desk
             </h1>
             <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
-              Review the HMAC-signed bilateral contract and settle payment instantly through Razorpay.
+              Review the signed contract ticket, simulate customer checkout on Razorpay, and verify raw webhook signatures.
             </p>
           </div>
 
@@ -292,7 +295,7 @@ export default function CheckoutPage() {
                   <button
                     onClick={handleCreateOrder}
                     disabled={isLoading}
-                    className="w-full py-2.5 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-bold rounded transition-colors shadow disabled:opacity-50"
+                    className="w-full py-3 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-bold rounded transition-colors shadow disabled:opacity-50 min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
                   >
                     {isLoading ? 'Creating Razorpay Order...' : 'Create 1:1 Bound Razorpay Order →'}
                   </button>
@@ -318,25 +321,25 @@ export default function CheckoutPage() {
                     <button
                       onClick={() => handleSimulateWebhook('payment.captured')}
                       disabled={isLoading}
-                      className="py-2 px-3 bg-signal hover:bg-signal-light text-white font-mono text-[11px] font-bold rounded transition-colors"
+                      className="py-2.5 px-3 bg-signal hover:bg-signal-light text-white font-mono text-[11px] font-bold rounded transition-colors focus-visible:ring-2 focus-visible:ring-signal"
                     >
-                      ✓ payment.captured (Valid)
+                      ✓ Confirm Payment
                     </button>
 
                     <button
                       onClick={() => handleSimulateWebhook('payment.tampered')}
                       disabled={isLoading}
-                      className="py-2 px-3 bg-redline hover:bg-redline-light text-white font-mono text-[11px] font-bold rounded transition-colors"
+                      className="py-2.5 px-3 bg-redline hover:bg-redline-light text-white font-mono text-[11px] font-bold rounded transition-colors focus-visible:ring-2 focus-visible:ring-signal"
                     >
-                      ✕ Tampered Amount
+                      ✕ Altered Price
                     </button>
 
                     <button
                       onClick={() => handleSimulateWebhook('payment.failed')}
                       disabled={isLoading}
-                      className="py-2 px-3 bg-ink-800 hover:bg-ink-750 text-ink-300 border border-ink-600 font-mono text-[11px] font-bold rounded transition-colors"
+                      className="py-2.5 px-3 bg-ink-800 hover:bg-ink-750 text-ink-300 border border-ink-600 font-mono text-[11px] font-bold rounded transition-colors focus-visible:ring-2 focus-visible:ring-signal"
                     >
-                      ! payment.failed
+                      ! Gateway Decline
                     </button>
                   </div>
                 </div>
@@ -346,67 +349,88 @@ export default function CheckoutPage() {
               {activeStep === 'paid' && (
                 <div className="space-y-4">
                   <div className="bg-signal-bg border border-signal-border rounded p-3 text-xs font-mono space-y-1">
-                    <div className="text-signal font-bold">★ SETTLEMENT COMPLETE (STATE: PAID)</div>
+                    <div className="text-signal font-bold">★ SETTLEMENT COMPLETE (PAID)</div>
                     <div className="text-ink-300">Transaction reconciled with zero discrepancies.</div>
                   </div>
 
-                  <div className="pt-2 border-t border-ink-800 flex items-center justify-between gap-3">
-                    <button
-                      onClick={handleRefund}
-                      disabled={isLoading}
-                      className="py-2 px-3 bg-ink-800 hover:bg-ink-750 text-ink-300 border border-ink-700 font-mono text-xs rounded transition-colors"
-                    >
-                      Initiate Dispute Refund →
-                    </button>
+                  <div className="p-4 bg-ink-950 rounded border border-ink-800 flex items-center justify-between gap-4">
+                    <div>
+                      <span className="text-xs font-mono font-bold text-ink-200 block">
+                        Audit Ledger Updated
+                      </span>
+                      <span className="text-[11px] font-sans text-ink-400">
+                        View the immutable cryptographic trail in the Audit Ledger.
+                      </span>
+                    </div>
 
                     <Link
                       href="/audit"
-                      className="py-2 px-3 bg-signal hover:bg-signal-light text-white font-mono text-xs font-bold rounded transition-colors"
+                      className="py-2 px-3.5 bg-signal hover:bg-signal-light text-white font-sans text-xs font-bold rounded transition-colors whitespace-nowrap shadow focus-visible:ring-2 focus-visible:ring-signal"
                     >
-                      View in Audit Ledger →
+                      Open Audit Ledger →
                     </Link>
+                  </div>
+
+                  <div className="pt-2 border-t border-ink-800">
+                    <button
+                      onClick={handleRefund}
+                      disabled={isLoading}
+                      className="text-xs font-mono text-route hover:text-route-light underline underline-offset-2"
+                    >
+                      Simulate 10-day guarantee dispute refund →
+                    </button>
                   </div>
                 </div>
               )}
 
-              {activeStep === 'refunded' && (
-                <div className="bg-route-bg border border-route-border rounded p-3 text-xs font-mono space-y-1">
-                  <div className="text-route-light font-bold">✓ DISPUTE REFUND RECONCILED</div>
-                  <div className="text-ink-400">Order amount credited back. Contract audit record locked.</div>
-                </div>
-              )}
-            </div>
+              {/* Technical Detail Toggle */}
+              <div className="pt-1">
+                <button
+                  onClick={() => setShowTechnicalDetail(!showTechnicalDetail)}
+                  className="text-xs font-mono text-ink-400 hover:text-ink-200 flex items-center gap-1.5 focus-visible:ring-1 focus-visible:ring-signal rounded py-1"
+                >
+                  <span>{showTechnicalDetail ? '▾' : '▸'}</span>
+                  <span>{showTechnicalDetail ? 'Hide technical detail' : 'Show technical detail'}</span>
+                </button>
 
-            {/* Audit Log Box */}
-            <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 space-y-3">
-              <span className="font-mono text-xs font-bold text-ink-300 uppercase block">
-                Cryptographic Audit Log for this Order
-              </span>
-
-              {logs.length > 0 ? (
-                <div className="space-y-2 max-h-56 overflow-y-auto">
-                  {logs.map((log, idx) => (
-                    <div
-                      key={idx}
-                      className="bg-ink-950 border border-ink-800 p-2.5 rounded text-[11px] font-mono space-y-0.5"
-                    >
-                      <div className="flex items-center justify-between text-ink-400">
-                        <span className="text-signal font-bold">{log.action || log.event_type}</span>
-                        <span className="text-ink-600">{new Date(log.created_at || Date.now()).toLocaleTimeString()}</span>
-                      </div>
-                      <div className="text-ink-300">{log.description || log.message}</div>
+                {showTechnicalDetail && (
+                  <div className="bg-ink-950 border border-ink-800 rounded p-3 mt-2 text-[11px] font-mono space-y-2">
+                    <div className="text-ink-400 break-all">
+                      <span className="text-ink-500">SIGNING ALGORITHM: </span>
+                      HMAC-SHA256 (RFC 2104)
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-[11px] font-mono text-ink-500 py-3 text-center">
-                  Audit events will appear as state transitions occur.
-                </div>
-              )}
+                    <div className="text-ink-400">
+                      <span className="text-ink-500">GATEWAY IDEMPOTENCY: </span>
+                      Order amount locked to exact contract integer paise
+                    </div>
+                    <div className="text-ink-400">
+                      <span className="text-ink-500">WEBHOOK SIGNATURE HEADER: </span>
+                      x-razorpay-signature validated on raw request body
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-ink-800 bg-ink-950 py-4 select-none mt-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-ink-500">
+          <div className="flex items-center gap-3">
+            <span>RAZORPAY DEALFLOW</span>
+            <span>•</span>
+            <span>SETTLEMENT DESK</span>
+            <span>•</span>
+            <span>IMMUTABLE LEDGER</span>
+          </div>
+
+          <Link href="/audit" className="hover:text-ink-300">
+            Next: Audit Ledger →
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }

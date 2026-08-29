@@ -246,7 +246,7 @@ export function runDualPathSimulation(
     for (const candidate of candidates) {
       const evaluation = evaluateAllPolicies(candidate, policy, product, inventory, now);
       if (evaluation.pass) {
-        const scored = scoreCandidateOffer(candidate, product, req.buyer_constraints, evaluation);
+        const scored = scoreCandidateOffer(candidate, evaluation, product, req.buyer_constraints);
         validScoredCandidates.push(scored);
       }
     }

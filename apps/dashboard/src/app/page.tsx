@@ -5,38 +5,38 @@ export default function Home() {
   const lifecycleFlow = [
     {
       step: '01',
-      state: 'REQUEST_RECEIVED',
-      role: 'Buyer Agent RFP',
+      state: 'Request',
+      role: 'Buyer intent',
       desc: 'Buyer agent sends intent with budget ceiling, quantity, delivery deadline, and payment rail.',
     },
     {
       step: '02',
-      state: 'OFFER_GENERATED',
-      role: 'Deterministic Engine',
+      state: 'Offer made',
+      role: 'Pricing engine',
       desc: 'Merchant engine scores candidate deals against margin floor, inventory velocity, and logistics SLA.',
     },
     {
       step: '03',
-      state: 'POLICY_APPROVED',
-      role: 'Signed Contract',
+      state: 'Approved',
+      role: 'Signed contract',
       desc: 'Winning offer is locked into an HMAC-SHA256 contract ticket with a single-use nonce.',
     },
     {
       step: '04',
-      state: 'OFFER_ACCEPTED',
-      role: 'Buyer Handshake',
-      desc: 'Buyer accepts the signed contract. Invariants verify amount has not been tampered with.',
+      state: 'Accepted',
+      role: 'Buyer handshake',
+      desc: 'Buyer accepts the signed contract. Security checks verify price has not been tampered with.',
     },
     {
       step: '05',
-      state: 'ORDER_CREATED',
-      role: 'Razorpay Gateway',
+      state: 'Order placed',
+      role: 'Razorpay order',
       desc: 'Razorpay order created with exact paise amount locked 1:1 to the signed contract.',
     },
     {
       step: '06',
-      state: 'PAID',
-      role: 'Cryptographic Audit',
+      state: 'Paid',
+      role: 'Audit ledger',
       desc: 'Raw webhook HMAC verified, funds captured, and state permanently recorded in the audit ledger.',
     },
   ];
@@ -107,26 +107,26 @@ export default function Home() {
           {/* Dual Clear CTAs */}
           <div className="mt-8 flex flex-wrap items-center gap-4 pt-6 border-t border-ink-800">
             <Link
-              href="/demo"
-              className="py-3 px-6 bg-signal hover:bg-signal-light text-white font-sans text-sm font-bold rounded transition-colors shadow-lg flex items-center gap-2"
-            >
-              <span>Run the Guided Demo (Recorded Presentation)</span>
-              <span className="font-mono">→</span>
-            </Link>
-
-            <Link
               href="/deal-room"
-              className="py-3 px-6 bg-ink-800 hover:bg-ink-750 text-ink-100 border border-ink-600 font-sans text-sm font-bold rounded transition-colors flex items-center gap-2"
+              className="py-3 px-6 bg-signal hover:bg-signal-light text-white font-sans text-sm font-bold rounded transition-colors shadow-lg flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
             >
-              <span>Open Live Deal Room</span>
+              <span>03 Enter the Live Deal Room</span>
               <span className="font-mono">→</span>
             </Link>
 
             <Link
               href="/merchant-console"
-              className="py-3 px-5 text-ink-400 hover:text-ink-200 font-sans text-sm font-medium transition-colors"
+              className="py-3 px-6 bg-ink-800 hover:bg-ink-750 text-ink-100 border border-ink-600 font-sans text-sm font-bold rounded transition-colors flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
             >
-              Configure Merchant Rules →
+              <span>02 Configure Merchant Rules</span>
+              <span className="font-mono">→</span>
+            </Link>
+
+            <Link
+              href="/checkout"
+              className="py-3 px-5 text-ink-400 hover:text-ink-200 font-sans text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
+            >
+              04 Contract & Checkout →
             </Link>
           </div>
         </div>
