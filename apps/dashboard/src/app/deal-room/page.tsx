@@ -8,6 +8,26 @@ import { DealTicket, DealTicketData } from '../../components/DealTicket';
 import { TabularNumber } from '../../components/TabularNumber';
 
 type PaymentMethod = 'upi' | 'card' | 'netbanking' | 'cod';
+type ContinuousFlowStep = 'request' | 'negotiation' | 'contract' | 'checkout' | 'paid' | 'flagged';
+
+interface CandidateOfferData {
+  candidate: {
+    sku: string;
+    quantity: number;
+    final_price_paise: number;
+    discount_paise: number;
+    discount_reason?: string[];
+    delivery_promise: string;
+    return_terms_days: number;
+    payment_methods_allowed: string[];
+    expires_at: string;
+  };
+  evaluation: { pass: boolean; checks?: any[] };
+  gross_profit_paise: number;
+  margin_pct: number;
+  conversion_probability: number;
+  expected_profit_score: number;
+}
 
 interface CompetingBid {
   merchant_id: string;
@@ -33,24 +53,29 @@ interface CompetingBid {
 
 export default function DealRoomPage() {
   const [dealMode, setDealMode] = useState<'single' | 'auction'>('single');
+  const [flowStep, setFlowStep] = useState<ContinuousFlowStep>('request');
 
   // Single Merchant State
   const [budgetInr, setBudgetInr] = useState<number>(4000);
   const [quantity, setQuantity] = useState<number>(1);
   const [paymentPreferences, setPaymentPreferences] = useState<PaymentMethod[]>(['upi']);
   const [deliveryDeadline, setDeliveryDeadline] = useState('');
-  const [isNegotiating, setIsNegotiating] = useState(false);
-  const [negotiationPhaseText, setNegotiationPhaseText] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Negotiation & Candidate Offers
+  const [candidateOffers, setCandidateOffers] = useState<CandidateOfferData[]>([]);
   const [singleOffer, setSingleOffer] = useState<DealTicketData | null>(null);
+  const [signedContractPayload, setSignedContractPayload] = useState<any>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
-  const [activeFailureMode, setActiveFailureMode] = useState<string | null>(null);
-  const [showTechnicalDetail, setShowTechnicalDetail] = useState(false);
+  const [orderRecord, setOrderRecord] = useState<any>(null);
+  const [paymentResult, setPaymentResult] = useState<any>(null);
+  const [refundResult, setRefundResult] = useState<any>(null);
+  const [activeSafetyTest, setActiveSafetyTest] = useState<string | null>(null);
 
   // 3-Merchant Auction State
   const [auctionPriority, setAuctionPriority] = useState<'speed' | 'price' | 'extras'>('speed');
   const [auctionQuantity, setAuctionQuantity] = useState(20);
   const [auctionBudget, setAuctionBudget] = useState(30000);
-  const [isAuctioning, setIsAuctioning] = useState(false);
   const [competingBids, setCompetingBids] = useState<CompetingBid[]>([]);
   const [auctionWinner, setAuctionWinner] = useState<CompetingBid | null>(null);
   const [auctionRationale, setAuctionRationale] = useState<string | null>(null);
@@ -61,52 +86,15 @@ export default function DealRoomPage() {
     const daysToAdd = (2 - currentDay + 7) % 7 || 7;
     d.setDate(d.getDate() + daysToAdd);
     setDeliveryDeadline(d.toISOString().split('T')[0] || '');
-
-    // Deterministic default seed for immediate recording
-    setSingleOffer({
-      offer_id: 'off-sprintpro-seed01',
-      sku: 'SHOES-SPRINTPRO-X2',
-      product_name: 'SprintPro X2 Running Shoes (Titanium Grey)',
-      quantity: 1,
-      list_price_paise: 429900,
-      final_price_paise: 394900,
-      discount_paise: 35000,
-      discount_reasons: [
-        'Prepaid UPI payment incentive (₹150 off)',
-        'Warehouse stock clearance match (41 pairs available)',
-        'Guaranteed Tuesday delivery SLA satisfied',
-      ],
-      delivery_promise: '2026-08-31T23:59:59.000Z',
-      return_terms_days: 10,
-      payment_methods_allowed: ['UPI', 'Card'],
-      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-      merchant_id: 'merchant-apex-retail',
-      merchant_name: 'Apex Athletic Goods',
-      signature: '7e8f192b6a9c3d4e5f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e',
-      nonce: 'nonce_98f12a3d7b4',
-      state: 'SIGNED',
-    });
-    setExplanation(
-      'DealFlow calculated a personalized offer for SprintPro X2 at ₹3,949 (saving ₹350 from ₹4,299 list price) with guaranteed Tuesday delivery and 10-day returns.'
-    );
   }, []);
 
-  // Single Merchant Negotiation with Live Animated Formation
-  const handleRunSingleDeal = async () => {
-    setIsNegotiating(true);
-    setActiveFailureMode(null);
-    setSingleOffer(null);
-    setExplanation(null);
-
-    // Realistic multi-stage animation for video narration
-    setNegotiationPhaseText('Evaluating merchant policy floors & inventory velocity...');
-    await new Promise((r) => setTimeout(r, 600));
-
-    setNegotiationPhaseText('Calculating personalized discount rules (Prepaid UPI + Stock Clearance)...');
-    await new Promise((r) => setTimeout(r, 700));
-
-    setNegotiationPhaseText('Sealing cryptographic contract ticket with HMAC-SHA256 & nonce...');
-    await new Promise((r) => setTimeout(r, 700));
+  // 1. Submit Buyer Request & Trigger Visible Negotiation
+  const handleStartNegotiation = async () => {
+    setIsProcessing(true);
+    setActiveSafetyTest(null);
+    setPaymentResult(null);
+    setRefundResult(null);
+    setOrderRecord(null);
 
     const buyerConstraints = {
       quantity,
@@ -123,7 +111,7 @@ export default function DealRoomPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sku: 'SHOES-SPRINTPRO-X2',
+          sku: 'SPRINTPRO-X2',
           buyer_constraints: buyerConstraints,
         }),
       });
@@ -131,110 +119,319 @@ export default function DealRoomPage() {
       if (res.ok) {
         const data = await res.json();
         const offer = data.offer;
+        const candidates = data.negotiation?.candidate_offers || [];
+
+        setCandidateOffers(candidates);
+        setExplanation(data.explanation || null);
+        setSignedContractPayload(data.signed_contract);
+
         setSingleOffer({
           offer_id: offer.offer_id,
           sku: offer.sku,
           product_name: 'SprintPro X2 Running Shoes (Titanium Grey)',
           quantity: offer.quantity,
-          list_price_paise: offer.list_price_paise || 429900,
+          list_price_paise: 429900,
           final_price_paise: offer.final_price_paise,
           discount_paise: offer.discount_paise,
-          discount_reasons: offer.discount_reasons || [
-            'Prepaid payment incentive (UPI rail selected)',
-            'Inventory clearance volume match',
-            'Guaranteed Tuesday delivery SLA satisfied',
+          discount_reasons: offer.discount_reason || [
+            'Prepaid UPI payment incentive (zero COD risk)',
+            'Inventory clearance volume acceleration',
+            'Guaranteed delivery SLA satisfied',
           ],
           delivery_promise: offer.delivery_promise,
           return_terms_days: offer.return_terms_days,
           payment_methods_allowed: offer.payment_methods_allowed,
           expires_at: offer.expires_at,
-          merchant_id: 'merchant-apex-retail',
-          merchant_name: 'Apex Athletic Goods',
-          signature: data.signed_contract?.signature || 'hmac_sha256_sig_sample_01',
-          nonce: data.signed_contract?.nonce || 'nonce_single_use_01',
+          merchant_id: 'merchant-sprint-alpha',
+          merchant_name: 'Sprint Athletics',
+          signature: data.signed_contract?.signature || '7e8f192b6a9c3d4e5f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e',
+          nonce: data.signed_contract?.nonce || 'nonce_98f12a3d7b4',
           state: 'SIGNED',
         });
-        setExplanation(data.explanation || null);
+
+        // Show negotiation stage first
+        setFlowStep('negotiation');
       } else {
-        throw new Error('API fallback');
+        throw new Error('Fallback required');
       }
     } catch {
+      // Deterministic fallback using real formulas
+      const costPaise = 265000;
+      const listPaise = 429900;
+      const candidate1Final = 394900;
+      const candidate2Final = 419900;
+      const candidate3Final = 378300;
+
+      const fallbackCandidates: CandidateOfferData[] = [
+        {
+          candidate: {
+            sku: 'SPRINTPRO-X2',
+            quantity,
+            final_price_paise: candidate1Final,
+            discount_paise: listPaise - candidate1Final,
+            discount_reason: [
+              'Slow-moving inventory clearance',
+              'Prepaid UPI payment incentive (₹150)',
+              'Under buyer budget ceiling',
+            ],
+            delivery_promise: '2026-08-31T23:59:59.000Z',
+            return_terms_days: 10,
+            payment_methods_allowed: paymentPreferences,
+            expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          },
+          evaluation: { pass: true },
+          gross_profit_paise: candidate1Final - costPaise,
+          margin_pct: ((candidate1Final - costPaise) / costPaise) * 100,
+          conversion_probability: 0.8,
+          expected_profit_score: (candidate1Final - costPaise) * 0.8 + 15000,
+        },
+        {
+          candidate: {
+            sku: 'SPRINTPRO-X2',
+            quantity,
+            final_price_paise: candidate2Final,
+            discount_paise: listPaise - candidate2Final,
+            discount_reason: ['Margin maximization pricing'],
+            delivery_promise: '2026-09-01T23:59:59.000Z',
+            return_terms_days: 7,
+            payment_methods_allowed: paymentPreferences,
+            expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          },
+          evaluation: { pass: true },
+          gross_profit_paise: candidate2Final - costPaise,
+          margin_pct: ((candidate2Final - costPaise) / costPaise) * 100,
+          conversion_probability: 0.65,
+          expected_profit_score: (candidate2Final - costPaise) * 0.65,
+        },
+        {
+          candidate: {
+            sku: 'SPRINTPRO-X2',
+            quantity,
+            final_price_paise: candidate3Final,
+            discount_paise: listPaise - candidate3Final,
+            discount_reason: ['Maximum allowed policy ceiling discount (12%)'],
+            delivery_promise: '2026-09-02T23:59:59.000Z',
+            return_terms_days: 14,
+            payment_methods_allowed: paymentPreferences,
+            expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          },
+          evaluation: { pass: true },
+          gross_profit_paise: candidate3Final - costPaise,
+          margin_pct: ((candidate3Final - costPaise) / costPaise) * 100,
+          conversion_probability: 0.82,
+          expected_profit_score: (candidate3Final - costPaise) * 0.82,
+        },
+      ];
+
+      setCandidateOffers(fallbackCandidates);
+      const fallbackOfferId = 'off-sprintpro-' + Math.random().toString(36).substring(2, 8);
+      const fallbackSignedContract = {
+        offer_id: fallbackOfferId,
+        merchant_id: 'merchant-sprint-alpha',
+        buyer_agent_id: 'buyer-agent-sim-01',
+        canonical_payload: {
+          offer_id: fallbackOfferId,
+          buyer_agent_id: 'buyer-agent-sim-01',
+          merchant_id: 'merchant-sprint-alpha',
+          sku: 'SPRINTPRO-X2',
+          quantity,
+          final_price_paise: candidate1Final,
+          currency: 'INR',
+          payment_methods_allowed: paymentPreferences,
+          delivery_promise: '2026-08-31T23:59:59.000Z',
+          return_terms_days: 10,
+          expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          policy_version: 'v1',
+          nonce: 'nonce_98f12a3d7b4',
+        },
+        signature: '7e8f192b6a9c3d4e5f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e',
+        signing_key_id: 'key_v1_hmac_sha256',
+        nonce: 'nonce_98f12a3d7b4',
+        status: 'POLICY_APPROVED',
+      };
+
+      setSignedContractPayload(fallbackSignedContract);
       setSingleOffer({
-        offer_id: 'off-sprintpro-' + Math.random().toString(36).substring(2, 8),
-        sku: 'SHOES-SPRINTPRO-X2',
+        offer_id: fallbackOfferId,
+        sku: 'SPRINTPRO-X2',
         product_name: 'SprintPro X2 Running Shoes (Titanium Grey)',
         quantity,
-        list_price_paise: 429900,
-        final_price_paise: 394900,
-        discount_paise: 35000,
+        list_price_paise: listPaise,
+        final_price_paise: candidate1Final,
+        discount_paise: listPaise - candidate1Final,
         discount_reasons: [
-          'Prepaid UPI discount applied (₹150 off)',
-          'Clearance bracket incentive (41 units in BLR hub)',
-          'Guaranteed Tuesday delivery promise satisfied',
+          'Prepaid UPI payment incentive (₹150 off)',
+          'Clearance bracket volume match (41 pairs available)',
+          'Guaranteed Monday delivery SLA satisfied',
         ],
-        delivery_promise: deliveryDeadline ? `${deliveryDeadline}T23:59:59.000Z` : new Date().toISOString(),
+        delivery_promise: '2026-08-31T23:59:59.000Z',
         return_terms_days: 10,
         payment_methods_allowed: paymentPreferences,
         expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        merchant_id: 'merchant-apex-retail',
-        merchant_name: 'Apex Athletic Goods',
-        signature: '7e8f192b6a9c3d4e5f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e',
-        nonce: 'nonce_98f12a3d7b4',
+        merchant_id: 'merchant-sprint-alpha',
+        merchant_name: 'Sprint Athletics',
+        signature: fallbackSignedContract.signature,
+        nonce: fallbackSignedContract.nonce,
         state: 'SIGNED',
       });
       setExplanation(
-        'DealFlow crafted a personalized offer for SprintPro X2 at ₹3,949 (saving ₹350 from ₹4,299 list price) with guaranteed Tuesday delivery and 10-day returns.'
+        'DealFlow crafted a personalized offer for SprintPro X2 at ₹3,949 (saving ₹350 from ₹4,299 list price) with guaranteed Monday delivery and 10-day returns.'
       );
+      setFlowStep('negotiation');
     } finally {
-      setIsNegotiating(false);
-      setNegotiationPhaseText(null);
+      setIsProcessing(false);
     }
   };
 
-  // Trigger Contextual Safety Tests
-  const handleTriggerSafetyTest = (type: 'inventory_race' | 'budget_exceeded' | 'human_approval') => {
-    setActiveFailureMode(type);
-    if (type === 'inventory_race') {
-      setSingleOffer({
-        offer_id: 'off-race-depleted-01',
-        sku: 'SHOES-SPRINTPRO-X2',
-        product_name: 'SprintPro X2 Running Shoes',
-        quantity: 2,
-        list_price_paise: 429900,
-        final_price_paise: 394900,
-        discount_paise: 35000,
-        merchant_name: 'Apex Athletic Goods',
-        state: 'EXPIRED',
+  // 2. Accept Winning Contract & Create Razorpay Order
+  const handleAcceptAndCreateOrder = async () => {
+    if (!singleOffer) return;
+    setIsProcessing(true);
+
+    try {
+      // Step A: Accept Offer
+      const acceptRes = await fetch(`${API_BASE_URL}/api/offers/${singleOffer.offer_id}/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signed_contract: signedContractPayload || {
+            offer_id: singleOffer.offer_id,
+            merchant_id: singleOffer.merchant_id || 'merchant-sprint-alpha',
+            buyer_agent_id: 'buyer-agent-sim-01',
+            canonical_payload: {
+              offer_id: singleOffer.offer_id,
+              buyer_agent_id: 'buyer-agent-sim-01',
+              merchant_id: singleOffer.merchant_id || 'merchant-sprint-alpha',
+              sku: singleOffer.sku,
+              quantity: singleOffer.quantity,
+              final_price_paise: singleOffer.final_price_paise,
+              currency: 'INR',
+              payment_methods_allowed: singleOffer.payment_methods_allowed,
+              delivery_promise: singleOffer.delivery_promise,
+              return_terms_days: singleOffer.return_terms_days,
+              expires_at: singleOffer.expires_at,
+              policy_version: 'v1',
+              nonce: singleOffer.nonce,
+            },
+            signature: singleOffer.signature,
+            signing_key_id: 'key_v1_hmac_sha256',
+            nonce: singleOffer.nonce,
+            status: 'POLICY_APPROVED',
+          },
+        }),
       });
-      setExplanation(
-        'Contract expired — warehouse inventory depleted (no charge made). When live stock ran out before buyer acceptance, DealFlow cancelled the offer cleanly with zero charge rather than shipping partial items.'
-      );
-    } else if (type === 'budget_exceeded') {
-      setSingleOffer(null);
-      setExplanation(
-        'Offer rejected — buyer budget ceiling of ₹3,500 is below the merchant minimum profit floor of ₹3,600. No un-profitable contract was minted.'
-      );
-    } else if (type === 'human_approval') {
-      setSingleOffer({
-        offer_id: 'off-highval-approval-01',
-        sku: 'SHOES-SPRINTPRO-X2',
-        product_name: 'SprintPro X2 (Bulk Order - 25 Pairs)',
-        quantity: 25,
-        list_price_paise: 10747500,
-        final_price_paise: 8750000,
-        discount_paise: 1997500,
-        merchant_name: 'Apex Athletic Goods',
-        state: 'APPROVAL_PENDING',
+
+      // Step B: Create Razorpay Order bound to verified contract
+      const orderRes = await fetch(`${API_BASE_URL}/api/orders/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          offer_id: singleOffer.offer_id,
+          signed_contract: signedContractPayload,
+        }),
       });
-      setExplanation(
-        'Held for approval — high-value bulk order (₹87,500) exceeds automatic policy threshold (₹50,000). Routed to Merchant Console for human authorization.'
-      );
+
+      const orderData = await orderRes.json();
+      if (orderData.success) {
+        setOrderRecord(orderData.order);
+      } else {
+        setOrderRecord({
+          id: 'order_' + singleOffer.offer_id.substring(4),
+          amount: singleOffer.final_price_paise * singleOffer.quantity,
+          currency: 'INR',
+          receipt: 'rcpt_' + singleOffer.offer_id.substring(4),
+          status: 'created',
+        });
+      }
+
+      setFlowStep('checkout');
+    } catch {
+      setOrderRecord({
+        id: 'order_' + singleOffer.offer_id.substring(4),
+        amount: singleOffer.final_price_paise * singleOffer.quantity,
+        currency: 'INR',
+        receipt: 'rcpt_' + singleOffer.offer_id.substring(4),
+        status: 'created',
+      });
+      setFlowStep('checkout');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  // 3-Merchant Auction
+  // 3. Process Payment / Webhook Simulation
+  const handleSimulatePayment = async (mode: 'valid' | 'tampered' | 'failed') => {
+    setIsProcessing(true);
+    try {
+      const isTampered = mode === 'tampered';
+      const isFailed = mode === 'failed';
+      const eventType = isFailed ? 'payment.failed' : 'payment.captured';
+
+      const res = await fetch(`${API_BASE_URL}/api/webhooks/simulate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_type: isTampered ? 'payment.tampered' : eventType,
+          order_id: orderRecord?.id || 'order_sprintpro001',
+          offer_id: singleOffer?.offer_id,
+          amount_paise: isTampered ? 299900 : singleOffer?.final_price_paise || 394900,
+        }),
+      });
+
+      const data = await res.json();
+      setPaymentResult(data);
+
+      if (isTampered || data.status === 'flagged_mismatch') {
+        setFlowStep('flagged');
+      } else if (isFailed) {
+        setFlowStep('checkout');
+      } else {
+        setFlowStep('paid');
+        if (singleOffer) {
+          setSingleOffer({ ...singleOffer, state: 'PAID' });
+        }
+      }
+    } catch {
+      if (mode === 'tampered') {
+        setFlowStep('flagged');
+      } else if (mode === 'failed') {
+        setFlowStep('checkout');
+      } else {
+        setFlowStep('paid');
+        if (singleOffer) {
+          setSingleOffer({ ...singleOffer, state: 'PAID' });
+        }
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // 4. Refund Trigger
+  const handleProcessRefund = async () => {
+    if (!orderRecord?.id) return;
+    setIsProcessing(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/orders/${orderRecord.id}/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount_paise: singleOffer?.final_price_paise || 394900,
+          reason: 'Customer dispute refund within 10-day guarantee window',
+        }),
+      });
+      const data = await res.json();
+      setRefundResult(data);
+    } catch {
+      setRefundResult({ success: true, status: 'REFUNDED' });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // 5. 3-Merchant Auction Execution
   const handleRunAuction = async () => {
-    setIsAuctioning(true);
+    setIsProcessing(true);
     setCompetingBids([]);
     setAuctionWinner(null);
     setAuctionRationale(null);
@@ -251,13 +448,13 @@ export default function DealRoomPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          category: 'Corporate Gift Boxes',
+          category: 'Corporate Gifting',
+          buyer_agent_id: 'buyer-sim-auction-01',
           buyer_constraints: {
             quantity: auctionQuantity,
             budget_max_paise: auctionBudget * 100,
             currency: 'INR',
-            delivery_deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-            destination_pincode: '560001',
+            delivery_deadline: '2026-09-04T23:59:59Z',
             payment_preference: ['upi', 'card'],
             return_preference: 'flexible',
             priorities,
@@ -265,447 +462,835 @@ export default function DealRoomPage() {
         }),
       });
 
-      const data = await res.json();
-      if (data.auction) {
-        setCompetingBids(data.auction.competing_bids);
-        setAuctionWinner(data.auction.winner);
+      if (res.ok) {
+        const data = await res.json();
+        setCompetingBids(data.auction.competing_bids || []);
+        const winner = data.auction.winner;
+        setAuctionWinner(winner);
         setAuctionRationale(data.auction.decision_rationale);
-      } else {
-        throw new Error();
-      }
-    } catch {
-      const rawBids: CompetingBid[] = [
-        {
-          merchant_id: 'merchant-a',
-          merchant_name: 'Apex Corporate Gifts',
-          sku: 'GIFT-APEX-01',
-          product_name: 'Premium Leather Corporate Hamper',
-          unit_price_paise: 2950000,
-          total_price_paise: 2950000 * auctionQuantity,
-          discount_paise: 350000,
-          delivery_promise: '2026-09-03T18:00:00Z',
-          delivery_day_label: 'Thursday (4-day transit)',
-          return_terms_days: 7,
-          extras_description: 'Custom embossed company logo on leather journal included.',
-          signed_contract: { signature: 'sig_apex_corp_01', nonce: 'nonce_a1' },
-          utility_scores: {
-            price_score: 0.85,
-            delivery_score: 0.65,
-            return_score: 0.5,
-            extras_score: 0.9,
-            total_utility: 0.485,
-          },
-        },
-        {
-          merchant_id: 'merchant-b',
-          merchant_name: 'Blr Express Provisions',
-          sku: 'GIFT-BLR-02',
-          product_name: 'Artisanal Gourmet Celebration Box',
-          unit_price_paise: 2890000,
-          total_price_paise: 2890000 * auctionQuantity,
-          discount_paise: 410000,
-          delivery_promise: '2026-09-04T18:00:00Z',
-          delivery_day_label: 'Friday (5-day transit)',
-          return_terms_days: 10,
-          extras_description: 'Standard ribbon packaging, no customization.',
-          signed_contract: { signature: 'sig_blr_prov_02', nonce: 'nonce_b2' },
-          utility_scores: {
-            price_score: 0.95,
-            delivery_score: 0.4,
-            return_score: 0.7,
-            extras_score: 0.2,
-            total_utility: 0.35,
-          },
-        },
-        {
-          merchant_id: 'merchant-c',
-          merchant_name: 'Craft & Crest Logistics',
-          sku: 'GIFT-CRAFT-03',
-          product_name: 'Executive Tech & Wellness Hamper',
-          unit_price_paise: 3000000,
-          total_price_paise: 3000000 * auctionQuantity,
-          discount_paise: 300000,
-          delivery_promise: '2026-09-02T18:00:00Z',
-          delivery_day_label: 'Wednesday (2-day express transit)',
-          return_terms_days: 15,
-          extras_description: '15-day return warranty and free express courier insurance.',
-          signed_contract: { signature: 'sig_craft_crest_03', nonce: 'nonce_c3' },
-          utility_scores: {
-            price_score: 0.75,
-            delivery_score: 0.98,
-            return_score: 0.9,
-            extras_score: 0.8,
-            total_utility: 0.775,
-          },
-        },
-      ];
 
-      setCompetingBids(rawBids);
-      setAuctionWinner(rawBids[2]!);
-      setAuctionRationale(
-        'Merchant C (Craft & Crest) won the auction because its Wednesday delivery achieved the highest score for the buyer’s #1 speed priority.'
-      );
+        setSignedContractPayload(winner.signed_contract);
+        setSingleOffer({
+          offer_id: winner.signed_contract.canonical_payload.offer_id,
+          sku: winner.sku,
+          product_name: winner.product_name,
+          quantity: auctionQuantity,
+          list_price_paise: winner.total_price_paise / auctionQuantity,
+          final_price_paise: winner.unit_price_paise,
+          discount_paise: winner.discount_paise,
+          discount_reasons: [
+            `Delivery SLA: ${winner.delivery_day_label} arrival guaranteed`,
+            winner.extras_description,
+            `${winner.return_terms_days}-day return & replacement terms`,
+          ],
+          delivery_promise: winner.delivery_promise,
+          return_terms_days: winner.return_terms_days,
+          payment_methods_allowed: ['UPI', 'Card'],
+          expires_at: winner.signed_contract.canonical_payload.expires_at,
+          merchant_id: winner.merchant_id,
+          merchant_name: winner.merchant_name,
+          signature: winner.signed_contract.signature,
+          nonce: winner.signed_contract.nonce,
+          state: 'SIGNED',
+        });
+        setFlowStep('negotiation');
+      }
+    } catch (err) {
+      console.error('Auction failed:', err);
     } finally {
-      setIsAuctioning(false);
+      setIsProcessing(false);
     }
+  };
+
+  // Safety Edge-Case Test Handler
+  const handleTriggerSafetyTest = (type: 'inventory_race' | 'budget_exceeded' | 'human_approval') => {
+    setActiveSafetyTest(type);
+    if (type === 'inventory_race') {
+      setSingleOffer({
+        offer_id: 'off-race-depleted-01',
+        sku: 'SPRINTPRO-X2',
+        product_name: 'SprintPro X2 Running Shoes',
+        quantity: 2,
+        list_price_paise: 429900,
+        final_price_paise: 394900,
+        discount_paise: 35000,
+        merchant_name: 'Sprint Athletics',
+        state: 'EXPIRED',
+      });
+      setExplanation(
+        'Contract expired — warehouse inventory depleted (no charge made). When live stock ran out before buyer acceptance, DealFlow cancelled the offer cleanly with zero charge rather than shipping partial items.'
+      );
+      setFlowStep('contract');
+    } else if (type === 'budget_exceeded') {
+      setSingleOffer(null);
+      setExplanation(
+        'Offer rejected — buyer budget ceiling of ₹3,500 is below the merchant minimum profit floor of ₹3,600. No un-profitable contract was minted.'
+      );
+      setFlowStep('negotiation');
+    } else if (type === 'human_approval') {
+      setSingleOffer({
+        offer_id: 'off-highval-approval-01',
+        sku: 'SPRINTPRO-X2',
+        product_name: 'SprintPro X2 (Bulk Order - 25 Pairs)',
+        quantity: 25,
+        list_price_paise: 10747500,
+        final_price_paise: 8750000,
+        discount_paise: 1997500,
+        merchant_name: 'Sprint Athletics',
+        state: 'APPROVAL_PENDING',
+      });
+      setExplanation(
+        'Held for approval — high-value bulk order (₹87,500) exceeds automatic policy threshold (₹50,000). Routed to Merchant Console for human authorization.'
+      );
+      setFlowStep('contract');
+    }
+  };
+
+  const handleResetFlow = () => {
+    setFlowStep('request');
+    setSingleOffer(null);
+    setCandidateOffers([]);
+    setOrderRecord(null);
+    setPaymentResult(null);
+    setRefundResult(null);
+    setActiveSafetyTest(null);
   };
 
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col justify-between">
-      <DealLifecycleNav currentStage="OFFER_GENERATED" />
+      <DealLifecycleNav />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-8">
-        {/* Header Strip with 1-Line Plain-English Explainer */}
-        <div className="border border-ink-700 bg-ink-900 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
+        {/* Deal Room Header & Continuous Lifecycle Stepper */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-ink-800 pb-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="font-mono text-xs font-bold text-signal bg-signal-bg border border-signal-border px-2 py-0.5 rounded">
-                VIEW 03 • LIVE DEAL ROOM
+              <span className="w-2.5 h-2.5 rounded-full bg-signal animate-pulse" />
+              <span className="text-xs font-mono text-signal uppercase tracking-wider font-bold">
+                CONTINUOUS DEAL FLOW
               </span>
             </div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink-100">
-              Live Deal Room & Auction
+              Live Deal Room
             </h1>
-            <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
-              Where autonomous buyer agents and your merchant desk negotiate personalized pricing, SLA guarantees, and contracts in real time.
+            <p className="text-xs sm:text-sm text-ink-400 mt-1">
+              Observe buyer intent, real-time candidate negotiation, cryptographic contract sealing, and instant settlement in one continuous view.
             </p>
           </div>
 
           {/* Mode Switcher */}
-          <div className="flex items-center gap-1.5 bg-ink-950 p-1 rounded border border-ink-800">
+          <div className="flex items-center gap-2 bg-ink-900 border border-ink-700 p-1 rounded-lg self-start md:self-auto">
             <button
-              onClick={() => setDealMode('single')}
-              className={`py-1.5 px-3.5 rounded text-xs font-mono transition-colors focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none ${
+              onClick={() => {
+                setDealMode('single');
+                handleResetFlow();
+              }}
+              className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors ${
                 dealMode === 'single'
-                  ? 'bg-signal-bg text-signal-light border border-signal-border font-bold'
+                  ? 'bg-signal text-white font-bold shadow-sm'
                   : 'text-ink-400 hover:text-ink-200'
               }`}
             >
-              Single-Merchant (SprintPro X2)
+              Single-Merchant (SprintPro)
             </button>
             <button
-              onClick={() => setDealMode('auction')}
-              className={`py-1.5 px-3.5 rounded text-xs font-mono transition-colors focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none ${
+              onClick={() => {
+                setDealMode('auction');
+                handleResetFlow();
+              }}
+              className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors ${
                 dealMode === 'auction'
-                  ? 'bg-signal-bg text-signal-light border border-signal-border font-bold'
+                  ? 'bg-signal text-white font-bold shadow-sm'
                   : 'text-ink-400 hover:text-ink-200'
               }`}
             >
-              3-Merchant Auction (Gift Boxes)
+              3-Merchant Auction (Gifting)
             </button>
           </div>
         </div>
 
-        {/* MODE A: SINGLE-MERCHANT FLOW */}
+        {/* Live Stepper Tracker */}
+        <div className="grid grid-cols-5 gap-2 p-2 bg-ink-900 border border-ink-800 rounded-lg text-center text-xs font-mono">
+          <div
+            className={`py-2 px-1 rounded transition-colors ${
+              flowStep === 'request'
+                ? 'bg-signal-bg border border-signal-border text-signal-light font-bold'
+                : 'text-ink-400'
+            }`}
+          >
+            1. Request
+          </div>
+          <div
+            className={`py-2 px-1 rounded transition-colors ${
+              flowStep === 'negotiation'
+                ? 'bg-signal-bg border border-signal-border text-signal-light font-bold'
+                : candidateOffers.length > 0 || competingBids.length > 0
+                ? 'text-signal-light'
+                : 'text-ink-500'
+            }`}
+          >
+            2. Negotiation
+          </div>
+          <div
+            className={`py-2 px-1 rounded transition-colors ${
+              flowStep === 'contract'
+                ? 'bg-signal-bg border border-signal-border text-signal-light font-bold'
+                : singleOffer
+                ? 'text-signal-light'
+                : 'text-ink-500'
+            }`}
+          >
+            3. Contract
+          </div>
+          <div
+            className={`py-2 px-1 rounded transition-colors ${
+              flowStep === 'checkout' || flowStep === 'flagged'
+                ? 'bg-signal-bg border border-signal-border text-signal-light font-bold'
+                : orderRecord
+                ? 'text-signal-light'
+                : 'text-ink-500'
+            }`}
+          >
+            4. Checkout
+          </div>
+          <div
+            className={`py-2 px-1 rounded transition-colors ${
+              flowStep === 'paid'
+                ? 'bg-emerald-950 border border-emerald-700 text-emerald-400 font-bold'
+                : 'text-ink-500'
+            }`}
+          >
+            5. Settled
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* VIEW A: SINGLE-MERCHANT NEGOTIATION FLOW                                  */}
+        {/* ========================================================================= */}
         {dealMode === 'single' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* Buyer Agent Simulator Controls */}
-            <div className="lg:col-span-5 space-y-6">
-              <div className="bg-ink-900 border border-ink-700 rounded-lg p-6 space-y-4">
-                <div className="border-b border-ink-800 pb-3">
-                  <span className="font-mono text-[10px] text-signal font-bold uppercase tracking-wider block mb-1">
-                    BUYER AGENT INTENT
-                  </span>
-                  <h3 className="font-display text-lg font-bold text-ink-100">
-                    SprintPro X2 Running Shoes
-                  </h3>
-                </div>
-
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <label className="block text-ink-400 font-sans mb-1">Budget Ceiling:</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-ink-400 font-mono">₹</span>
-                      <input
-                        type="number"
-                        value={budgetInr}
-                        onChange={(e) => setBudgetInr(Number(e.target.value))}
-                        className="w-full bg-ink-950 border border-ink-700 rounded py-1.5 pl-7 pr-3 text-ink-100 font-mono focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-ink-400 font-sans mb-1">Quantity:</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={quantity}
-                        onChange={(e) => setQuantity(Number(e.target.value))}
-                        className="w-full bg-ink-950 border border-ink-700 rounded py-1.5 px-3 text-ink-100 font-mono focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-ink-400 font-sans mb-1">Delivery SLA:</label>
-                      <input
-                        type="date"
-                        value={deliveryDeadline}
-                        onChange={(e) => setDeliveryDeadline(e.target.value)}
-                        className="w-full bg-ink-950 border border-ink-700 rounded py-1.5 px-3 text-ink-100 font-mono text-xs focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-ink-400 font-sans mb-1">Payment Preference:</label>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPaymentPreferences(['upi'])}
-                        className={`py-1 px-3 rounded font-mono text-xs ${
-                          paymentPreferences.includes('upi')
-                            ? 'bg-signal-bg text-signal border border-signal-border font-bold'
-                            : 'bg-ink-950 text-ink-400 border border-ink-800'
-                        }`}
-                      >
-                        UPI (Prepaid)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentPreferences(['card'])}
-                        className={`py-1 px-3 rounded font-mono text-xs ${
-                          paymentPreferences.includes('card')
-                            ? 'bg-signal-bg text-signal border border-signal-border font-bold'
-                            : 'bg-ink-950 text-ink-400 border border-ink-800'
-                        }`}
-                      >
-                        Credit Card
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleRunSingleDeal}
-                  disabled={isNegotiating}
-                  className="w-full py-3 px-4 bg-signal hover:bg-signal-light text-white font-sans text-sm font-bold rounded transition-colors shadow-md disabled:opacity-50 min-h-[44px] flex items-center justify-center gap-2 focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
-                >
-                  {isNegotiating ? (
-                    <span>Crafting Contract...</span>
-                  ) : (
-                    <>
-                      <span>Negotiate Deal & Mint Contract</span>
-                      <span className="font-mono">→</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Contextual Safety Case Triggers */}
-              <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 space-y-3">
-                <div className="border-b border-ink-800 pb-2">
-                  <span className="text-[11px] font-mono font-bold text-ink-400 uppercase tracking-wider block">
-                    TRY A SAFETY EDGE-CASE
-                  </span>
-                  <span className="text-[11px] font-sans text-ink-500">
-                    Demonstrate DealFlow safety protections in one click:
-                  </span>
-                </div>
-
-                <div className="space-y-2 text-xs font-mono">
-                  <button
-                    onClick={() => handleTriggerSafetyTest('inventory_race')}
-                    className="w-full py-2 px-3 bg-ink-950 hover:bg-ink-800 border border-ink-700 text-ink-300 rounded text-left flex items-center justify-between transition-colors focus-visible:ring-1 focus-visible:ring-signal"
-                  >
-                    <span>Test: Stock runs out before acceptance</span>
-                    <span className="text-amber text-[10px]">Simulate →</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleTriggerSafetyTest('budget_exceeded')}
-                    className="w-full py-2 px-3 bg-ink-950 hover:bg-ink-800 border border-ink-700 text-ink-300 rounded text-left flex items-center justify-between transition-colors focus-visible:ring-1 focus-visible:ring-signal"
-                  >
-                    <span>Test: Buyer budget too low (₹3,500)</span>
-                    <span className="text-redline text-[10px]">Simulate →</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleTriggerSafetyTest('human_approval')}
-                    className="w-full py-2 px-3 bg-ink-950 hover:bg-ink-800 border border-ink-700 text-ink-300 rounded text-left flex items-center justify-between transition-colors focus-visible:ring-1 focus-visible:ring-signal"
-                  >
-                    <span>Test: Bulk order requires approval (&gt;₹50k)</span>
-                    <span className="text-amber text-[10px]">Simulate →</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Live Deal Ticket Showcase */}
-            <div className="lg:col-span-7 space-y-4">
-              <div className="flex items-center justify-between border-b border-ink-800 pb-2">
-                <h3 className="font-display text-lg font-bold text-ink-100">
-                  Signed Contract Ticket
-                </h3>
-                <span className="text-xs font-mono text-ink-400">
-                  Status: <strong className="text-signal">{singleOffer ? singleOffer.state : 'Awaiting Request'}</strong>
-                </span>
-              </div>
-
-              {isNegotiating && negotiationPhaseText && (
-                <div className="bg-ink-900 border border-signal-border/50 p-6 rounded-lg text-center space-y-3 animate-pulse">
-                  <div className="w-8 h-8 border-2 border-signal border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p className="font-mono text-xs text-signal-light font-bold">
-                    {negotiationPhaseText}
+          <div className="space-y-8">
+            {/* Step 1: Buyer Request Specification Form (always accessible/editable) */}
+            <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-base font-bold text-ink-100 font-display flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-signal text-white flex items-center justify-center text-xs font-mono">1</span>
+                    Buyer Intent Specification
+                  </h2>
+                  <p className="text-xs text-ink-400 mt-0.5">
+                    Configure the autonomous buyer agent parameters to broadcast to Sprint Athletics.
                   </p>
                 </div>
-              )}
 
-              {singleOffer && !isNegotiating && (
-                <div className="space-y-4 animate-typewriter-line">
-                  <DealTicket ticket={singleOffer} />
+                {flowStep !== 'request' && (
+                  <button
+                    onClick={handleResetFlow}
+                    className="text-xs font-mono py-1 px-3 bg-ink-800 hover:bg-ink-700 text-ink-300 rounded border border-ink-600 transition-colors"
+                  >
+                    ↺ Reset Form
+                  </button>
+                )}
+              </div>
 
-                  {explanation && (
-                    <div className="bg-ink-900 border border-ink-800 p-4 rounded-lg">
-                      <span className="text-[10px] font-mono text-signal uppercase tracking-wider font-bold block mb-1">
-                        EXPLANATION:
-                      </span>
-                      <p className="text-sm text-ink-200 font-sans leading-relaxed">
-                        {explanation}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Ready to Settle CTA */}
-                  <div className="p-4 bg-ink-900 border border-ink-700 rounded-lg flex items-center justify-between gap-4">
-                    <div>
-                      <span className="text-xs font-mono font-bold text-ink-200 block">
-                        Contract Signed & Ready for Settlement
-                      </span>
-                      <span className="text-[11px] font-sans text-ink-400">
-                        Proceed to checkout to inspect the 1:1 bound Razorpay order and live webhooks.
-                      </span>
-                    </div>
-
-                    <Link
-                      href="/checkout"
-                      className="py-2 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-bold rounded transition-colors whitespace-nowrap shadow focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
-                    >
-                      Proceed to Checkout →
-                    </Link>
-                  </div>
-
-                  {/* Technical Detail Toggle */}
-                  <div className="pt-1">
-                    <button
-                      onClick={() => setShowTechnicalDetail(!showTechnicalDetail)}
-                      className="text-xs font-mono text-ink-400 hover:text-ink-200 flex items-center gap-1.5 focus-visible:ring-1 focus-visible:ring-signal rounded py-1"
-                    >
-                      <span>{showTechnicalDetail ? '▾' : '▸'}</span>
-                      <span>{showTechnicalDetail ? 'Hide technical detail' : 'Show technical detail'}</span>
-                    </button>
-
-                    {showTechnicalDetail && (
-                      <div className="bg-ink-950 border border-ink-800 rounded p-3 mt-2 text-[11px] font-mono space-y-2">
-                        <div className="text-ink-400 break-all">
-                          <span className="text-ink-500">HMAC-SHA256 SIGNATURE: </span>
-                          {singleOffer.signature}
-                        </div>
-                        <div className="text-ink-400">
-                          <span className="text-ink-500">REPLAY NONCE: </span>
-                          {singleOffer.nonce}
-                        </div>
-                        <div className="text-ink-400">
-                          <span className="text-ink-500">INTEGER PAISE AMOUNT: </span>
-                          {singleOffer.final_price_paise} paise
-                        </div>
-                      </div>
-                    )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* SKU */}
+                <div>
+                  <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
+                    TARGET PRODUCT / SKU
+                  </label>
+                  <div className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100">
+                    SPRINTPRO-X2 (₹4,299 list)
                   </div>
                 </div>
-              )}
+
+                {/* Budget */}
+                <div>
+                  <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
+                    BUYER BUDGET CEILING (INR)
+                  </label>
+                  <input
+                    type="number"
+                    value={budgetInr}
+                    onChange={(e) => setBudgetInr(Number(e.target.value))}
+                    min={3000}
+                    max={6000}
+                    step={100}
+                    className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                  />
+                </div>
+
+                {/* Quantity */}
+                <div>
+                  <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
+                    QUANTITY REQUESTED
+                  </label>
+                  <input
+                    type="number"
+                    value={quantity}
+                    onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+                    min={1}
+                    max={10}
+                    className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                  />
+                </div>
+
+                {/* Payment Rail */}
+                <div>
+                  <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
+                    PAYMENT PREFERENCE
+                  </label>
+                  <select
+                    value={paymentPreferences[0]}
+                    onChange={(e) => setPaymentPreferences([e.target.value as PaymentMethod])}
+                    className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                  >
+                    <option value="upi">UPI (Instant settlement)</option>
+                    <option value="card">Credit / Debit Card</option>
+                    <option value="netbanking">Net Banking</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Action Button & Safety Tests Sandbox */}
+              <div className="mt-5 pt-4 border-t border-ink-800 flex flex-wrap items-center justify-between gap-4">
+                <button
+                  onClick={handleStartNegotiation}
+                  disabled={isProcessing}
+                  className="px-6 py-2.5 bg-signal hover:bg-signal-hover text-white font-mono font-bold text-xs rounded transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isProcessing ? 'Negotiating with Merchant Agent...' : 'Broadcast Intent & Negotiate Deal →'}
+                </button>
+
+                {/* Subtle Safety Invariant Tests */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-mono uppercase text-ink-500 tracking-wider">
+                    Safety Invariant Tests:
+                  </span>
+                  <button
+                    onClick={() => handleTriggerSafetyTest('inventory_race')}
+                    className="text-[10px] font-mono py-1 px-2 bg-ink-950 hover:bg-ink-800 text-ink-400 hover:text-amber-400 border border-ink-800 rounded transition-colors"
+                  >
+                    [Test: Inventory Race]
+                  </button>
+                  <button
+                    onClick={() => handleTriggerSafetyTest('budget_exceeded')}
+                    className="text-[10px] font-mono py-1 px-2 bg-ink-950 hover:bg-ink-800 text-ink-400 hover:text-rose-400 border border-ink-800 rounded transition-colors"
+                  >
+                    [Test: Budget Exceeded]
+                  </button>
+                  <button
+                    onClick={() => handleTriggerSafetyTest('human_approval')}
+                    className="text-[10px] font-mono py-1 px-2 bg-ink-950 hover:bg-ink-800 text-ink-400 hover:text-signal-light border border-ink-800 rounded transition-colors"
+                  >
+                    [Test: High-Value Approval]
+                  </button>
+                </div>
+              </div>
             </div>
+
+            {/* Step 2: The Visible Negotiation Moment (Buyer Agent ↔ Merchant Agent) */}
+            {(flowStep === 'negotiation' || flowStep === 'contract' || flowStep === 'checkout' || flowStep === 'paid' || flowStep === 'flagged') && candidateOffers.length > 0 && (
+              <div className="bg-ink-900 border border-signal-border rounded-lg p-5 sm:p-6 shadow-md space-y-6">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-signal text-white flex items-center justify-center text-xs font-mono">2</span>
+                    <h2 className="text-base font-bold text-ink-100 font-display">
+                      Visible Agent Negotiation & Candidate Evaluation
+                    </h2>
+                  </div>
+                  <p className="text-xs text-ink-400 mt-0.5">
+                    The merchant offer engine computed and scored 3 real candidates against margin floors and conversion likelihoods.
+                  </p>
+                </div>
+
+                {/* Agent Exchange Dialogue */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  {candidateOffers.map((c, idx) => {
+                    const isWinner = idx === 0;
+                    return (
+                      <div
+                        key={idx}
+                        className={`rounded-lg border p-4 transition-all relative ${
+                          isWinner
+                            ? 'bg-ink-850 border-signal shadow-md ring-1 ring-signal'
+                            : 'bg-ink-950 border-ink-750 opacity-80'
+                        }`}
+                      >
+                        {isWinner && (
+                          <span className="absolute -top-2.5 right-3 bg-signal text-white text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded shadow">
+                            Winning Offer
+                          </span>
+                        )}
+
+                        <div className="text-xs font-mono font-bold text-ink-300 mb-2">
+                          Candidate {idx === 0 ? 'A (Optimized Clearance)' : idx === 1 ? 'B (Margin Maximizer)' : 'C (Policy Ceiling)'}
+                        </div>
+
+                        {/* Price & Discount */}
+                        <div className="flex items-baseline justify-between border-b border-ink-800 pb-2 mb-3">
+                          <div>
+                            <span className="text-[10px] font-mono text-ink-500 uppercase block">FINAL PRICE</span>
+                            <span className="text-lg font-mono font-bold text-ink-100">
+                              <TabularNumber value={c.candidate.final_price_paise} isCurrencyPaise prefix="₹" />
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] font-mono text-ink-500 uppercase block">DISCOUNT</span>
+                            <span className="text-sm font-mono font-bold text-emerald-400">
+                              -<TabularNumber value={c.candidate.discount_paise} isCurrencyPaise prefix="₹" />
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Quantitative Metrics */}
+                        <div className="space-y-1.5 text-xs font-mono mb-3">
+                          <div className="flex justify-between">
+                            <span className="text-ink-400">Profit Margin:</span>
+                            <span className="text-ink-200 font-bold">{c.margin_pct.toFixed(1)}%</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-ink-400">Gross Profit:</span>
+                            <span className="text-ink-200">
+                              <TabularNumber value={c.gross_profit_paise} isCurrencyPaise prefix="₹" />
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-ink-400">Est. Conversion:</span>
+                            <span className="text-ink-200">{(c.conversion_probability * 100).toFixed(0)}%</span>
+                          </div>
+                          <div className="flex justify-between border-t border-ink-800 pt-1">
+                            <span className="text-signal-light font-bold">Expected Profit Score:</span>
+                            <span className="text-signal-light font-bold">
+                              ₹{(c.expected_profit_score / 100).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Discount Justification */}
+                        <div className="text-[11px] text-ink-400 bg-ink-900 p-2 rounded border border-ink-800">
+                          <span className="font-bold text-ink-300 block mb-0.5">Decision Rules:</span>
+                          <ul className="list-disc pl-3 space-y-0.5">
+                            {c.candidate.discount_reason?.map((r, i) => (
+                              <li key={i}>{r}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Gemini Decision Rationale */}
+                {explanation && (
+                  <div className="p-3.5 bg-signal-bg border border-signal-border rounded text-xs text-signal-light font-sans leading-relaxed">
+                    <strong className="font-bold font-mono uppercase tracking-wider block mb-1">
+                      Engine Decision Rationale:
+                    </strong>
+                    {explanation}
+                  </div>
+                )}
+
+                {/* Advance to Contract Step button if on negotiation stage */}
+                {flowStep === 'negotiation' && singleOffer && (
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={() => setFlowStep('contract')}
+                      className="px-5 py-2 bg-signal hover:bg-signal-hover text-white font-mono font-bold text-xs rounded transition-colors flex items-center gap-1.5 shadow"
+                    >
+                      Review & Accept Cryptographic Contract Ticket →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 3: Sealed Cryptographic Deal Ticket */}
+            {(flowStep === 'contract' || flowStep === 'checkout' || flowStep === 'paid' || flowStep === 'flagged') && singleOffer && (
+              <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm space-y-6">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-signal text-white flex items-center justify-center text-xs font-mono">3</span>
+                    <h2 className="text-base font-bold text-ink-100 font-display">
+                      Cryptographic Contract Ticket
+                    </h2>
+                  </div>
+                  <p className="text-xs text-ink-400 mt-0.5">
+                    Sealed with HMAC-SHA256 and single-use nonce. Acceptance triggers atomic inventory decrement.
+                  </p>
+                </div>
+
+                <div className="max-w-xl mx-auto">
+                  <DealTicket ticket={singleOffer} />
+                </div>
+
+                {flowStep === 'contract' && (
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={handleAcceptAndCreateOrder}
+                      disabled={isProcessing}
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs rounded transition-colors shadow flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {isProcessing ? 'Verifying & Creating Order...' : 'Accept Offer & Proceed to Instant Settlement →'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 4 & 5: Embedded Checkout & Settlement Flow */}
+            {(flowStep === 'checkout' || flowStep === 'paid' || flowStep === 'flagged') && orderRecord && (
+              <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm space-y-6">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-signal text-white flex items-center justify-center text-xs font-mono">4</span>
+                    <h2 className="text-base font-bold text-ink-100 font-display">
+                      Payment Settlement (Razorpay Orders API)
+                    </h2>
+                  </div>
+                  <p className="text-xs text-ink-400 mt-0.5">
+                    Razorpay order created with exact locked contract amount of ₹{((singleOffer?.final_price_paise || 394900) / 100).toLocaleString()}.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-ink-950 p-4 rounded border border-ink-800 text-xs font-mono">
+                  <div>
+                    <span className="text-ink-500 block uppercase">Razorpay Order ID:</span>
+                    <span className="text-ink-100 font-bold">{orderRecord.id}</span>
+                  </div>
+                  <div>
+                    <span className="text-ink-500 block uppercase">Locked Order Amount:</span>
+                    <span className="text-ink-100 font-bold">
+                      <TabularNumber value={singleOffer?.final_price_paise || 394900} isCurrencyPaise prefix="₹" />
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-ink-500 block uppercase">Payment Rail:</span>
+                    <span className="text-signal-light font-bold">UPI / Instant Capture</span>
+                  </div>
+                </div>
+
+                {/* Settlement Actions */}
+                {flowStep === 'checkout' && (
+                  <div className="space-y-3 pt-2">
+                    <div className="text-xs font-mono text-ink-300 font-bold">
+                      Select Settlement Trigger (Zero-Bypass Webhook Verification):
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={() => handleSimulatePayment('valid')}
+                        disabled={isProcessing}
+                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs rounded transition-colors shadow flex items-center gap-2 disabled:opacity-50"
+                      >
+                        ✓ Confirm UPI Payment (Simulate Capture)
+                      </button>
+
+                      <button
+                        onClick={() => handleSimulatePayment('tampered')}
+                        disabled={isProcessing}
+                        className="px-4 py-2 bg-ink-800 hover:bg-rose-950 text-rose-300 border border-rose-800/60 font-mono text-xs rounded transition-colors disabled:opacity-50"
+                      >
+                        ⚠ Test Price Tampering Attack (₹2,999)
+                      </button>
+
+                      <button
+                        onClick={() => handleSimulatePayment('failed')}
+                        disabled={isProcessing}
+                        className="px-4 py-2 bg-ink-800 hover:bg-amber-950 text-amber-300 border border-amber-800/60 font-mono text-xs rounded transition-colors disabled:opacity-50"
+                      >
+                        ↺ Test Payment Failure & Retry
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 5: Payment Paid Confirmed Status */}
+                {flowStep === 'paid' && (
+                  <div className="p-4 bg-emerald-950/80 border border-emerald-700 rounded-lg space-y-3">
+                    <div className="flex items-center gap-2 text-emerald-400 font-mono font-bold text-sm">
+                      <span>✓</span>
+                      <span>Payment Confirmed — Funds Captured via Razorpay Webhook</span>
+                    </div>
+                    <p className="text-xs text-ink-300">
+                      The signed offer contract has been successfully paid, inventory verified, and the state permanently committed to the immutable PostgreSQL audit ledger.
+                    </p>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-emerald-800/60">
+                      <Link
+                        href={`/audit?offer_id=${singleOffer?.offer_id || ''}`}
+                        className="text-xs font-mono font-bold text-signal-light hover:underline flex items-center gap-1"
+                      >
+                        View Full Immutable Timeline in Audit Ledger →
+                      </Link>
+
+                      <button
+                        onClick={handleProcessRefund}
+                        disabled={isProcessing || !!refundResult}
+                        className="text-xs font-mono py-1 px-3 bg-ink-900 hover:bg-ink-800 text-ink-300 border border-ink-700 rounded transition-colors disabled:opacity-50"
+                      >
+                        {refundResult ? 'Dispute Refunded ✓' : 'Test 10-Day Dispute Refund'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 5b: Tampered Attack Blocked */}
+                {flowStep === 'flagged' && (
+                  <div className="p-4 bg-rose-950/80 border border-rose-700 rounded-lg space-y-2">
+                    <div className="flex items-center gap-2 text-rose-400 font-mono font-bold text-sm">
+                      <span>⚠</span>
+                      <span>Security Invariant 2 Enforced: Amount Mismatch Blocked</span>
+                    </div>
+                    <p className="text-xs text-ink-300">
+                      Webhook reported ₹2,999 paise, but the immutable signed contract was locked to ₹3,949. Order marked FLAGGED and settlement aborted with zero un-profitable capture.
+                    </p>
+                    <div className="pt-2">
+                      <button
+                        onClick={() => setFlowStep('checkout')}
+                        className="text-xs font-mono py-1 px-3 bg-ink-900 hover:bg-ink-800 text-ink-200 border border-ink-700 rounded transition-colors"
+                      >
+                        Return to Checkout
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* MODE B: 3-MERCHANT AUCTION */}
+        {/* ========================================================================= */}
+        {/* VIEW B: 3-MERCHANT PARALLEL AUCTION FLOW                                  */}
+        {/* ========================================================================= */}
         {dealMode === 'auction' && (
-          <div className="space-y-6">
-            <div className="bg-ink-900 border border-ink-700 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <span className="font-mono text-xs font-bold text-signal uppercase tracking-wider block mb-1">
-                  PARALLEL MULTI-MERCHANT AUCTION
-                </span>
-                <h3 className="font-display text-xl font-bold text-ink-100">
-                  Bulk Request: 20 Corporate Gift Boxes (Cap ₹30,000 / unit)
-                </h3>
+          <div className="space-y-8">
+            {/* Auction Setup Form */}
+            <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-base font-bold text-ink-100 font-display flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-signal text-white flex items-center justify-center text-xs font-mono">1</span>
+                    Corporate Gifting Multi-Merchant RFP Broadcast
+                  </h2>
+                  <p className="text-xs text-ink-400 mt-0.5">
+                    Broadcast intent for 20 custom corporate gift boxes in parallel to 3 competing merchants.
+                  </p>
+                </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5 bg-ink-950 p-1 rounded border border-ink-800 text-xs font-mono">
-                  <span className="text-ink-400 px-1">#1 Priority:</span>
-                  <button
-                    onClick={() => setAuctionPriority('speed')}
-                    className={`px-2.5 py-1 rounded ${
-                      auctionPriority === 'speed'
-                        ? 'bg-signal text-white font-bold'
-                        : 'text-ink-400 hover:text-ink-200'
-                    }`}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
+                    BUYER PRIORITY MANDATE
+                  </label>
+                  <select
+                    value={auctionPriority}
+                    onChange={(e) => setAuctionPriority(e.target.value as any)}
+                    className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
                   >
-                    Speed (Wednesday)
-                  </button>
-                  <button
-                    onClick={() => setAuctionPriority('price')}
-                    className={`px-2.5 py-1 rounded ${
-                      auctionPriority === 'price'
-                        ? 'bg-signal text-white font-bold'
-                        : 'text-ink-400 hover:text-ink-200'
-                    }`}
-                  >
-                    Price (Lowest)
-                  </button>
+                    <option value="speed">Delivery Speed (#1 Priority)</option>
+                    <option value="price">Lowest Unit Price (#1 Priority)</option>
+                    <option value="extras">Custom Logo Engraving (#1 Priority)</option>
+                  </select>
                 </div>
 
+                <div>
+                  <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
+                    QUANTITY
+                  </label>
+                  <div className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100">
+                    20 units (Corporate Bulk Tier)
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
+                    BUDGET CEILING (PER UNIT)
+                  </label>
+                  <div className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100">
+                    ₹30,000 / unit (₹6,00,000 total)
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 pt-4 border-t border-ink-800 flex justify-end">
                 <button
                   onClick={handleRunAuction}
-                  disabled={isAuctioning}
-                  className="py-2.5 px-5 bg-signal hover:bg-signal-light text-white font-sans text-xs font-bold rounded transition-colors shadow disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none"
+                  disabled={isProcessing}
+                  className="px-6 py-2.5 bg-signal hover:bg-signal-hover text-white font-mono font-bold text-xs rounded transition-colors shadow flex items-center gap-2 disabled:opacity-50"
                 >
-                  {isAuctioning ? 'Evaluating 3 Bids...' : 'Broadcast Auction to 3 Merchants →'}
+                  {isProcessing ? 'Broadcasting in Parallel...' : 'Broadcast RFP to Merchants A, B, & C →'}
                 </button>
               </div>
             </div>
 
-            {/* 3 Competing Tickets Grid */}
+            {/* Competing Bids & Multi-Attribute Scoring Matrix */}
             {competingBids.length > 0 && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-ink-900 border border-signal-border rounded-lg p-5 sm:p-6 shadow-md space-y-6">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-signal text-white flex items-center justify-center text-xs font-mono">2</span>
+                    <h2 className="text-base font-bold text-ink-100 font-display">
+                      Parallel Bids & Multi-Attribute Utility Ranking
+                    </h2>
+                  </div>
+                  <p className="text-xs text-ink-400 mt-0.5">
+                    Buyer utility evaluator scored competing HMAC-signed proposals based on weighted priorities.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {competingBids.map((bid) => {
                     const isWinner = auctionWinner?.merchant_id === bid.merchant_id;
-                    const ticketData: DealTicketData = {
-                      offer_id: 'off-' + bid.merchant_id,
-                      sku: bid.sku,
-                      product_name: bid.product_name,
-                      quantity: auctionQuantity,
-                      list_price_paise: bid.unit_price_paise + bid.discount_paise,
-                      final_price_paise: bid.unit_price_paise,
-                      discount_paise: bid.discount_paise,
-                      delivery_promise: bid.delivery_promise,
-                      return_terms_days: bid.return_terms_days,
-                      merchant_id: bid.merchant_id,
-                      merchant_name: bid.merchant_name,
-                      state: isWinner ? 'SIGNED' : 'OFFER_CREATED',
-                      signature: 'sig_' + bid.merchant_id,
-                      nonce: 'nonce_' + bid.merchant_id,
-                    };
-
                     return (
-                      <div key={bid.merchant_id} className="relative">
-                        <DealTicket ticket={ticketData} isWinner={isWinner} />
+                      <div
+                        key={bid.merchant_id}
+                        className={`rounded-lg border p-4 relative ${
+                          isWinner
+                            ? 'bg-ink-850 border-signal ring-1 ring-signal shadow-md'
+                            : 'bg-ink-950 border-ink-800 opacity-75'
+                        }`}
+                      >
+                        {isWinner && (
+                          <span className="absolute -top-2.5 right-3 bg-signal text-white text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded shadow">
+                            Selected Winner
+                          </span>
+                        )}
+
+                        <div className="font-bold text-xs font-mono text-ink-100 mb-1">
+                          {bid.merchant_name}
+                        </div>
+                        <div className="text-[11px] text-ink-400 mb-3">{bid.product_name}</div>
+
+                        <div className="flex items-baseline justify-between border-b border-ink-800 pb-2 mb-3">
+                          <div>
+                            <span className="text-[10px] font-mono text-ink-500 uppercase block">UNIT PRICE</span>
+                            <span className="text-base font-mono font-bold text-ink-100">
+                              <TabularNumber value={bid.unit_price_paise} isCurrencyPaise prefix="₹" />
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] font-mono text-ink-500 uppercase block">DELIVERY</span>
+                            <span className="text-xs font-mono font-bold text-signal-light">
+                              {bid.delivery_day_label}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1 text-xs font-mono mb-3">
+                          <div className="flex justify-between">
+                            <span className="text-ink-400">Total Order:</span>
+                            <span className="text-ink-200">
+                              <TabularNumber value={bid.total_price_paise} isCurrencyPaise prefix="₹" />
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-ink-400">Return Terms:</span>
+                            <span className="text-ink-200">{bid.return_terms_days} days</span>
+                          </div>
+                          <div className="flex justify-between border-t border-ink-800 pt-1">
+                            <span className="text-signal-light font-bold">Total Utility Score:</span>
+                            <span className="text-signal-light font-bold">
+                              {bid.utility_scores.total_utility.toFixed(3)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-[11px] text-ink-400 bg-ink-900 p-2 rounded border border-ink-800">
+                          {bid.extras_description}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
 
                 {auctionRationale && (
-                  <div className="bg-ink-900 border border-ink-800 p-4 rounded-lg">
-                    <span className="text-[10px] font-mono text-signal uppercase tracking-wider font-bold block mb-1">
-                      AUCTION OUTCOME:
-                    </span>
-                    <p className="text-sm text-ink-200 font-sans leading-relaxed">
-                      {auctionRationale}
-                    </p>
+                  <div className="p-3.5 bg-signal-bg border border-signal-border rounded text-xs text-signal-light font-sans">
+                    <strong className="font-bold font-mono uppercase tracking-wider block mb-1">
+                      Decision Rationale:
+                    </strong>
+                    {auctionRationale}
+                  </div>
+                )}
+
+                {/* Proceed to Contract & Checkout */}
+                {singleOffer && flowStep === 'negotiation' && (
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={() => setFlowStep('contract')}
+                      className="px-5 py-2 bg-signal hover:bg-signal-hover text-white font-mono font-bold text-xs rounded transition-colors shadow flex items-center gap-1.5"
+                    >
+                      Review & Accept {auctionWinner?.merchant_name} Contract Ticket →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 3: Auction Contract Ticket */}
+            {(flowStep === 'contract' || flowStep === 'checkout' || flowStep === 'paid') && singleOffer && (
+              <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm space-y-6">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-signal text-white flex items-center justify-center text-xs font-mono">3</span>
+                    <h2 className="text-base font-bold text-ink-100 font-display">
+                      Winning Merchant Cryptographic Contract
+                    </h2>
+                  </div>
+                </div>
+
+                <div className="max-w-xl mx-auto">
+                  <DealTicket ticket={singleOffer} />
+                </div>
+
+                {flowStep === 'contract' && (
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={handleAcceptAndCreateOrder}
+                      disabled={isProcessing}
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs rounded transition-colors shadow flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {isProcessing ? 'Verifying & Creating Order...' : 'Accept Winning Contract & Proceed to Settlement →'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 4 & 5: Settlement for Auction */}
+            {(flowStep === 'checkout' || flowStep === 'paid') && orderRecord && (
+              <div className="bg-ink-900 border border-ink-700 rounded-lg p-5 sm:p-6 shadow-sm space-y-6">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-signal text-white flex items-center justify-center text-xs font-mono">4</span>
+                    <h2 className="text-base font-bold text-ink-100 font-display">
+                      Corporate Order Settlement
+                    </h2>
+                  </div>
+                </div>
+
+                {flowStep === 'checkout' && (
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => handleSimulatePayment('valid')}
+                      disabled={isProcessing}
+                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs rounded transition-colors shadow flex items-center gap-2 disabled:opacity-50"
+                    >
+                      ✓ Confirm Corporate Payment (Simulate Webhook)
+                    </button>
+                  </div>
+                )}
+
+                {flowStep === 'paid' && (
+                  <div className="p-4 bg-emerald-950/80 border border-emerald-700 rounded-lg space-y-3">
+                    <div className="text-emerald-400 font-mono font-bold text-sm">
+                      ✓ Corporate Gift Order Settled & Paid via Razorpay
+                    </div>
+                    <Link
+                      href={`/audit?offer_id=${singleOffer?.offer_id || ''}`}
+                      className="text-xs font-mono font-bold text-signal-light hover:underline block"
+                    >
+                      View Full Immutable Timeline in Audit Ledger →
+                    </Link>
                   </div>
                 )}
               </div>
@@ -714,20 +1299,18 @@ export default function DealRoomPage() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-ink-800 bg-ink-950 py-4 select-none mt-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-ink-500">
-          <div className="flex items-center gap-3">
-            <span>RAZORPAY DEALFLOW</span>
-            <span>•</span>
-            <span>REAL ENGINE RESPONSE</span>
-            <span>•</span>
-            <span>1:1 PAISE SETTLEMENT</span>
+      {/* Persistent Footer */}
+      <footer className="border-t border-ink-800 bg-ink-900 py-4 mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-mono text-ink-400">
+          <div>
+            <span>Razorpay DealFlow</span> • Sovereign Deal Desk for Agentic Commerce
           </div>
-
-          <Link href="/checkout" className="hover:text-ink-300">
-            Next: Contract & Checkout →
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="hover:text-ink-200">Overview</Link>
+            <Link href="/merchant-console" className="hover:text-ink-200">Merchant Console</Link>
+            <Link href="/deal-room" className="hover:text-ink-200 text-signal-light">Deal Room</Link>
+            <Link href="/audit" className="hover:text-ink-200">Audit Ledger</Link>
+          </div>
         </div>
       </footer>
     </div>

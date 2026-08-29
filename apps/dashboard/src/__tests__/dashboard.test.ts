@@ -50,32 +50,14 @@ describe('apps/dashboard - 5 Canonical Views & Stepper Stepper Navigation', () =
     expect(html).toContain('HMAC-SHA256');
   });
 
-  it('renders DealLifecycleNav with all 6 plain-language lifecycle stages', () => {
+  it('renders the 4 canonical primary route links in DealLifecycleNav', () => {
     const html = renderToString(
-      React.createElement(DealLifecycleNav, {
-        currentStage: 'REQUEST_RECEIVED',
-      })
-    );
-
-    expect(html).toContain('Request');
-    expect(html).toContain('Offer made');
-    expect(html).toContain('Approved');
-    expect(html).toContain('Accepted');
-    expect(html).toContain('Order placed');
-    expect(html).toContain('Paid');
-  });
-
-  it('renders the 5 canonical real product route links in DealLifecycleNav', () => {
-    const html = renderToString(
-      React.createElement(DealLifecycleNav, {
-        currentStage: 'REQUEST_RECEIVED',
-      })
+      React.createElement(DealLifecycleNav)
     );
 
     expect(html).toContain('01 Overview');
     expect(html).toContain('02 Merchant Console');
     expect(html).toContain('03 Deal Room');
-    expect(html).toContain('04 Contract &amp; Checkout');
-    expect(html).toContain('05 Audit Ledger');
+    expect(html).toContain('04 Audit Ledger');
   });
 });

@@ -52,16 +52,10 @@ export default function Home() {
       title: '03 Live Deal Room',
       href: '/deal-room',
       badge: 'CENTERPIECE',
-      desc: 'Watch an AI buyer and your merchant agent negotiate in real time (Single-Merchant & 3-Merchant Auction).',
+      desc: 'Watch an AI buyer and your merchant agent negotiate in real time, inspect real candidate offers, and settle instantly in a continuous flow.',
     },
     {
-      title: '04 Contract & Checkout',
-      href: '/checkout',
-      badge: 'SETTLEMENT',
-      desc: 'Inspect the cryptographic contract ticket and complete settlement via Razorpay Checkout.js and webhooks.',
-    },
-    {
-      title: '05 Audit Ledger',
+      title: '04 Audit Ledger',
       href: '/audit',
       badge: 'IMMUTABLE',
       desc: 'Searchable chronological timeline tracking every state transition, policy rule, actor, and gateway response.',
@@ -70,7 +64,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col justify-between">
-      <DealLifecycleNav currentStage="REQUEST_RECEIVED" />
+      <DealLifecycleNav />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full flex-1 space-y-12">
         {/* Hero 30-Second Explainer Banner */}
