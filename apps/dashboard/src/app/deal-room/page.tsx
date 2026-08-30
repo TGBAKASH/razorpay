@@ -278,7 +278,7 @@ export default function DealRoomPage() {
       const listPaise = 429900;
       const candidate1Final = 394900;
       const candidate2Final = 419900;
-      const candidate3Final = 378300;
+      const candidate3Final = 378312; // Candidate C (12% maximum policy ceiling discount)
 
       const fallbackCandidates: CandidateOfferData[] = [
         {
@@ -300,8 +300,8 @@ export default function DealRoomPage() {
           evaluation: { pass: true, requires_human_approval: false },
           gross_profit_paise: candidate1Final - costPaise,
           margin_pct: ((candidate1Final - costPaise) / costPaise) * 100,
-          conversion_probability: 0.8,
-          expected_profit_score: (candidate1Final - costPaise) * 0.8 + 15000,
+          conversion_probability: 0.575,
+          expected_profit_score: (candidate1Final - costPaise) * 0.575,
         },
         {
           candidate: {
@@ -309,7 +309,7 @@ export default function DealRoomPage() {
             quantity,
             final_price_paise: candidate2Final,
             discount_paise: listPaise - candidate2Final,
-            discount_reason: ['Margin maximization pricing'],
+            discount_reason: ['Margin maximization pricing (standard list terms)'],
             delivery_promise: '2026-09-01T23:59:59.000Z',
             return_terms_days: 7,
             payment_methods_allowed: paymentPreferences,
@@ -318,8 +318,8 @@ export default function DealRoomPage() {
           evaluation: { pass: true, requires_human_approval: false },
           gross_profit_paise: candidate2Final - costPaise,
           margin_pct: ((candidate2Final - costPaise) / costPaise) * 100,
-          conversion_probability: 0.65,
-          expected_profit_score: (candidate2Final - costPaise) * 0.65,
+          conversion_probability: 0.425,
+          expected_profit_score: (candidate2Final - costPaise) * 0.425,
         },
         {
           candidate: {
@@ -336,12 +336,35 @@ export default function DealRoomPage() {
           evaluation: { pass: true, requires_human_approval: false },
           gross_profit_paise: candidate3Final - costPaise,
           margin_pct: ((candidate3Final - costPaise) / costPaise) * 100,
-          conversion_probability: 0.82,
-          expected_profit_score: (candidate3Final - costPaise) * 0.82,
+          conversion_probability: 0.62,
+          expected_profit_score: (candidate3Final - costPaise) * 0.62,
         },
       ];
 
+      // Pure Buyer-Priority Sorting across policy-valid candidates
+      const p1 = prioritiesOrder[0] || 'price';
+      fallbackCandidates.sort((a, b) => {
+        if (p1 === 'price') {
+          const diff = a.candidate.final_price_paise - b.candidate.final_price_paise;
+          if (diff !== 0) return diff; // Lowest Price wins
+          return b.expected_profit_score - a.expected_profit_score;
+        }
+        if (p1 === 'delivery_speed') {
+          const diff = new Date(a.candidate.delivery_promise).getTime() - new Date(b.candidate.delivery_promise).getTime();
+          if (diff !== 0) return diff; // Fastest delivery wins
+          return b.expected_profit_score - a.expected_profit_score;
+        }
+        if (p1 === 'return_terms') {
+          const diff = b.candidate.return_terms_days - a.candidate.return_terms_days;
+          if (diff !== 0) return diff; // Longest return window wins
+          return b.expected_profit_score - a.expected_profit_score;
+        }
+        return b.expected_profit_score - a.expected_profit_score;
+      });
+
+      const winnerCand = fallbackCandidates[0]!;
       setCandidateOffers(fallbackCandidates);
+
       const fallbackOfferId = 'off-sprintpro-' + Math.random().toString(36).substring(2, 8);
       const fallbackSignedContract = {
         offer_id: fallbackOfferId,
@@ -353,11 +376,11 @@ export default function DealRoomPage() {
           merchant_id: 'merchant-sprint-alpha',
           sku: 'SPRINTPRO-X2',
           quantity,
-          final_price_paise: candidate1Final,
+          final_price_paise: winnerCand.candidate.final_price_paise,
           currency: 'INR',
           payment_methods_allowed: paymentPreferences,
-          delivery_promise: deliveryDeadline ? `${deliveryDeadline}T23:59:59.000Z` : '2026-08-31T23:59:59.000Z',
-          return_terms_days: 10,
+          delivery_promise: winnerCand.candidate.delivery_promise,
+          return_terms_days: winnerCand.candidate.return_terms_days,
           expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
           policy_version: 'v1',
           nonce: 'nonce_98f12a3d7b4',
@@ -375,34 +398,59 @@ export default function DealRoomPage() {
         product_name: 'SprintPro X2 Running Shoes (Titanium Grey)',
         quantity,
         list_price_paise: listPaise,
-        final_price_paise: candidate1Final,
-        discount_paise: listPaise - candidate1Final,
-        discount_reasons: [
-          'Prepaid UPI payment incentive (₹150 off)',
+        final_price_paise: winnerCand.candidate.final_price_paise,
+        discount_paise: winnerCand.candidate.discount_paise,
+        discount_reasons: winnerCand.candidate.discount_reason || [
+          'Prepaid UPI payment incentive (zero COD return risk)',
           'Clearance bracket volume match (41 pairs available)',
-          'Guaranteed Monday delivery satisfied',
+          'Guaranteed delivery satisfied',
         ],
-        delivery_promise: deliveryDeadline ? `${deliveryDeadline}T23:59:59.000Z` : '2026-08-31T23:59:59.000Z',
-        return_terms_days: 10,
+        delivery_promise: winnerCand.candidate.delivery_promise,
+        return_terms_days: winnerCand.candidate.return_terms_days,
         payment_methods_allowed: paymentPreferences,
         expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         merchant_id: 'merchant-sprint-alpha',
         merchant_name: 'Sprint Athletics',
         signature: fallbackSignedContract.signature,
         nonce: fallbackSignedContract.nonce,
+        buyer_notes: additionalNotes || undefined,
         state: 'SIGNED',
       };
 
       setSingleOffer(fallbackOfferData);
-      setExplanation(
-        `Calculated an optimal offer of ₹3,949 for SprintPro X2 (saving ₹350 from ₹4,299 list price)${
-          deliveryDeadline ? ' matching your requested delivery deadline' : ''
-        } with 10-day returns.`
-      );
+
+      let explanationNotice = '';
+      if (p1 === 'price') {
+        const formattedPrice = (winnerCand.candidate.final_price_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        const formattedDiscount = (winnerCand.candidate.discount_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        explanationNotice = `You told us lowest price mattered most. Among every offer Sprint Athletics could still profitably make you, this was the cheapest at ₹${formattedPrice} (saving ₹${formattedDiscount}).`;
+      } else if (p1 === 'delivery_speed') {
+        const formattedDelivery = winnerCand.candidate.delivery_promise.includes('T')
+          ? new Date(winnerCand.candidate.delivery_promise).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+          : winnerCand.candidate.delivery_promise;
+        explanationNotice = `You told us fastest delivery mattered most. Among every offer Sprint Athletics could still profitably make you, this offered the earliest guaranteed delivery (${formattedDelivery}).`;
+      } else if (p1 === 'return_terms') {
+        explanationNotice = `You told us flexible return terms mattered most. Among every offer Sprint Athletics could still profitably make you, this offered the longest return window (${winnerCand.candidate.return_terms_days} days).`;
+      } else {
+        explanationNotice = `You told us your priorities mattered most. Among every offer Sprint Athletics could still profitably make you, this was the best one on that measure.`;
+      }
+
+      setExplanation(explanationNotice);
+      setTiebreakInfo({
+        applied: true,
+        near_tied_candidates_count: fallbackCandidates.length,
+        top_profit_candidate_sku: winnerCand.candidate.sku,
+        winner_sku: winnerCand.candidate.sku,
+        top_profit_score: winnerCand.expected_profit_score,
+        winner_profit_score: winnerCand.expected_profit_score,
+        score_delta_pct: 0,
+        buyer_priority: p1,
+        reason: explanationNotice,
+      });
 
       setOrderRecord({
         id: 'order_' + fallbackOfferId.replace(/^off-/, ''),
-        amount: candidate1Final * quantity,
+        amount: winnerCand.candidate.final_price_paise * quantity,
         currency: 'INR',
         receipt: 'rcpt_' + fallbackOfferId.replace(/^off-/, ''),
         status: 'created',
@@ -1071,7 +1119,7 @@ export default function DealRoomPage() {
               <div className="p-2.5 bg-ink-950 border border-ink-800 rounded text-[11px] font-mono text-ink-400 flex items-center gap-2">
                 <span className="text-signal font-bold">ℹ Note:</span>
                 <span>
-                  Buyer Priority Mandate acts as a bounded tiebreaker when multiple candidate offers clear merchant policy within the 10% expected profit band in single-merchant mode, or across competing merchants in 3-Merchant Auction mode.
+                  Buyer Priority Mandate strictly ranks every policy-valid candidate offer (Lowest Price selects the cheapest offer, Fastest Delivery selects the earliest SLA, Flexible Return Terms selects the longest return window). Merchant expected profit is used solely as a true tiebreaker if multiple offers are identical on your chosen priority.
                 </span>
               </div>
 

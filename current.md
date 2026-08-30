@@ -13,7 +13,7 @@
 Unlike naive chatbot implementations where an LLM is asked to guess prices or pick deals (risking hallucinations, margin leakage, and non-binding conversational text), DealFlow guarantees:
 1. **Mathematical Determinism**: Pricing, discounts, inventory locks, and margin floors are strictly computed by deterministic policy rules in integer paise — an LLM never touches contract numbers.
 2. **Cryptographic Non-Repudiation**: Every negotiated agreement is hashed into a canonical JSON payload and signed with an HMAC-SHA256 key, complete with a single-use timestamped nonce.
-3. **Bounded Multi-Attribute Utility**: Single-merchant candidate selection balances merchant expected profit velocity with a bounded 10% buyer priority tiebreaker. 3-Merchant Auctions evaluate multi-attribute utility across Price, Delivery Speed, Return Terms, and Custom Extras.
+3. **Pure Buyer Priority Ranking**: Single-merchant candidate selection strictly ranks all policy-valid candidates by the buyer's stated priority (Lowest Price picks cheapest offer, Fastest Delivery picks earliest SLA, Flexible Returns picks longest window), using merchant expected profit solely as a true tiebreaker. 3-Merchant Auctions evaluate multi-attribute utility across Price, Delivery Speed, Return Terms, and Custom Extras.
 4. **Atomic Payment Rails & Escrow**: Native integration with Razorpay Standard Checkout SDK (`orders.create`), cryptographic webhook verification (`x-razorpay-signature`), and automated dispute refund lifecycles.
 5. **Role Privacy & Immutable Audit Ledger**: Buyer views never leak merchant confidential margins, discount ceilings, or turnover metrics. Every state transition is recorded immutably in Neon PostgreSQL.
 
@@ -146,11 +146,9 @@ flowchart TD
         D --> E["Deterministic Policy Filter<br>(Margin Floor, Discount Ceiling, SLA, Expiry)"]
         E --> F["Generate 3 Candidate Offers<br>(Clearance A, Standard B, Max Discount C)"]
         F --> G["Expected Profit Scoring<br>(Gross Profit x Conversion Probability)"]
-        G --> H{"Check 10% Tiebreak Band"}
-        H -->|Near-Tie <= 10%| I["Apply Buyer Priority<br>(Price, Speed, or Returns)"]
-        H -->|Score Gap > 10%| J["Select Profit Maximizer<br>(Candidate A)"]
+        G --> H["Rank Policy-Valid Candidates by Stated Buyer Priority<br>(Lowest Price / Fastest Delivery / Longest Returns)"]
+        H --> I["Resolve True Ties via Merchant Expected Profit"]
         I --> K["Selected Winning Candidate"]
-        J --> K
     end
 
     subgraph Security ["3. Cryptographic Governance"]
@@ -194,8 +192,8 @@ flowchart TD
      * **Candidate A (Optimized Clearance)**: Clearance acceleration on slow-moving inventory with prepaid incentive.
      * **Candidate B (Standard Pricing)**: List price with standard terms.
      * **Candidate C (Maximum Discount)**: Max allowable policy discount (12%).
-   * **Bounded 10% Tiebreak Step**: If multiple candidates score within 10% expected profit of each other, the buyer's stated priority decides the winner.
-   * **Honest Decision Notice**: Clearly explains whether a near-tie was broken or if the profit leader was selected due to a >10% score gap.
+   * **Pure Buyer-Priority Candidate Selection**: Stated buyer priority purely ranks every policy-valid offer (Lowest Price $\rightarrow$ Candidate C @ ₹3,783 wins; Fastest Delivery $\rightarrow$ Candidate A @ Monday SLA wins; Flexible Returns $\rightarrow$ Candidate C @ 14-day window wins). Merchant profit is used solely as a true tiebreaker for identical values.
+   * **Honest Decision Notice**: Clearly explains which candidate was selected and why, dynamically reporting the winning price, delivery date, or return window.
    * **Buyer-Safe Candidate Cards**: Displays only buyer value qualifications (Delivery SLA, Return Window, Stock Readiness, Verified Status), keeping internal margin floors confidential.
 3. **Cryptographic Contract Review**:
    * Displays the signed Deal Ticket with verified merchant signature, key ID, nonce, and ISO-8601 expiry timestamp.
@@ -228,7 +226,7 @@ DealFlow translates any incoming agent protocol into the canonical **Common Comm
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/intent/parse` | Public | Parses natural language (English/Hinglish) into structured CCO buyer constraints using Gemini 1.5 Flash. |
 | `POST` | `/api/policy/interpret-nl` | Merchant | Translates natural language policy rules into structured numerical guardrails. |
-| `POST` | `/api/offers/generate` | Public | Evaluates candidates, executes bounded tiebreak, signs contract, and returns winning offer. |
+| `POST` | `/api/offers/generate` | Public | Evaluates candidates, executes pure buyer-priority ranking, signs contract, and returns winning offer. |
 | `GET` | `/api/offers/pending-approvals` | Merchant | Lists all offers requiring human approval (>₹15,000 threshold). |
 | `POST` | `/api/offers/:id/human-approve` | Merchant | Approves a held offer and transitions state to `POLICY_APPROVED`. |
 | `POST` | `/api/offers/:id/human-reject` | Merchant | Rejects a held offer and transitions state to `POLICY_REJECTED`. |
@@ -334,7 +332,7 @@ DealFlow translates any incoming agent protocol into the canonical **Common Comm
 | :--- | :--- | :--- |
 | **1** | **Deterministic Math Only** | Prices, discounts, and margins are computed strictly in integer paise. An LLM never generates or alters numeric contract terms. |
 | **2** | **Cryptographic Non-Repudiation** | Canonical JSON payloads are signed using HMAC-SHA256. Nonces are recorded and rejected on reuse to prevent replay attacks. |
-| **3** | **Bounded Tiebreak Step** | Stated buyer priorities can only break ties among valid candidates that score within 10% of the top expected profit candidate. |
+| **3** | **Pure Buyer Priority Ranking** | Stated buyer priority purely ranks all policy-valid offers (Lowest Price / Fastest Delivery / Longest Returns), using merchant profit solely as a true tiebreaker. |
 | **4** | **Policy Floor Primacy** | A candidate that breaches any merchant boundary (margin, discount ceiling, inventory) is rejected immediately and can never win. |
 | **5** | **Zero Margin Leakage** | Buyer candidate cards display only PASS/FAIL badges and value qualifications. Raw margins and internal metrics are merchant-gated. |
 | **6** | **Atomic Settlement** | Razorpay orders are linked 1:1 with signed contracts. Payments are validated via webhook signatures before committing to the ledger. |

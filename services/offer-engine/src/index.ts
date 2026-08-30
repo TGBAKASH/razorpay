@@ -5,16 +5,12 @@ import {
 } from '@razorpay-dealflow/adapters';
 import {
   evaluateAllPolicies,
-  TIEBREAK_PROFIT_BAND_PCT,
-  BOUNDED_TIEBREAK_THRESHOLD_RATIO,
   type CandidateOfferInput,
   type MerchantPolicyConfig,
   type ProductSnapshot,
   type InventorySnapshot,
   type PolicyEvaluationResult,
 } from '@razorpay-dealflow/policy-engine';
-
-export { TIEBREAK_PROFIT_BAND_PCT, BOUNDED_TIEBREAK_THRESHOLD_RATIO };
 
 export interface ScoredCandidateOffer {
   candidate: CandidateOfferInput;
@@ -552,7 +548,21 @@ export async function processOfferNegotiation(
       ? 'flexible return terms'
       : buyerPriority;
 
-  const decisionNotice = `You told us ${priorityText} mattered most. Among every offer ${merchantName} could still profitably make you, this was the best one on that measure.`;
+  let decisionNotice = '';
+  if (buyerPriority === 'price') {
+    const formattedPrice = (winner.candidate.final_price_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    const formattedDiscount = (winner.candidate.discount_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    decisionNotice = `You told us lowest price mattered most. Among every offer ${merchantName} could still profitably make you, this was the cheapest at ₹${formattedPrice} (saving ₹${formattedDiscount}).`;
+  } else if (buyerPriority === 'delivery_speed') {
+    const formattedDelivery = winner.candidate.delivery_promise.includes('T')
+      ? new Date(winner.candidate.delivery_promise).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+      : winner.candidate.delivery_promise;
+    decisionNotice = `You told us fastest delivery mattered most. Among every offer ${merchantName} could still profitably make you, this offered the earliest guaranteed delivery (${formattedDelivery}).`;
+  } else if (buyerPriority === 'return_terms') {
+    decisionNotice = `You told us flexible return terms mattered most. Among every offer ${merchantName} could still profitably make you, this offered the longest return window (${winner.candidate.return_terms_days} days).`;
+  } else {
+    decisionNotice = `You told us ${priorityText} mattered most. Among every offer ${merchantName} could still profitably make you, this was the best one on that measure.`;
+  }
 
   const orderedCandidates = [winner, ...scoredCandidates.filter((c) => c !== winner)];
 
