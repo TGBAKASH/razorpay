@@ -135,16 +135,18 @@ export async function registerAuctionRoutes(fastify: FastifyInstance) {
         extras_description: extrasDesc,
         signed_contract: signedContract,
         checks: negotiationResult.candidate_offers[0]?.evaluation?.checks || [],
+        reliability: merchant.reliability,
       };
     });
 
     const rawBids = await Promise.all(merchantBidPromises);
 
-    // 3. Multi-Attribute Decision Function: Score candidate bids using buyer's priority ranking
+    // 3. Multi-Attribute Decision Function: Score candidate bids using buyer's priority ranking and reliability floor
     const auctionResult = evaluateBuyerMultiAttributeUtility(
       rawBids,
-      buyerConstraints.priorities,
-      buyerConstraints.budget_max_paise
+      buyerConstraints,
+      buyerConstraints.budget_max_paise,
+      buyerConstraints.min_reliability_stars
     );
 
     // 4. Register winning contract into activeContracts so it proceeds seamlessly to Phase 6

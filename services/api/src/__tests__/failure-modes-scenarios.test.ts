@@ -195,7 +195,42 @@ describe('Failure Modes & Edge Cases (Phase 11 - The 8 Triggerable Demo Scenario
     expect(result.audit_entry.action).toBe('OFFER_GEN_INVENTORY_SIGNAL_DIFFERENTIATION');
   });
 
-  it('Batch execution endpoint POST /api/demo/trigger-all runs all 10 scenarios and confirms 100% pass rate', async () => {
+  it('Scenario 11 (Reliability Changes Outcome): 4.0+ star floor excludes lower reliability merchant B and selects merchant A', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/demo/trigger-scenario',
+      payload: { scenario_id: 11 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    const result = body.result;
+
+    expect(result.passed).toBe(true);
+    expect(result.scenario_id).toBe(11);
+    expect(result.details.run1_no_floor.winning_merchant).toContain('Merchant B');
+    expect(result.details.run2_with_4_star_floor.winning_merchant).toContain('Merchant A');
+    expect(result.audit_entry.action).toBe('AUCTION_RELIABILITY_FLOOR_APPLIED');
+  });
+
+  it('Scenario 12 (Protocol Interoperability): ACP and AP2 payloads normalize into identical CCO constraints and pricing', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/demo/trigger-scenario',
+      payload: { scenario_id: 12 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    const result = body.result;
+
+    expect(result.passed).toBe(true);
+    expect(result.scenario_id).toBe(12);
+    expect(result.details.acp_normalized_cco.winning_price_inr).toBe(result.details.ap2_normalized_cco.winning_price_inr);
+    expect(result.audit_entry.action).toBe('MULTI_PROTOCOL_INTEROP_NORMALIZED');
+  });
+
+  it('Batch execution endpoint POST /api/demo/trigger-all runs all 12 scenarios and confirms 100% pass rate', async () => {
     const res = await server.inject({
       method: 'POST',
       url: '/api/demo/trigger-all',
@@ -205,6 +240,6 @@ describe('Failure Modes & Edge Cases (Phase 11 - The 8 Triggerable Demo Scenario
     const body = JSON.parse(res.body);
     expect(body.success).toBe(true);
     expect(body.all_passed).toBe(true);
-    expect(body.results).toHaveLength(10);
+    expect(body.results).toHaveLength(12);
   });
 });

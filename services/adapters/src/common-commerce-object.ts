@@ -32,6 +32,7 @@ export const BuyerConstraintsSectionSchema = z.object({
   payment_preference: z.array(PaymentPreferenceMethodSchema).min(1, 'At least one payment method preference is required'),
   return_preference: z.string().min(1, 'Return preference is required'),
   priorities: z.array(PriorityFactorSchema).min(1, 'Priorities must be specified'),
+  min_reliability_stars: z.number().optional(),
 });
 export type BuyerConstraintsSection = z.infer<typeof BuyerConstraintsSectionSchema>;
 

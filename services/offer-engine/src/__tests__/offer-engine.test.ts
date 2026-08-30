@@ -5,6 +5,7 @@ import {
   processOfferNegotiation,
   computeDeterministicAcceptanceProbability,
   computeDeterministicExpectedProfit,
+  evaluateBuyerMultiAttributeUtility,
 } from '../index.js';
 import type { BuyerConstraintsSection } from '@razorpay-dealflow/adapters';
 import type {
@@ -340,5 +341,71 @@ describe('Offer Engine (Rules + Gemini Explanation + Heuristic Ranking)', () => 
 
     // Fast mover preserves margin under no-discount-fast-moving policy
     expect(fastCandidates[1]?.final_price_paise).toBeGreaterThanOrEqual(419900);
+  });
+
+  it('Auction evaluation: excludes merchants below buyer reliability floor and selects highest utility eligible merchant', () => {
+    const rawBids = [
+      {
+        merchant_id: 'merchant-a',
+        merchant_name: 'Merchant A',
+        sku: 'SKU-A',
+        product_name: 'Product A',
+        unit_price_paise: 2950000, // ₹29,500
+        total_price_paise: 2950000 * 20,
+        discount_paise: 250000,
+        delivery_promise: '2026-09-03T23:59:59Z',
+        delivery_day_label: 'Thursday',
+        return_terms_days: 7,
+        extras_description: 'Free branding',
+        signed_contract: { offer_id: 'off-a' },
+        reliability: {
+          total_completed_deals: 18,
+          on_time_deliveries: 16,
+          disputed_or_refunded_orders: 1,
+          signed_contracts_total: 18,
+          signed_contracts_paid: 18,
+          on_time_rate: 0.889,
+          dispute_rate: 0.944,
+          completion_rate: 1.0,
+          reliability_score: 0.944,
+          star_rating: 4.7,
+        },
+      },
+      {
+        merchant_id: 'merchant-b',
+        merchant_name: 'Merchant B',
+        sku: 'SKU-B',
+        product_name: 'Product B',
+        unit_price_paise: 2890000, // ₹28,900 (Cheapest)
+        total_price_paise: 2890000 * 20,
+        discount_paise: 210000,
+        delivery_promise: '2026-09-04T23:59:59Z',
+        delivery_day_label: 'Friday',
+        return_terms_days: 7,
+        extras_description: 'Standard pack',
+        signed_contract: { offer_id: 'off-b' },
+        reliability: {
+          total_completed_deals: 20,
+          on_time_deliveries: 12,
+          disputed_or_refunded_orders: 4,
+          signed_contracts_total: 20,
+          signed_contracts_paid: 16,
+          on_time_rate: 0.60,
+          dispute_rate: 0.80,
+          completion_rate: 0.80,
+          reliability_score: 0.733,
+          star_rating: 3.7,
+        },
+      },
+    ];
+
+    // Run 1: No floor (0★) -> Merchant B (cheapest) wins
+    const run1 = evaluateBuyerMultiAttributeUtility(rawBids, ['price'], 3000000, 0);
+    expect(run1.winner.merchant_id).toBe('merchant-b');
+
+    // Run 2: 4.0★ floor -> Merchant B is excluded (3.7★ < 4.0★), Merchant A (4.7★) wins
+    const run2 = evaluateBuyerMultiAttributeUtility(rawBids, ['price'], 3000000, 4.0);
+    expect(run2.winner.merchant_id).toBe('merchant-a');
+    expect(run2.competing_bids.find((b) => b.merchant_id === 'merchant-b')?.excluded_by_floor).toBe(true);
   });
 });

@@ -20,17 +20,28 @@ interface CompetingBid {
   return_terms_days: number;
   extras_description: string;
   signed_contract: any;
+  reliability?: {
+    on_time_rate: number;
+    dispute_rate: number;
+    completion_rate: number;
+    reliability_score: number;
+    star_rating: number;
+  };
   utility_scores: {
     price_score: number;
     delivery_score: number;
     return_score: number;
     extras_score: number;
+    trust_score: number;
     total_utility: number;
   };
+  excluded_by_floor?: boolean;
+  exclusion_reason?: string;
 }
 
 export default function AuctionPage() {
   const [priorityMode, setPriorityMode] = useState<'speed' | 'price' | 'extras'>('speed');
+  const [minReliabilityFloor, setMinReliabilityFloor] = useState<number>(0);
   const [quantity, setQuantity] = useState(20);
   const [budgetPerUnit, setBudgetPerUnit] = useState(30000);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
@@ -63,6 +74,7 @@ export default function AuctionPage() {
             payment_preference: ['upi', 'card'],
             return_preference: 'flexible',
             priorities,
+            min_reliability_stars: minReliabilityFloor,
           },
         }),
       });
@@ -74,7 +86,7 @@ export default function AuctionPage() {
         setDecisionRationale(data.auction.decision_rationale);
       }
     } catch {
-      // Mock fallback
+      // Deterministic Mock fallback
       const rawBids: CompetingBid[] = [
         {
           merchant_id: 'merchant-a-crafts',
@@ -89,13 +101,22 @@ export default function AuctionPage() {
           return_terms_days: 7,
           extras_description: 'Free custom logo laser engraving & branding included',
           signed_contract: { offer_id: 'off-a-001', signature: 'sig_a_mock_hmac' },
+          reliability: {
+            on_time_rate: 0.889,
+            dispute_rate: 0.944,
+            completion_rate: 1.0,
+            reliability_score: 0.944,
+            star_rating: 4.7,
+          },
           utility_scores: {
             price_score: 0.455,
             delivery_score: 0.5,
             return_score: 0.0,
             extras_score: 1.0,
-            total_utility: priorityMode === 'extras' ? 0.725 : 0.485,
+            trust_score: 0.944,
+            total_utility: priorityMode === 'extras' ? 0.725 : 0.525,
           },
+          excluded_by_floor: minReliabilityFloor > 4.7,
         },
         {
           merchant_id: 'merchant-b-bulk',
@@ -110,13 +131,25 @@ export default function AuctionPage() {
           return_terms_days: 7,
           extras_description: 'Standard packaging (no custom branding)',
           signed_contract: { offer_id: 'off-b-001', signature: 'sig_b_mock_hmac' },
+          reliability: {
+            on_time_rate: 0.60,
+            dispute_rate: 0.80,
+            completion_rate: 0.80,
+            reliability_score: 0.733,
+            star_rating: 3.7,
+          },
           utility_scores: {
             price_score: 1.0,
             delivery_score: 0.0,
             return_score: 0.0,
             extras_score: 0.0,
-            total_utility: priorityMode === 'price' ? 0.85 : 0.35,
+            trust_score: 0.733,
+            total_utility: minReliabilityFloor > 3.7 ? -1.0 : (priorityMode === 'price' ? 0.82 : 0.35),
           },
+          excluded_by_floor: minReliabilityFloor > 3.7,
+          exclusion_reason: minReliabilityFloor > 3.7
+            ? `Merchant rating (3.7★) is below buyer's required minimum reliability floor of ${minReliabilityFloor.toFixed(1)}★ (Dispute rate: 20%, On-time rate: 60%).`
+            : undefined,
         },
         {
           merchant_id: 'merchant-c-express',
@@ -131,24 +164,43 @@ export default function AuctionPage() {
           return_terms_days: 15,
           extras_description: '15-day hassle-free replacement warranty included',
           signed_contract: { offer_id: 'off-c-001', signature: 'sig_c_mock_hmac' },
+          reliability: {
+            on_time_rate: 1.0,
+            dispute_rate: 1.0,
+            completion_rate: 1.0,
+            reliability_score: 1.0,
+            star_rating: 5.0,
+          },
           utility_scores: {
             price_score: 0.0,
             delivery_score: 1.0,
             return_score: 1.0,
             extras_score: 0.0,
-            total_utility: priorityMode === 'speed' ? 0.775 : 0.32,
+            trust_score: 1.0,
+            total_utility: priorityMode === 'speed' ? 0.775 : 0.38,
           },
+          excluded_by_floor: minReliabilityFloor > 5.0,
         },
       ];
 
-      let win = rawBids[2]!;
-      let rat = 'Merchant C selected: Delivery speed was ranked #1 priority (Wednesday delivery beats Thursday and Friday).';
-      if (priorityMode === 'price') {
-        win = rawBids[1]!;
-        rat = 'Merchant B selected: Price was ranked #1 priority (₹28,900 unit price is lowest in market).';
+      const eligibleBids = rawBids.filter((b) => !b.excluded_by_floor);
+      let win = eligibleBids[0]!;
+      let rat = '';
+
+      if (priorityMode === 'speed') {
+        win = eligibleBids.find((b) => b.sku === 'GIFTBOX-CORP-C') || eligibleBids[0]!;
+        rat = `Merchant C selected: Delivery speed was ranked #1 priority (Wednesday air courier) with 5.0★ perfect reliability record.`;
+      } else if (priorityMode === 'price') {
+        if (minReliabilityFloor > 3.7) {
+          win = eligibleBids.find((b) => b.sku === 'GIFTBOX-CORP-A') || eligibleBids[0]!;
+          rat = `Merchant A selected (₹29,500 / 4.7★): Lowest price bidder Merchant B (₹28,900 / 3.7★) was excluded because its 3.7★ rating fell below your ${minReliabilityFloor.toFixed(1)}★ reliability floor (20% dispute rate, 40% late delivery history).`;
+        } else {
+          win = eligibleBids.find((b) => b.sku === 'GIFTBOX-CORP-B') || eligibleBids[0]!;
+          rat = `Merchant B selected (₹28,900 / 3.7★): Price was ranked #1 priority with no reliability floor restriction.`;
+        }
       } else if (priorityMode === 'extras') {
-        win = rawBids[0]!;
-        rat = 'Merchant A selected: Customization and extras were ranked #1 priority (Free custom branding included).';
+        win = eligibleBids.find((b) => b.sku === 'GIFTBOX-CORP-A') || eligibleBids[0]!;
+        rat = `Merchant A selected: Customization and extras were ranked #1 priority (Free custom logo branding included) with 4.7★ reliability.`;
       }
 
       setCompetingBids(rawBids);
@@ -176,13 +228,13 @@ export default function AuctionPage() {
               3-Merchant Multi-Attribute Auction
             </h1>
             <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
-              One buyer intent fans out to 3 independent merchant offer engines in parallel. Compares signed contracts on Speed vs. Price vs. Customization.
+              One buyer intent fans out to 3 independent merchant offer engines in parallel. Compares signed contracts on Speed, Price, Customization, and Demonstrated Reliability.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-ink-400 bg-ink-800 border border-ink-700 px-3 py-1.5 rounded">
-              DECISION MODEL: MULTI-ATTRIBUTE UTILITY (MAUT)
+              DECISION MODEL: RELIABILITY-WEIGHTED MAUT
             </span>
           </div>
         </div>
@@ -194,11 +246,11 @@ export default function AuctionPage() {
               Buyer Agent Request Parameters
             </span>
             <span className="font-mono text-[10px] text-ink-500 uppercase">
-              PARALLEL FANOUT
+              PARALLEL FANOUT + TRUST FLOOR
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-[11px] font-mono uppercase text-ink-400 mb-1">
                 Requested Quantity
@@ -266,6 +318,22 @@ export default function AuctionPage() {
                 </button>
               </div>
             </div>
+
+            <div>
+              <label className="block text-[11px] font-mono uppercase text-ink-400 mb-1">
+                Min. Merchant Reliability
+              </label>
+              <select
+                value={minReliabilityFloor}
+                onChange={(e) => setMinReliabilityFloor(parseFloat(e.target.value))}
+                className="w-full bg-ink-950 border border-ink-700 rounded px-2.5 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+              >
+                <option value={0}>No preference (All eligible)</option>
+                <option value={3.0}>3.0+ Stars (Standard)</option>
+                <option value={4.0}>4.0+ Stars (High Reliability)</option>
+                <option value={4.5}>4.5+ Stars (Verified Elite)</option>
+              </select>
+            </div>
           </div>
 
           <button
@@ -314,6 +382,11 @@ export default function AuctionPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
               {competingBids.map((bid) => {
                 const isCurrentWinner = winner?.sku === bid.sku;
+                const isExcluded = bid.excluded_by_floor;
+                const starRating = bid.reliability?.star_rating || 4.0;
+                const onTimePct = Math.round((bid.reliability?.on_time_rate || 0.9) * 100);
+                const disputePct = Math.round((1 - (bid.reliability?.dispute_rate || 1.0)) * 100);
+
                 const ticketData: DealTicketData = {
                   offer_id: bid.signed_contract?.offer_id || 'bid-' + bid.sku,
                   sku: bid.sku,
@@ -326,6 +399,7 @@ export default function AuctionPage() {
                     bid.extras_description,
                     `Delivery: ${bid.delivery_day_label} guaranteed`,
                     `${bid.return_terms_days}-day return policy`,
+                    `Reliability: ${starRating.toFixed(1)}★ (${onTimePct}% on-time, ${disputePct}% dispute)`,
                   ],
                   delivery_promise: bid.delivery_promise,
                   return_terms_days: bid.return_terms_days,
@@ -339,13 +413,42 @@ export default function AuctionPage() {
                 };
 
                 return (
-                  <div key={bid.sku} className="space-y-3">
+                  <div key={bid.sku} className={`space-y-3 ${isExcluded ? 'opacity-70' : ''}`}>
+                    {/* Reliability Trust Badge */}
+                    <div className={`p-2.5 rounded border text-xs font-mono flex items-center justify-between ${
+                      isExcluded
+                        ? 'bg-rose-950/40 border-rose-800/80 text-rose-300'
+                        : starRating >= 4.5
+                        ? 'bg-emerald-950/40 border-emerald-800/80 text-emerald-300'
+                        : 'bg-ink-900 border-ink-700 text-ink-200'
+                    }`}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-amber-400 font-bold">★ {starRating.toFixed(1)}</span>
+                        <span className="text-[10px] text-ink-400">({onTimePct}% on-time | {disputePct}% disp)</span>
+                      </div>
+                      {isExcluded ? (
+                        <span className="text-[10px] uppercase font-bold text-rose-400 px-1.5 py-0.5 bg-rose-900/60 rounded">
+                          Excluded (Below Floor)
+                        </span>
+                      ) : starRating >= 4.8 ? (
+                        <span className="text-[10px] uppercase font-bold text-emerald-400 px-1.5 py-0.5 bg-emerald-900/60 rounded">
+                          Verified Elite
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {isExcluded && bid.exclusion_reason && (
+                      <div className="p-2 rounded bg-rose-950/60 border border-rose-800 text-[10px] text-rose-200 font-mono leading-tight">
+                        {bid.exclusion_reason}
+                      </div>
+                    )}
+
                     <DealTicket
                       ticket={ticketData}
                       isCompetitorBid
-                      isWinner={isCurrentWinner}
+                      isWinner={isCurrentWinner && !isExcluded}
                       onPay={
-                        isCurrentWinner
+                        isCurrentWinner && !isExcluded
                           ? () => {
                               window.location.href = `/checkout?offer_id=${ticketData.offer_id}&amount=${ticketData.final_price_paise * quantity}`;
                             }
@@ -357,8 +460,8 @@ export default function AuctionPage() {
                     <div className="bg-ink-900 border border-ink-700 rounded p-3 text-[11px] font-mono space-y-1.5">
                       <div className="flex items-center justify-between text-ink-400 border-b border-ink-800 pb-1">
                         <span>MAUT Utility Breakdown</span>
-                        <span className="text-ink-200 font-bold">
-                          {bid.utility_scores.total_utility.toFixed(3)}
+                        <span className={`font-bold ${isExcluded ? 'text-rose-400 line-through' : 'text-ink-200'}`}>
+                          {bid.utility_scores.total_utility < 0 ? '0.000 (Excluded)' : bid.utility_scores.total_utility.toFixed(3)}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-ink-500">
@@ -377,6 +480,12 @@ export default function AuctionPage() {
                         <span>Extras & Customization:</span>
                         <span className="text-amber">
                           {bid.utility_scores.extras_score.toFixed(3)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-ink-500">
+                        <span>Trust & Reliability:</span>
+                        <span className="text-emerald-400">
+                          {(bid.utility_scores.trust_score || 0.85).toFixed(3)} ({starRating.toFixed(1)}★)
                         </span>
                       </div>
                     </div>

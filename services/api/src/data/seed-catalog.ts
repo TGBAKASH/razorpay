@@ -25,6 +25,19 @@ export interface ProductData {
   listedAt?: string;
 }
 
+export interface MerchantReliabilityMetrics {
+  total_completed_deals: number;
+  on_time_deliveries: number;
+  disputed_or_refunded_orders: number;
+  signed_contracts_total: number;
+  signed_contracts_paid: number;
+  on_time_rate: number; // deliveries fulfilled by promised date / total completed deals
+  dispute_rate: number; // 1 - (disputed or refunded orders / total completed deals)
+  completion_rate: number; // signed contracts that reached PAID / signed contracts total
+  reliability_score: number; // (on_time_rate + dispute_rate + completion_rate) / 3
+  star_rating: number; // reliability_score * 5
+}
+
 export interface MerchantData {
   id: string;
   name: string;
@@ -32,6 +45,7 @@ export interface MerchantData {
   policy: MerchantPolicyData;
   policyHistory: MerchantPolicyData[];
   products: ProductData[];
+  reliability: MerchantReliabilityMetrics;
 }
 
 export const CATALOG_MERCHANTS: MerchantData[] = [
@@ -39,6 +53,18 @@ export const CATALOG_MERCHANTS: MerchantData[] = [
     id: 'merchant-sprint-alpha',
     name: 'Sprint Athletics',
     slug: 'sprint-athletics',
+    reliability: {
+      total_completed_deals: 25,
+      on_time_deliveries: 24,
+      disputed_or_refunded_orders: 1,
+      signed_contracts_total: 25,
+      signed_contracts_paid: 25,
+      on_time_rate: 0.96,
+      dispute_rate: 0.96,
+      completion_rate: 1.0,
+      reliability_score: 0.973,
+      star_rating: 4.9,
+    },
     policy: {
       policyVersion: 'v1',
       minMarginPct: 18.0,
@@ -85,6 +111,18 @@ export const CATALOG_MERCHANTS: MerchantData[] = [
     id: 'merchant-a-crafts',
     name: 'Merchant A - Premium Crafts',
     slug: 'merchant-a-crafts',
+    reliability: {
+      total_completed_deals: 18,
+      on_time_deliveries: 16,
+      disputed_or_refunded_orders: 1,
+      signed_contracts_total: 18,
+      signed_contracts_paid: 18,
+      on_time_rate: 0.889,
+      dispute_rate: 0.944,
+      completion_rate: 1.0,
+      reliability_score: 0.944,
+      star_rating: 4.7,
+    },
     policy: {
       policyVersion: 'v1',
       minMarginPct: 15.0,
@@ -117,6 +155,18 @@ export const CATALOG_MERCHANTS: MerchantData[] = [
     id: 'merchant-b-bulk',
     name: 'Merchant B - Bulk Gifting Direct',
     slug: 'merchant-b-bulk',
+    reliability: {
+      total_completed_deals: 20,
+      on_time_deliveries: 12, // 60% due to freight delays
+      disputed_or_refunded_orders: 4, // 4 refunds
+      signed_contracts_total: 20,
+      signed_contracts_paid: 16, // 80% paid
+      on_time_rate: 0.60,
+      dispute_rate: 0.80,
+      completion_rate: 0.80,
+      reliability_score: 0.733,
+      star_rating: 3.7,
+    },
     policy: {
       policyVersion: 'v1',
       minMarginPct: 15.0,
@@ -149,6 +199,18 @@ export const CATALOG_MERCHANTS: MerchantData[] = [
     id: 'merchant-c-express',
     name: 'Merchant C - Express Corporate Gifting',
     slug: 'merchant-c-express',
+    reliability: {
+      total_completed_deals: 20,
+      on_time_deliveries: 20, // 100% on time
+      disputed_or_refunded_orders: 0, // 0 disputes
+      signed_contracts_total: 20,
+      signed_contracts_paid: 20, // 100% paid
+      on_time_rate: 1.0,
+      dispute_rate: 1.0,
+      completion_rate: 1.0,
+      reliability_score: 1.0,
+      star_rating: 5.0,
+    },
     policy: {
       policyVersion: 'v1',
       minMarginPct: 15.0,

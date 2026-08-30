@@ -204,12 +204,13 @@ flowchart TD
 
 ### C. 3-Merchant Parallel Auction Flow
 * Broadcasts an RFP in parallel to 3 competing merchants:
-  * **Sprint Athletics** (Clearance & margin balanced)
-  * **FitPro Gear** (Fastest delivery / air courier)
-  * **Velocity Sports** (Custom logo laser engraving & extras)
-* Evaluates bids using a **Multi-Attribute Utility Function**:
-  $$\text{Utility} = w_{\text{price}} \cdot S_{\text{price}} + w_{\text{delivery}} \cdot S_{\text{delivery}} + w_{\text{returns}} \cdot S_{\text{returns}} + w_{\text{extras}} \cdot S_{\text{extras}}$$
-* Displays interactive bid comparison cards with masked margin percentages and automatic contract signing for the winner.
+  * **Sprint Athletics / Merchant A** (Clearance & margin balanced, 4.7★ Reliability)
+  * **FitPro Gear / Merchant C** (Fastest delivery / air courier, 5.0★ Verified Elite)
+  * **Velocity Sports / Merchant B** (Bulk direct discount, 3.7★ Reliability)
+* Evaluates bids using a **Reliability-Weighted Multi-Attribute Utility Function**:
+  $$\text{Utility} = w_{\text{price}} \cdot S_{\text{price}} + w_{\text{delivery}} \cdot S_{\text{delivery}} + w_{\text{returns}} \cdot S_{\text{returns}} + w_{\text{extras}} \cdot S_{\text{extras}} + w_{\text{trust}} \cdot S_{\text{trust}}$$
+* **Buyer-Controlled Reliability Floor**: Buyers can set a minimum merchant trust floor (`0 / 3.0+ / 4.0+ / 4.5+ Stars`). Merchants below the floor are excluded prior to scoring.
+* Displays interactive bid comparison cards with star ratings, on-time/dispute breakdown tooltips, masked margins, and automatic contract signing for the winner.
 
 ### D. Universal Protocol Adapters (`services/adapters`)
 DealFlow translates any incoming agent protocol into the canonical **Common Commerce Object (CCO)**:
@@ -231,15 +232,15 @@ DealFlow translates any incoming agent protocol into the canonical **Common Comm
 | `POST` | `/api/offers/:id/human-approve` | Merchant | Approves a held offer and transitions state to `POLICY_APPROVED`. |
 | `POST` | `/api/offers/:id/human-reject` | Merchant | Rejects a held offer and transitions state to `POLICY_REJECTED`. |
 | `POST` | `/api/offers/:id/accept` | Public | Accepts a signed contract with nonce replay validation. |
-| `POST` | `/api/auction/broadcast` | Public | Broadcasts RFP to 3 competing merchants and computes multi-attribute utility winner. |
+| `POST` | `/api/auction/broadcast` | Public | Broadcasts RFP to 3 competing merchants, enforces buyer reliability floor, and computes utility winner. |
 | `POST` | `/api/orders/create` | Public | Creates a Razorpay Order (`orders.create`) linked 1:1 with an offer contract. |
 | `POST` | `/api/webhooks/razorpay` | Razorpay | Validates HMAC-SHA256 webhook signature, captures payment, and transitions state to `PAID`. |
 | `POST` | `/api/orders/:id/refund` | Public | Triggers 10-day dispute refund via Razorpay API and marks contract `REFUNDED`. |
 | `GET` | `/api/buyer/orders` | Buyer | Returns buyer-scoped past orders with receipt data. |
 | `GET` | `/api/audit-logs` | Public | Retrieves immutable audit trail entries for a given offer ID. |
 | `GET` | `/api/offers/live-feed` | Public | Live stream of recent negotiations and state transitions. |
-| `POST` | `/api/demo/trigger-scenario` | Public | Executes 1 of 10 live edge-case / invariant failure presets. |
-| `POST` | `/api/demo/trigger-all` | Public | Batch executes all 10 edge-case presets and asserts 100% pass rate. |
+| `POST` | `/api/demo/trigger-scenario` | Public | Executes 1 of 12 live edge-case / invariant failure presets. |
+| `POST` | `/api/demo/trigger-all` | Public | Batch executes all 12 edge-case presets and asserts 100% pass rate. |
 
 ---
 

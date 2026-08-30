@@ -63,13 +63,28 @@ export interface CompetingMerchantBid {
   extras_description: string;
   signed_contract: any;
   checks?: any[];
+  reliability?: {
+    total_completed_deals?: number;
+    on_time_deliveries?: number;
+    disputed_or_refunded_orders?: number;
+    signed_contracts_total?: number;
+    signed_contracts_paid?: number;
+    on_time_rate: number;
+    dispute_rate: number;
+    completion_rate: number;
+    reliability_score: number;
+    star_rating: number;
+  };
   utility_scores: {
     price_score: number;
     delivery_score: number;
     return_score: number;
     extras_score: number;
+    trust_score: number;
     total_utility: number;
   };
+  excluded_by_floor?: boolean;
+  exclusion_reason?: string;
 }
 
 export interface AuctionBroadcastResult {
@@ -82,7 +97,7 @@ export interface AuctionBroadcastResult {
 export function getUpcomingDayISO(targetWeekday: number, referenceDate: Date = new Date()): string {
   const currentDay = referenceDate.getDay();
   let daysToAdd = (targetWeekday - currentDay + 7) % 7;
-  if (daysToAdd <= 2) daysToAdd += 7;
+  if (daysToAdd < 3) daysToAdd += 7;
   const d = new Date(referenceDate);
   d.setDate(d.getDate() + daysToAdd);
   d.setHours(23, 59, 59, 0);
@@ -121,13 +136,12 @@ export function computeDeterministicExpectedProfit(
   daysListed: number = 0
 ): number {
   const prob = computeDeterministicAcceptanceProbability(pricePaise, budgetPaise, movementRate, daysListed);
-  return prob * (pricePaise - costPaise);
+  const profit = Math.max(0, pricePaise - costPaise);
+  return profit * prob;
 }
 
 /**
- * 1. Dynamic Inventory-Aware Candidate Offer Generation:
- * Evaluates live inventory holding signals (days listed, movement rate velocity, cost floor)
- * across allowable discount tiers to produce explainable, deterministic candidate offers.
+ * 1. Candidate Offer Generator
  */
 export function generateCandidateOffers(
   buyerConstraints: BuyerConstraintsSection,
@@ -138,19 +152,14 @@ export function generateCandidateOffers(
 ): CandidateOfferInput[] {
   const candidates: CandidateOfferInput[] = [];
 
-  const maxAllowedPolicyDiscountPaise = Math.floor(
-    (product.list_price_paise * policy.max_discount_pct) / 100
-  );
-  const minFloorPricePaise = Math.ceil(
-    product.cost_paise * (1 + policy.min_margin_pct / 100)
-  );
+  const preferredPayment = buyerConstraints.payment_preference?.length
+    ? buyerConstraints.payment_preference
+    : ['upi', 'card'];
+  const isPrepaidRequested = preferredPayment.some((p) => ['upi', 'card', 'netbanking'].includes(p.toLowerCase()));
 
-  const preferredPayment = buyerConstraints.payment_preference || ['upi'];
-  const isPrepaidRequested = preferredPayment.some((p) =>
-    ['upi', 'card', 'netbanking'].includes(p.toLowerCase())
-  );
+  const minFloorPricePaise = product.cost_paise + Math.ceil(product.cost_paise * (policy.min_margin_pct / 100));
+  const maxAllowedPolicyDiscountPaise = Math.floor(product.list_price_paise * (policy.max_discount_pct / 100));
 
-  // Compute inventory age in days from listed_at
   let daysListed = product.movement_rate === 'slow' ? 60 : 15;
   if (product.listed_at) {
     const listedTime = new Date(product.listed_at).getTime();
@@ -159,7 +168,6 @@ export function generateCandidateOffers(
     }
   }
 
-  // Chronologically guaranteed sequential delivery promises
   const mondayDelivery = getUpcomingDayISO(1, now);
   const mondayDate = new Date(mondayDelivery);
   const tuesdayDelivery = new Date(mondayDate.getTime() + 1 * 24 * 60 * 60 * 1000).toISOString();
@@ -167,39 +175,35 @@ export function generateCandidateOffers(
   const thursdayDelivery = new Date(mondayDate.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
   const fridayDelivery = new Date(mondayDate.getTime() + 4 * 24 * 60 * 60 * 1000).toISOString();
 
-  // 1. Policy-Bounded Discrete Discount Tier Sweep (0%, 2%, 4%, ... up to max_discount_pct)
-  const discountTiers: { pct: number; price: number; discountPaise: number; expectedProfit: number; reasons: string[] }[] = [];
+  const discountTiers: Array<{
+    pct: number;
+    price: number;
+    discountPaise: number;
+    expectedProfit: number;
+    reasons: string[];
+  }> = [];
 
-  for (let d = 0; d <= policy.max_discount_pct + 0.001; d += 2.0) {
-    const discountPaise = Math.min(
-      Math.floor((product.list_price_paise * d) / 100),
-      maxAllowedPolicyDiscountPaise
-    );
-    const pricePaise = Math.max(minFloorPricePaise, product.list_price_paise - discountPaise);
-    const marginPct = product.cost_paise > 0 ? ((pricePaise - product.cost_paise) / product.cost_paise) * 100 : 0;
+  const maxPct = policy.max_discount_pct || 12;
+  const sweepPercentages = [0, 2, 4, 6, 8, 10, maxPct];
 
-    // Check policy floor constraints
-    if (marginPct < policy.min_margin_pct) continue;
-    if (product.movement_rate === 'fast' && policy.no_discount_fast_moving && d > 0 && !product.clearance_flag) continue;
+  for (const d of sweepPercentages) {
+    if (d > maxPct) continue;
+    const discountPaise = Math.floor((product.list_price_paise * d) / 100);
+    const rawPrice = product.list_price_paise - discountPaise;
+    const pricePaise = Math.max(minFloorPricePaise, rawPrice);
 
     const reasons: string[] = [];
     if (d > 0) {
       if (product.movement_rate === 'slow' || daysListed > 45) {
-        reasons.push(`Aged inventory clearance acceleration (${daysListed} days listed, slow movement rate)`);
+        reasons.push(`Aged inventory clearance (${daysListed}d in ${inventory.warehouse_location})`);
       } else {
-        reasons.push(`Dynamic inventory pricing (${d.toFixed(0)}% optimal discount tier)`);
+        reasons.push(`${d}% dynamic velocity discount`);
       }
       if (isPrepaidRequested) {
-        reasons.push('Prepaid payment incentive (zero COD return risk)');
+        reasons.push('Prepaid payment incentive (zero COD risk)');
       }
     } else {
       reasons.push('List price standard offer');
-    }
-
-    if (pricePaise <= buyerConstraints.budget_max_paise) {
-      const budgetInr = Math.round(buyerConstraints.budget_max_paise / 100);
-      const priceInr = Math.round(pricePaise / 100);
-      reasons.push(`Under buyer budget mandate (₹${priceInr.toLocaleString()} vs ₹${budgetInr.toLocaleString()} max)`);
     }
 
     const expProfit = computeDeterministicExpectedProfit(
@@ -219,7 +223,6 @@ export function generateCandidateOffers(
     });
   }
 
-  // Find optimal expected profit tier
   let optimalTier = discountTiers[0]!;
   for (const tier of discountTiers) {
     if (tier.expectedProfit > optimalTier.expectedProfit) {
@@ -227,12 +230,15 @@ export function generateCandidateOffers(
     }
   }
 
-  // Candidate 1 (Offer A): Optimal Expected-Profit Clearance / Dynamic Offer
   let offerAPrice = optimalTier.price;
   let offerADiscount = optimalTier.discountPaise;
   let offerAReasons = [...optimalTier.reasons];
 
-  if (product.sku === 'SPRINTPRO-X2') {
+  if (product.movement_rate === 'fast' && policy.no_discount_fast_moving && !product.clearance_flag) {
+    offerAPrice = product.list_price_paise;
+    offerADiscount = 0;
+    offerAReasons = ['Full list price preserved (zero discount enforced for high-velocity stock)'];
+  } else if (product.sku === 'SPRINTPRO-X2') {
     offerADiscount = 35000;
     offerAPrice = 394900;
     offerAReasons = [
@@ -287,11 +293,13 @@ export function generateCandidateOffers(
     cod_return_risk: isPrepaidRequested ? 'low' : 'high',
   });
 
-  // Candidate 2 (Offer B): Margin Maximizer / Standard Offer
-  const offerBPrice = Math.max(
-    minFloorPricePaise,
-    product.list_price_paise > 420000 ? 419900 : product.list_price_paise - 10000
-  );
+  const offerBPrice =
+    product.movement_rate === 'fast' && policy.no_discount_fast_moving && !product.clearance_flag
+      ? product.list_price_paise
+      : Math.max(
+          minFloorPricePaise,
+          product.list_price_paise > 420000 ? 419900 : product.list_price_paise - 10000
+        );
   candidates.push({
     sku: product.sku,
     quantity: buyerConstraints.quantity,
@@ -311,7 +319,6 @@ export function generateCandidateOffers(
     cod_return_risk: isPrepaidRequested ? 'low' : 'high',
   });
 
-  // Candidate 3 (Offer C): Maximum Allowed Policy Discount Ceiling
   const offerCPrice = Math.max(minFloorPricePaise, product.list_price_paise - maxAllowedPolicyDiscountPaise);
   candidates.push({
     sku: product.sku,
@@ -337,41 +344,55 @@ export function generateCandidateOffers(
 
 /**
  * 2. Multi-Attribute Utility Evaluator for 3-Merchant Auctions
+ * Incorporates Reliability / Trust weighting and buyer-controlled minimum reliability floor.
  */
 export function evaluateBuyerMultiAttributeUtility(
-  competingBids: Omit<CompetingMerchantBid, 'utility_scores'>[],
+  competingBids: (Omit<CompetingMerchantBid, 'utility_scores'> & { utility_scores?: any })[],
   prioritiesOrConstraints: string[] | BuyerConstraintsSection = ['delivery_speed', 'price', 'return_terms', 'extras'],
-  _budgetMaxPaise?: number
+  _budgetMaxPaise?: number,
+  minReliabilityFloorStars?: number
 ): AuctionBroadcastResult {
   const priorities = Array.isArray(prioritiesOrConstraints)
     ? prioritiesOrConstraints
     : prioritiesOrConstraints.priorities || ['delivery_speed', 'price', 'return_terms', 'extras'];
 
+  const minFloor =
+    minReliabilityFloorStars ??
+    (!Array.isArray(prioritiesOrConstraints) ? prioritiesOrConstraints.min_reliability_stars : 0) ??
+    0;
+
   const weights: Record<string, number> = {};
+  const trustWeight = 0.15;
+
   if (priorities[0] === 'delivery_speed') {
-    weights.delivery = 0.75;
+    weights.delivery = 0.60;
+    weights.trust = trustWeight;
     weights.price = 0.15;
     weights.returns = 0.05;
     weights.extras = 0.05;
   } else if (priorities[0] === 'price') {
-    weights.price = 0.75;
+    weights.price = 0.60;
+    weights.trust = trustWeight;
     weights.delivery = 0.15;
     weights.returns = 0.05;
     weights.extras = 0.05;
   } else if (priorities[0] === 'extras') {
-    weights.extras = 0.75;
+    weights.extras = 0.60;
+    weights.trust = trustWeight;
     weights.price = 0.15;
     weights.delivery = 0.05;
     weights.returns = 0.05;
   } else if (priorities[0] === 'return_terms') {
-    weights.returns = 0.75;
+    weights.returns = 0.60;
+    weights.trust = trustWeight;
     weights.price = 0.15;
     weights.delivery = 0.05;
     weights.extras = 0.05;
   } else {
-    weights.price = 0.35;
-    weights.delivery = 0.30;
-    weights.returns = 0.20;
+    weights.price = 0.30;
+    weights.delivery = 0.25;
+    weights.trust = trustWeight;
+    weights.returns = 0.15;
     weights.extras = 0.15;
   }
 
@@ -388,39 +409,70 @@ export function evaluateBuyerMultiAttributeUtility(
     else if (bid.delivery_day_label.toLowerCase().includes('friday')) deliveryScore = 0.5;
 
     const returnScore = bid.return_terms_days >= 15 ? 1.0 : bid.return_terms_days >= 7 ? 0.7 : 0.3;
-    const extrasScore = bid.extras_description.toLowerCase().includes('logo') || bid.extras_description.toLowerCase().includes('engraving') || bid.extras_description.toLowerCase().includes('branding') ? 1.0 : 0.2;
+    const extrasScore =
+      bid.extras_description.toLowerCase().includes('logo') ||
+      bid.extras_description.toLowerCase().includes('engraving') ||
+      bid.extras_description.toLowerCase().includes('branding')
+        ? 1.0
+        : 0.2;
 
-    const totalUtility =
-      priceScore * (weights.price ?? 0.3) +
-      deliveryScore * (weights.delivery ?? 0.3) +
-      returnScore * (weights.returns ?? 0.2) +
-      extrasScore * (weights.extras ?? 0.2);
+    const trustScore = bid.reliability ? bid.reliability.reliability_score : 0.85;
+    const starRating = bid.reliability ? bid.reliability.star_rating : 4.0;
+
+    const isExcluded = minFloor > 0 && starRating < minFloor;
+    const exclusionReason = isExcluded
+      ? `Merchant rating (${starRating.toFixed(1)}★) is below buyer's required minimum reliability floor of ${minFloor.toFixed(1)}★ (Dispute rate: ${bid.reliability ? `${((1 - bid.reliability.dispute_rate) * 100).toFixed(0)}% disputes` : 'N/A'}, On-time rate: ${bid.reliability ? `${(bid.reliability.on_time_rate * 100).toFixed(0)}%` : 'N/A'}).`
+      : undefined;
+
+    const totalUtility = isExcluded
+      ? -1.0
+      : priceScore * (weights.price ?? 0.25) +
+        deliveryScore * (weights.delivery ?? 0.25) +
+        returnScore * (weights.returns ?? 0.15) +
+        extrasScore * (weights.extras ?? 0.15) +
+        trustScore * (weights.trust ?? 0.20);
 
     return {
       ...bid,
+      excluded_by_floor: isExcluded,
+      exclusion_reason: exclusionReason,
       utility_scores: {
         price_score: priceScore,
         delivery_score: deliveryScore,
         return_score: returnScore,
         extras_score: extrasScore,
+        trust_score: trustScore,
         total_utility: totalUtility,
       },
     };
   });
 
   scoredBids.sort((a, b) => b.utility_scores.total_utility - a.utility_scores.total_utility);
-  const winner = scoredBids[0]!;
 
+  const eligibleBids = scoredBids.filter((b) => !b.excluded_by_floor);
+  if (eligibleBids.length === 0) {
+    throw new Error(`All competing merchants fell below your required minimum reliability floor of ${minFloor.toFixed(1)} stars.`);
+  }
+
+  const winner = eligibleBids[0]!;
   const p1 = priorities[0];
   let decisionRationale = '';
+
+  const excludedCount = scoredBids.filter((b) => b.excluded_by_floor).length;
+  const reliabilityNote =
+    minFloor > 0
+      ? ` (Buyer reliability floor of ${minFloor.toFixed(1)}★ applied; ${excludedCount} merchant${excludedCount === 1 ? '' : 's'} excluded due to past delivery delay / dispute rates)`
+      : ` (Reliability score: ${winner.reliability ? `${winner.reliability.star_rating.toFixed(1)}★` : 'Verified'})`;
+
   if (p1 === 'delivery_speed') {
-    decisionRationale = `Selected ${winner.merchant_name} (Utility: ${winner.utility_scores.total_utility.toFixed(3)}) because delivery speed was ranked #1 priority. ${winner.merchant_name} offers the fastest delivery on ${winner.delivery_day_label} (Wednesday air courier).`;
+    decisionRationale = `Selected ${winner.merchant_name} (Utility: ${winner.utility_scores.total_utility.toFixed(3)}${reliabilityNote}) because delivery speed was ranked #1 priority. ${winner.merchant_name} offers the fastest delivery on ${winner.delivery_day_label} (Wednesday air courier).`;
   } else if (p1 === 'price') {
-    decisionRationale = `Selected ${winner.merchant_name} (Utility: ${winner.utility_scores.total_utility.toFixed(3)}) because price was ranked #1 priority. ${winner.merchant_name} offered the lowest unit price of ₹${(winner.unit_price_paise / 100).toLocaleString()} (saving ₹1,100/unit under the ₹30,000 budget).`;
+    const savingsInr = Math.round((3000000 - winner.unit_price_paise) / 100);
+    decisionRationale = `Selected ${winner.merchant_name} (Utility: ${winner.utility_scores.total_utility.toFixed(3)}${reliabilityNote}) because price was ranked #1 priority among eligible merchants. ${winner.merchant_name} offered unit price of ₹${(winner.unit_price_paise / 100).toLocaleString()} (saving ₹${savingsInr.toLocaleString()}/unit).`;
   } else if (p1 === 'extras') {
-    decisionRationale = `Selected ${winner.merchant_name} (Utility: ${winner.utility_scores.total_utility.toFixed(3)}) because customization and extras were ranked #1 priority. ${winner.merchant_name} includes free custom logo laser engraving & branding at ₹${(winner.unit_price_paise / 100).toLocaleString()}.`;
+    decisionRationale = `Selected ${winner.merchant_name} (Utility: ${winner.utility_scores.total_utility.toFixed(3)}${reliabilityNote}) because customization and extras were ranked #1 priority. ${winner.merchant_name} includes free custom logo laser engraving & branding at ₹${(winner.unit_price_paise / 100).toLocaleString()}.`;
   } else {
-    decisionRationale = `Selected ${winner.merchant_name} based on multi-attribute utility score of ${winner.utility_scores.total_utility.toFixed(3)}.`;
+    decisionRationale = `Selected ${winner.merchant_name} based on multi-attribute utility score of ${winner.utility_scores.total_utility.toFixed(3)}${reliabilityNote}.`;
   }
 
   return {

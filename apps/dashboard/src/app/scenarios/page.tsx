@@ -100,6 +100,22 @@ const SCENARIOS = [
     description: 'Identical buyer budget (₹4,000) sent to slow-moving aged stock vs fast-moving scarce stock.',
     invariant: 'Engine recommends clearance incentive for aged stock (8.1% discount) and protects list price (0% discount) for fast movers.',
   },
+  {
+    id: 11,
+    title: '11. Reliability Changes the Outcome',
+    category: 'Auction Trust Floor',
+    code: 'AUCTION_RELIABILITY_FLOOR',
+    description: 'Same 3 merchant prices evaluated twice: once with "No preference" (cheapest wins) and once with "4+ stars required" (higher reliability merchant wins instead).',
+    invariant: 'Merchants below buyer-stated reliability floor are excluded before scoring runs; cheaper merchants only lose when buyer explicitly mandates trust.',
+  },
+  {
+    id: 12,
+    title: '12. Multi-Protocol Interoperability (ACP vs AP2)',
+    category: 'Protocol Interoperability',
+    code: 'MULTI_PROTOCOL_INTEROP',
+    description: 'Identical intent submitted in ACP and AP2 formats; both adapt into identical canonical CCO and produce matching signed contracts.',
+    invariant: 'Universal adapter converts heterogeneous agent protocols (ACP, AP2, UCP, x402) into a single canonical CCO with mathematical equivalence.',
+  },
 ];
 
 export default function ScenariosPage() {
@@ -305,6 +321,67 @@ export default function ScenariosPage() {
                               <div className="text-ink-500 text-[9px]">Multiplier: {result.details.fast_mover.urgency_multiplier}</div>
                               <div className="text-ink-500 text-[9px]">Policy: Full List Price Preserved (No Discount)</div>
                             </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Custom Scenario 11 Visualization: Reliability Changes the Outcome */}
+                      {scenario.id === 11 && result.details && (
+                        <div className="mt-2 p-3 bg-ink-900 border border-ink-700 rounded space-y-2 text-[11px]">
+                          <div className="flex items-center justify-between border-b border-ink-800 pb-1.5">
+                            <span className="font-bold text-signal-light uppercase text-[10px]">
+                              Floor Impact on 3-Merchant Auction Outcome:
+                            </span>
+                            <span className="text-amber-400 text-[9px] font-bold">TRUST FLOOR ACTIVE</span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            <div className="p-2 rounded bg-ink-950 border border-ink-800 space-y-1">
+                              <span className="text-ink-300 font-bold block">RUN 1: NO FLOOR (0★)</span>
+                              <div className="text-ink-200">Winner: <span className="text-signal-light font-bold">{result.details.run1_no_floor.winning_merchant}</span></div>
+                              <div className="text-ink-300">Price: ₹{result.details.run1_no_floor.unit_price_inr}</div>
+                              <div className="text-amber-400">Rating: ★ {result.details.run1_no_floor.reliability_stars} (60% on-time, 20% disputes)</div>
+                              <div className="text-ink-500 text-[9px]">Cheapest price wins without trust filtering</div>
+                            </div>
+
+                            <div className="p-2 rounded bg-ink-950 border border-signal-border space-y-1">
+                              <span className="text-signal font-bold block">RUN 2: 4.0★ FLOOR REQUIRED</span>
+                              <div className="text-ink-200">Winner: <span className="text-signal font-bold">{result.details.run2_with_4_star_floor.winning_merchant}</span></div>
+                              <div className="text-ink-300">Price: ₹{result.details.run2_with_4_star_floor.unit_price_inr}</div>
+                              <div className="text-emerald-400">Rating: ★ {result.details.run2_with_4_star_floor.reliability_stars} (88.9% on-time, 5.6% disputes)</div>
+                              <div className="text-rose-400 text-[9px]">Excluded: Merchant B (3.7★ &lt; 4.0★ floor)</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Custom Scenario 12 Visualization: Multi-Protocol Interoperability */}
+                      {scenario.id === 12 && result.details && (
+                        <div className="mt-2 p-3 bg-ink-900 border border-ink-700 rounded space-y-2 text-[11px]">
+                          <div className="flex items-center justify-between border-b border-ink-800 pb-1.5">
+                            <span className="font-bold text-signal-light uppercase text-[10px]">
+                              Heterogeneous Protocol Normalization to Canonical CCO:
+                            </span>
+                            <span className="text-emerald-400 text-[9px] font-bold">100% CCO PARITY</span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            <div className="p-2 rounded bg-ink-950 border border-ink-800 space-y-1">
+                              <span className="text-ink-200 font-bold block">ACP INGRESS (Agent Comm Protocol)</span>
+                              <div className="text-ink-400 font-mono text-[9px]">query.budget: ₹4,000 | query.item: SPRINTPRO-X2</div>
+                              <div className="text-ink-300">Normalized Budget: ₹{result.details.acp_normalized_cco.budget_max_inr}</div>
+                              <div className="text-signal-light font-bold">Signed Price: ₹{result.details.acp_normalized_cco.winning_price_inr}</div>
+                            </div>
+
+                            <div className="p-2 rounded bg-ink-950 border border-ink-800 space-y-1">
+                              <span className="text-ink-200 font-bold block">AP2 INGRESS (Agent Payment Protocol)</span>
+                              <div className="text-ink-400 font-mono text-[9px]">cart[0].max_price_paise: 400000 | mandate: lowest_price</div>
+                              <div className="text-ink-300">Normalized Budget: ₹{result.details.ap2_normalized_cco.budget_max_inr}</div>
+                              <div className="text-signal-bold text-signal font-bold">Signed Price: ₹{result.details.ap2_normalized_cco.winning_price_inr}</div>
+                            </div>
+                          </div>
+                          <div className="text-emerald-400 text-[9px] font-mono text-center pt-1 border-t border-ink-800">
+                            ✓ {result.details.parity_asserted}
                           </div>
                         </div>
                       )}

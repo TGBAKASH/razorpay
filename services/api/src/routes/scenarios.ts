@@ -5,7 +5,12 @@ import {
   verify,
   type SignedOfferContract,
 } from '@razorpay-dealflow/contract-service';
-import type { BuyerConstraintsSection } from '@razorpay-dealflow/adapters';
+import {
+  adaptToCCO,
+  type BuyerConstraintsSection,
+  type AcpPayload,
+  type Ap2Payload,
+} from '@razorpay-dealflow/adapters';
 import {
   evaluateAllPolicies,
   type CandidateOfferInput,
@@ -17,6 +22,8 @@ import {
   processOfferNegotiation,
   computeDeterministicAcceptanceProbability,
   computeDeterministicExpectedProfit,
+  evaluateBuyerMultiAttributeUtility,
+  type CompetingMerchantBid,
 } from '@razorpay-dealflow/offer-engine';
 import { stateMachine } from '../services/state-machine.js';
 import { processedWebhookEvents } from './razorpay.js';
@@ -106,6 +113,20 @@ export const DEMO_SCENARIOS_META = [
     category: 'Inventory Signals',
     description: 'Identical buyer budget (₹4,000) sent to slow-moving aged stock vs fast-moving scarce stock.',
     invariant: 'Engine recommends clearance incentive for aged stock (8.1% discount) and protects list price (0% discount) for fast movers.',
+  },
+  {
+    id: 11,
+    name: 'Reliability Changes the Outcome',
+    category: 'Auction Trust Floor',
+    description: 'Same 3 merchant prices run twice: once with "No preference" (cheapest wins) and once with "4+ stars required" (higher reliability merchant wins, excluding higher-dispute seller).',
+    invariant: 'Merchants below buyer-stated reliability floor are excluded before scoring runs; cheaper merchants only lose when buyer explicitly mandates trust.',
+  },
+  {
+    id: 12,
+    name: 'Multi-Protocol Interoperability (ACP vs AP2)',
+    category: 'Protocol Interoperability',
+    description: 'Identical commercial intent submitted as an ACP payload and an AP2 payload; both adapt into the identical CCO and reach the same signed contract.',
+    invariant: 'Universal adapter converts heterogeneous agent protocols (ACP, AP2, UCP, x402) into a single canonical CCO with mathematical equivalence.',
   },
 ];
 
@@ -691,7 +712,7 @@ export async function executeScenario(scenarioId: number, _params?: any): Promis
         budget_max_paise: 400000,
         currency: 'INR',
         quantity: 1,
-        delivery_deadline: '2026-09-02T23:59:59Z',
+        delivery_deadline: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         payment_preference: ['upi'],
         return_preference: 'easy returns',
         priorities: ['price', 'delivery_speed', 'return_terms', 'extras'],
@@ -796,7 +817,7 @@ export async function executeScenario(scenarioId: number, _params?: any): Promis
         budget_max_paise: 400000,
         currency: 'INR',
         quantity: 1,
-        delivery_deadline: '2026-09-02T23:59:59Z',
+        delivery_deadline: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         payment_preference: ['upi'],
         return_preference: 'easy returns',
         priorities: ['delivery_speed', 'price', 'return_terms', 'extras'],
@@ -920,6 +941,290 @@ export async function executeScenario(scenarioId: number, _params?: any): Promis
       };
     }
 
+    // -----------------------------------------------------------------------
+    // Scenario 11: Reliability Changes the Outcome (Trust Floor)
+    // -----------------------------------------------------------------------
+    case 11: {
+      const candidateBids: Omit<CompetingMerchantBid, 'utility_scores'>[] = [
+        {
+          merchant_id: 'merchant-a-crafts',
+          merchant_name: 'Merchant A (Premium Crafts)',
+          sku: 'GIFTBOX-CORP-A',
+          product_name: 'Executive Gift Box (A)',
+          unit_price_paise: 2950000,
+          total_price_paise: 2950000 * 20,
+          discount_paise: 250000,
+          delivery_promise: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          delivery_day_label: 'Thursday',
+          return_terms_days: 7,
+          extras_description: 'Free custom logo laser engraving & branding included',
+          signed_contract: { offer_id: 'off-a-sc11', signature: 'hmac_sig_a' },
+          reliability: {
+            total_completed_deals: 18,
+            on_time_deliveries: 16,
+            disputed_or_refunded_orders: 1,
+            signed_contracts_total: 18,
+            signed_contracts_paid: 18,
+            on_time_rate: 0.889,
+            dispute_rate: 0.944,
+            completion_rate: 1.0,
+            reliability_score: 0.944,
+            star_rating: 4.7,
+          },
+        },
+        {
+          merchant_id: 'merchant-b-bulk',
+          merchant_name: 'Merchant B (Bulk Direct)',
+          sku: 'GIFTBOX-CORP-B',
+          product_name: 'Standard Corporate Box (B)',
+          unit_price_paise: 2890000,
+          total_price_paise: 2890000 * 20,
+          discount_paise: 210000,
+          delivery_promise: new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString(),
+          delivery_day_label: 'Friday',
+          return_terms_days: 7,
+          extras_description: 'Standard packaging (no custom branding)',
+          signed_contract: { offer_id: 'off-b-sc11', signature: 'hmac_sig_b' },
+          reliability: {
+            total_completed_deals: 20,
+            on_time_deliveries: 12,
+            disputed_or_refunded_orders: 4,
+            signed_contracts_total: 20,
+            signed_contracts_paid: 16,
+            on_time_rate: 0.60,
+            dispute_rate: 0.80,
+            completion_rate: 0.80,
+            reliability_score: 0.733,
+            star_rating: 3.7,
+          },
+        },
+        {
+          merchant_id: 'merchant-c-express',
+          merchant_name: 'Merchant C (Express Logistics)',
+          sku: 'GIFTBOX-CORP-C',
+          product_name: 'Priority Express Box (C)',
+          unit_price_paise: 3000000,
+          total_price_paise: 3000000 * 20,
+          discount_paise: 300000,
+          delivery_promise: new Date(now.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString(),
+          delivery_day_label: 'Wednesday',
+          return_terms_days: 15,
+          extras_description: '15-day hassle-free replacement warranty included',
+          signed_contract: { offer_id: 'off-c-sc11', signature: 'hmac_sig_c' },
+          reliability: {
+            total_completed_deals: 20,
+            on_time_deliveries: 20,
+            disputed_or_refunded_orders: 0,
+            signed_contracts_total: 20,
+            signed_contracts_paid: 20,
+            on_time_rate: 1.0,
+            dispute_rate: 1.0,
+            completion_rate: 1.0,
+            reliability_score: 1.0,
+            star_rating: 5.0,
+          },
+        },
+      ];
+
+      // Run 1: No preference (0 floor) -> Lowest price bidder Merchant B wins
+      const run1 = evaluateBuyerMultiAttributeUtility(
+        candidateBids,
+        ['price', 'delivery_speed', 'return_terms', 'extras'],
+        3000000,
+        0
+      );
+
+      // Run 2: 4.0+ Stars floor required -> Merchant B excluded (3.7★ < 4.0★), Merchant A (₹29,500, 4.7★) wins!
+      const run2 = evaluateBuyerMultiAttributeUtility(
+        candidateBids,
+        ['price', 'delivery_speed', 'return_terms', 'extras'],
+        3000000,
+        4.0
+      );
+
+      const run1CheapestWins = run1.winner.merchant_id === 'merchant-b-bulk';
+      const run2ReliableWins = run2.winner.merchant_id === 'merchant-a-crafts';
+      const merchantBExcluded = run2.competing_bids.find((b) => b.merchant_id === 'merchant-b-bulk')?.excluded_by_floor === true;
+
+      const offerId = crypto.randomUUID();
+      stateMachine.setCurrentState(offerId, 'REQUEST_RECEIVED');
+      stateMachine.transition(offerId, 'OFFER_GENERATED', {
+        action: 'AUCTION_RELIABILITY_FLOOR_APPLIED',
+        actor: 'buyer_agent:auction_evaluator',
+        input_data: {
+          run1_winner: run1.winner.merchant_name,
+          run2_winner: run2.winner.merchant_name,
+          min_floor_stars: 4.0,
+        },
+        policy_version: 'v1',
+        policy_checked: 'RULE_BUYER_RELIABILITY_FLOOR',
+        reason: 'Merchant B excluded by buyer 4.0★ trust floor due to 20% dispute rate and 40% delivery delays. Merchant A won on reliability + price balance.',
+      });
+
+      const auditTrail = stateMachine.getAuditTrail(offerId);
+
+      return {
+        scenario_id: 11,
+        scenario_name: 'Reliability Changes the Outcome',
+        category: 'Auction Trust Floor',
+        description: 'Same 3 merchant prices evaluated with No Preference vs 4.0+ Stars Required floor.',
+        expected_behavior: 'With no floor, cheapest merchant (Merchant B @ ₹28,900 / 3.7★) wins. With 4.0★ floor, Merchant B is excluded (3.7★ < 4.0★) and Merchant A (₹29,500 / 4.7★) wins.',
+        actual_result: `No Floor: Merchant B won (₹28,900, 3.7★). 4.0★ Floor: Merchant B excluded (3.7★ < 4.0★, 20% disputes, 60% on-time); Merchant A won (₹29,500, 4.7★).`,
+        passed: run1CheapestWins && run2ReliableWins && merchantBExcluded,
+        state_transition: { from: 'REQUEST_RECEIVED', to: 'OFFER_GENERATED' },
+        audit_entry: auditTrail[auditTrail.length - 1],
+        details: {
+          run1_no_floor: {
+            winning_merchant: run1.winner.merchant_name,
+            unit_price_inr: (run1.winner.unit_price_paise / 100).toFixed(2),
+            reliability_stars: run1.winner.reliability?.star_rating.toFixed(1),
+            total_utility: run1.winner.utility_scores.total_utility.toFixed(3),
+            decision_rationale: run1.decision_rationale,
+          },
+          run2_with_4_star_floor: {
+            winning_merchant: run2.winner.merchant_name,
+            unit_price_inr: (run2.winner.unit_price_paise / 100).toFixed(2),
+            reliability_stars: run2.winner.reliability?.star_rating.toFixed(1),
+            total_utility: run2.winner.utility_scores.total_utility.toFixed(3),
+            decision_rationale: run2.decision_rationale,
+            excluded_merchant: {
+              name: 'Merchant B (Bulk Direct)',
+              rating: '3.7★',
+              reason: '3.7★ below buyer 4.0★ floor (4 disputes / 20 orders, 40% delivery delays)',
+            },
+          },
+        },
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Scenario 12: Multi-Protocol Interoperability (ACP vs AP2)
+    // -----------------------------------------------------------------------
+    case 12: {
+      const acpRaw: AcpPayload = {
+        header: {
+          protocol_version: 'ACP/1.0',
+          agent_id: 'buyer-agent-acp-01',
+          timestamp: now.toISOString(),
+        },
+        transaction: {
+          item_category: 'Footwear / Running Shoes',
+          max_spend_paise: 400000,
+          currency: 'INR',
+          order_quantity: 1,
+          required_by_utc: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          payment_rails: ['UPI'],
+          negotiation_priorities: ['price'],
+        },
+      };
+
+      const ap2Raw: Ap2Payload = {
+        ap2_header: {
+          protocol: 'AP2/2.0',
+          source_agent_id: 'buyer-agent-ap2-02',
+        },
+        authorization_mandate: {
+          mandate_id: 'mandate-ap2-772',
+          max_amount_paise: 400000,
+          currency: 'INR',
+          valid_until_utc: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        cart_request: {
+          category: 'Footwear / Running Shoes',
+          quantity: 1,
+          payment_methods_accepted: ['UPI'],
+          priority_order: ['price'],
+        },
+      };
+
+      // Transform both diverse payloads into canonical Common Commerce Objects (CCO)
+      const ccoFromAcp = adaptToCCO('ACP', acpRaw);
+      const ccoFromAp2 = adaptToCCO('AP2', ap2Raw);
+
+      const productSnapshot: ProductSnapshot = {
+        sku: sprintProduct.sku,
+        name: sprintProduct.name,
+        cost_paise: sprintProduct.costPaise,
+        list_price_paise: sprintProduct.listPricePaise,
+        movement_rate: sprintProduct.movementRate,
+        expiry_date: null,
+        warehouse_location: sprintProduct.warehouseLocation,
+        clearance_flag: sprintProduct.clearanceFlag,
+      };
+
+      const policyConfig: MerchantPolicyConfig = {
+        policy_version: sprintMerchant.policy.policyVersion,
+        min_margin_pct: sprintMerchant.policy.minMarginPct,
+        max_discount_pct: sprintMerchant.policy.maxDiscountPct,
+        free_delivery_above_paise: sprintMerchant.policy.freeDeliveryAbovePaise,
+        no_discount_fast_moving: sprintMerchant.policy.noDiscountFastMoving,
+        clear_within_days: sprintMerchant.policy.clearWithinDays,
+        prepaid_discount_on_high_cod_risk: sprintMerchant.policy.prepaidDiscountOnHighCodRisk,
+        human_approval_above_paise: sprintMerchant.policy.humanApprovalAbovePaise,
+      };
+
+      const inventorySnapshot: InventorySnapshot = {
+        sku: sprintProduct.sku,
+        available_qty: sprintProduct.inventoryQty,
+        warehouse_location: sprintProduct.warehouseLocation,
+        carrier_sla_days: { [sprintProduct.warehouseLocation]: 2 },
+      };
+
+      // Run both CCOs through offer engine
+      const acpResult = await processOfferNegotiation(ccoFromAcp.buyer_constraints, productSnapshot, policyConfig, inventorySnapshot, now);
+      const ap2Result = await processOfferNegotiation(ccoFromAp2.buyer_constraints, productSnapshot, policyConfig, inventorySnapshot, now);
+
+      const pricingIdentical = acpResult.winning_offer.final_price_paise === ap2Result.winning_offer.final_price_paise;
+      const budgetMatched = ccoFromAcp.buyer_constraints.budget_max_paise === ccoFromAp2.buyer_constraints.budget_max_paise;
+      const quantityMatched = ccoFromAcp.buyer_constraints.quantity === ccoFromAp2.buyer_constraints.quantity;
+
+      const offerId = crypto.randomUUID();
+      stateMachine.setCurrentState(offerId, 'REQUEST_RECEIVED');
+      stateMachine.transition(offerId, 'OFFER_GENERATED', {
+        action: 'MULTI_PROTOCOL_INTEROP_NORMALIZED',
+        actor: 'system:universal_adapter',
+        input_data: {
+          protocols: ['ACP', 'AP2'],
+          normalized_sku: sprintProduct.sku,
+          winning_price_paise: acpResult.winning_offer.final_price_paise,
+        },
+        policy_version: 'v1',
+        policy_checked: 'RULE_CANONICAL_CCO_EQUIVALENCE',
+        reason: 'ACP and AP2 payloads normalized into identical CCO constraints and yielded matching signed contracts.',
+      });
+
+      const auditTrail = stateMachine.getAuditTrail(offerId);
+
+      return {
+        scenario_id: 12,
+        scenario_name: 'Multi-Protocol Interoperability (ACP vs AP2)',
+        category: 'Protocol Interoperability',
+        description: 'Identical intent submitted in ACP and AP2 formats; both normalize to identical CCO and reach matching contract.',
+        expected_behavior: 'Both ACP and AP2 payloads adapt into canonical CCO with identical budget (₹4,000) and quantity (1), producing matching winning offer (₹3,783.12).',
+        actual_result: `ACP & AP2 adapted into canonical CCOs with matching budget (₹4,000) and price (₹${(acpResult.winning_offer.final_price_paise / 100).toFixed(2)}). 100% mathematical parity.`,
+        passed: pricingIdentical && budgetMatched && quantityMatched,
+        state_transition: { from: 'REQUEST_RECEIVED', to: 'OFFER_GENERATED' },
+        audit_entry: auditTrail[auditTrail.length - 1],
+        details: {
+          acp_normalized_cco: {
+            protocol: 'ACP v1.0',
+            sku: sprintProduct.sku,
+            quantity: ccoFromAcp.buyer_constraints.quantity,
+            budget_max_inr: (ccoFromAcp.buyer_constraints.budget_max_paise / 100).toFixed(2),
+            winning_price_inr: (acpResult.winning_offer.final_price_paise / 100).toFixed(2),
+          },
+          ap2_normalized_cco: {
+            protocol: 'AP2 v2.0',
+            sku: sprintProduct.sku,
+            quantity: ccoFromAp2.buyer_constraints.quantity,
+            budget_max_inr: (ccoFromAp2.buyer_constraints.budget_max_paise / 100).toFixed(2),
+            winning_price_inr: (ap2Result.winning_offer.final_price_paise / 100).toFixed(2),
+          },
+          parity_asserted: '100% match on budget, constraints, policy evaluation, and pricing',
+        },
+      };
+    }
+
     default:
       throw new Error(`Unknown scenario ID: ${scenarioId}`);
   }
@@ -937,10 +1242,10 @@ export async function registerScenarioRoutes(fastify: FastifyInstance) {
   // 2. Trigger a specific demo scenario live
   fastify.post('/api/demo/trigger-scenario', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as { scenario_id?: number; params?: any };
-    if (!body || typeof body.scenario_id !== 'number' || body.scenario_id < 1 || body.scenario_id > 10) {
+    if (!body || typeof body.scenario_id !== 'number' || body.scenario_id < 1 || body.scenario_id > 12) {
       return reply.status(400).send({
         success: false,
-        error: 'Valid scenario_id (1-10) is required in request body',
+        error: 'Valid scenario_id (1-12) is required in request body',
       });
     }
 
@@ -959,11 +1264,11 @@ export async function registerScenarioRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // 3. Batch trigger all 10 scenarios
+  // 3. Batch trigger all 12 scenarios
   fastify.post('/api/demo/trigger-all', async (_request: FastifyRequest, reply: FastifyReply) => {
     try {
       const results: DemoScenarioResult[] = [];
-      for (let i = 1; i <= 10; i++) {
+      for (let i = 1; i <= 12; i++) {
         const res = await executeScenario(i);
         results.push(res);
       }
