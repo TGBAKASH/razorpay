@@ -240,6 +240,8 @@ DealFlow translates any incoming agent protocol into the canonical **Common Comm
 | `GET` | `/api/buyer/orders` | Buyer | Returns buyer-scoped past orders with receipt data. |
 | `GET` | `/api/audit-logs` | Public | Retrieves immutable audit trail entries for a given offer ID. |
 | `GET` | `/api/offers/live-feed` | Public | Live stream of recent negotiations and state transitions. |
+| `POST` | `/api/demo/trigger-scenario` | Public | Executes 1 of 10 live edge-case / invariant failure presets. |
+| `POST` | `/api/demo/trigger-all` | Public | Batch executes all 10 edge-case presets and asserts 100% pass rate. |
 
 ---
 

@@ -159,7 +159,43 @@ describe('Failure Modes & Edge Cases (Phase 11 - The 8 Triggerable Demo Scenario
     expect(result.audit_entry.policy_checked).toBe('RULE_WEBHOOK_IDEMPOTENCY');
   });
 
-  it('Batch execution endpoint POST /api/demo/trigger-all runs all 8 scenarios and confirms 100% pass rate', async () => {
+  it('Scenario 9 (Buyer Priority Actually Wins): cheapest policy-valid candidate (Candidate C @ ₹3,783) wins over higher profit Candidate A', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/demo/trigger-scenario',
+      payload: { scenario_id: 9 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    const result = body.result;
+
+    expect(result.passed).toBe(true);
+    expect(result.scenario_id).toBe(9);
+    expect(result.details.winning_price_paise).toBe(378312);
+    expect(result.details.provably_valid).toBe(true);
+    expect(result.audit_entry.action).toBe('OFFER_GEN_BUYER_PRIORITY_WIN');
+  });
+
+  it('Scenario 10 (Same Offer, Different Product): recommends 8.1% clearance for slow mover and 0% discount for fast mover', async () => {
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/demo/trigger-scenario',
+      payload: { scenario_id: 10 },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    const result = body.result;
+
+    expect(result.passed).toBe(true);
+    expect(result.scenario_id).toBe(10);
+    expect(result.details.slow_mover.offered_price_inr).toBe('3949.00');
+    expect(result.details.fast_mover.offered_price_inr).toBe('4299.00');
+    expect(result.audit_entry.action).toBe('OFFER_GEN_INVENTORY_SIGNAL_DIFFERENTIATION');
+  });
+
+  it('Batch execution endpoint POST /api/demo/trigger-all runs all 10 scenarios and confirms 100% pass rate', async () => {
     const res = await server.inject({
       method: 'POST',
       url: '/api/demo/trigger-all',
@@ -169,6 +205,6 @@ describe('Failure Modes & Edge Cases (Phase 11 - The 8 Triggerable Demo Scenario
     const body = JSON.parse(res.body);
     expect(body.success).toBe(true);
     expect(body.all_passed).toBe(true);
-    expect(body.results).toHaveLength(8);
+    expect(body.results).toHaveLength(10);
   });
 });

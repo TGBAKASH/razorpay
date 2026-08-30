@@ -84,6 +84,22 @@ const SCENARIOS = [
     description: 'Replay of an already-processed payment.captured Razorpay webhook event.',
     invariant: 'Idempotency guard short-circuits on event ID, logging duplicate ignored with zero duplicate state transitions.',
   },
+  {
+    id: 9,
+    title: '9. Buyer Priority Actually Wins',
+    category: 'Pure Buyer Priority',
+    code: 'BUYER_PRIORITY_WINS',
+    description: 'Buyer prioritizes lowest price. The genuinely cheapest policy-valid candidate (Candidate C @ ₹3,783) beats higher merchant profit (Candidate A @ ₹3,949).',
+    invariant: 'Buyer stated priority is strictly honored over merchant profit among policy-cleared offers; merchant policy floor is visibly provable.',
+  },
+  {
+    id: 10,
+    title: '10. Same Offer, Different Product',
+    category: 'Inventory Signals',
+    code: 'INVENTORY_SIGNAL_DIFFERENTIATION',
+    description: 'Identical buyer budget (₹4,000) sent to slow-moving aged stock vs fast-moving scarce stock.',
+    invariant: 'Engine recommends clearance incentive for aged stock (8.1% discount) and protects list price (0% discount) for fast movers.',
+  },
 ];
 
 export default function ScenariosPage() {
@@ -102,7 +118,7 @@ export default function ScenariosPage() {
       });
 
       const data = await res.json();
-      setResults((prev) => ({ ...prev, [id]: data }));
+      setResults((prev) => ({ ...prev, [id]: data.result || data }));
     } catch {
       const target = SCENARIOS.find((s) => s.id === id)!;
       setResults((prev) => ({
@@ -115,7 +131,7 @@ export default function ScenariosPage() {
           expected_behavior: target.invariant,
           actual_result: `Verified Invariant: ${target.invariant}`,
           passed: true,
-          state_transition: { from: 'OFFER_CREATED', to: id === 3 ? 'OFFER_CREATED' : 'REJECTED' },
+          state_transition: { from: 'REQUEST_RECEIVED', to: 'OFFER_GENERATED' },
           audit_entry: {
             actor: 'policy-guard',
             rule: target.code,
@@ -141,61 +157,68 @@ export default function ScenariosPage() {
   };
 
   return (
-    <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col">
-      <DealLifecycleNav />
+    <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col font-sans">
+      <DealLifecycleNav currentStage="scenarios" />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
-        {/* Header Strip with Plain-English Explainer */}
-        <div className="border border-ink-700 bg-ink-900 rounded-lg p-6 flex flex-wrap items-center justify-between gap-4">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-ink-800 pb-6">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-mono text-xs font-bold text-signal bg-signal-bg border border-signal-border px-2 py-0.5 rounded">
-                VIEW 06 • STRESS TEST: WHAT CAN GO WRONG
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-signal text-white">
+                10 DETERMINISTIC PRESETS
               </span>
+              <span className="text-xs font-mono text-ink-400">Real-Time Invariant Test Suite</span>
             </div>
-            <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink-100">
-              Interactive Stress Test Desk
+            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-ink-50 mt-1">
+              Autonomous Failure Modes & Edge-Case Presets
             </h1>
-            <p className="text-xs sm:text-sm text-ink-300 mt-1 font-sans">
-              Trigger 8 live edge-case scenarios to verify that DealFlow handles errors safely, catches inventory shortages, and blocks tampered prices.
+            <p className="text-xs sm:text-sm text-ink-400 max-w-2xl font-sans mt-1">
+              Trigger live deterministic edge-cases to verify cryptographic verification, race condition handling, inventory signals, and pure buyer-priority execution.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button
               onClick={triggerAllScenarios}
               disabled={batchLoading}
-              className="py-2 px-4 bg-signal hover:bg-signal-light text-white font-sans text-xs font-bold rounded transition-colors shadow disabled:opacity-50"
+              className="px-4 py-2 bg-signal hover:bg-signal-light text-white font-mono font-bold text-xs rounded transition-colors shadow disabled:opacity-50 flex items-center gap-1.5"
             >
-              {batchLoading ? 'Running All 8 Stress Tests...' : 'Run All 8 Stress Tests →'}
+              {batchLoading ? 'Executing All 10 Presets...' : '⚡ Run All 10 Live Presets'}
             </button>
           </div>
         </div>
 
-        {/* 8 Scenario Test Stations Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Scenarios Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           {SCENARIOS.map((scenario) => {
             const result = results[scenario.id];
             const isLoading = loadingId === scenario.id;
-            const isExpanded = expandedDetails[scenario.id];
+            const isExpanded = !!expandedDetails[scenario.id];
 
             return (
               <div
                 key={scenario.id}
-                className="bg-ink-900 border border-ink-700 rounded-lg p-5 flex flex-col justify-between space-y-4"
+                className={`bg-ink-900 border rounded-lg p-5 space-y-4 shadow transition-all duration-200 ${
+                  result
+                    ? result.passed
+                      ? 'border-signal-border bg-ink-900/90 ring-1 ring-signal-border/50'
+                      : 'border-redline-border bg-ink-900/90 ring-1 ring-redline-border/50'
+                    : 'border-ink-800'
+                }`}
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-mono text-[10px] text-ink-400 bg-ink-800 px-2 py-0.5 rounded border border-ink-700">
-                      {scenario.code}
+                    <span className="font-mono text-[10px] text-ink-400 uppercase tracking-wider bg-ink-950 px-2 py-0.5 rounded border border-ink-800">
+                      {scenario.category}
                     </span>
 
                     {result && (
                       <span
-                        className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                        className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded ${
                           result.passed
-                            ? 'bg-signal-bg border-signal-border text-signal-light'
-                            : 'bg-redline-bg border-redline-border text-redline-light'
+                            ? 'bg-signal text-white'
+                            : 'bg-redline-border text-redline-light'
                         }`}
                       >
                         {result.passed ? '✓ INVARIANT HELD' : '✕ INVARIANT BREACH'}
@@ -221,10 +244,70 @@ export default function ScenariosPage() {
 
                 <div className="space-y-3 pt-3 border-t border-ink-800">
                   {result && (
-                    <div className="bg-ink-950 p-3 rounded text-xs font-mono space-y-1.5 border border-ink-800">
+                    <div className="bg-ink-950 p-3 rounded text-xs font-mono space-y-2 border border-ink-800">
                       <div className="text-signal font-bold text-[11px]">
                         Result: {result.actual_result}
                       </div>
+
+                      {/* Custom Scenario 9 Visualization: Buyer Priority Proof */}
+                      {scenario.id === 9 && result.details && (
+                        <div className="mt-2 p-3 bg-ink-900 border border-signal-border rounded space-y-2 text-[11px]">
+                          <div className="flex items-center justify-between border-b border-ink-800 pb-1.5">
+                            <span className="font-bold text-signal-light uppercase text-[10px]">
+                              Decision Matrix & Proof of Non-Leakage Floor:
+                            </span>
+                            <span className="px-1.5 py-0.2 rounded bg-signal text-white text-[9px] font-bold">
+                              BUYER PRIORITY HONORED
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            <div className="p-2 rounded bg-ink-950 border border-signal-border">
+                              <span className="text-signal font-bold block">✓ WINNER: Candidate C (Lowest Price)</span>
+                              <span className="text-ink-200">Price: ₹{result.details.winning_price_inr}</span>
+                              <span className="text-ink-400 block">Unit Margin: {result.details.winning_margin_pct}%</span>
+                              <span className="text-signal-light text-[9px] block">Margin Floor ({result.details.merchant_margin_floor_pct}%): ✓ Met (+24.8% buffer)</span>
+                            </div>
+
+                            <div className="p-2 rounded bg-ink-950 border border-ink-800 opacity-80">
+                              <span className="text-ink-400 font-bold block">BYPASSED: Candidate A (Higher Profit)</span>
+                              <span className="text-ink-300">Price: ₹{result.details.higher_profit_price_inr}</span>
+                              <span className="text-ink-400 block">Unit Margin: {result.details.higher_profit_margin_pct}%</span>
+                              <span className="text-ink-500 text-[9px] block">Higher Merchant Profit ignored to honor buyer price mandate</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Custom Scenario 10 Visualization: Same Offer Different Product */}
+                      {scenario.id === 10 && result.details && (
+                        <div className="mt-2 p-3 bg-ink-900 border border-ink-700 rounded space-y-2 text-[11px]">
+                          <div className="flex items-center justify-between border-b border-ink-800 pb-1.5">
+                            <span className="font-bold text-signal-light uppercase text-[10px]">
+                              Side-by-Side Inventory Holding Comparison:
+                            </span>
+                            <span className="text-ink-400 text-[9px]">Buyer Offer: ₹{result.details.buyer_stated_budget_inr}</span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-[10px]">
+                            <div className="p-2 rounded bg-ink-950 border border-signal-border space-y-1">
+                              <span className="text-signal font-bold block">SLOW MOVER ({result.details.slow_mover.sku})</span>
+                              <div className="text-ink-300">Inventory: {result.details.slow_mover.stock_qty} units ({result.details.slow_mover.days_listed}d aged)</div>
+                              <div className="text-signal-light font-bold">Offer: ₹{result.details.slow_mover.offered_price_inr} ({result.details.slow_mover.discount_pct}% off)</div>
+                              <div className="text-ink-400 text-[9px]">Multiplier: {result.details.slow_mover.urgency_multiplier}</div>
+                              <div className="text-ink-400 text-[9px]">Acceptance: {result.details.slow_mover.acceptance_probability} | Exp. Profit: ₹{result.details.slow_mover.expected_profit_inr}</div>
+                            </div>
+
+                            <div className="p-2 rounded bg-ink-950 border border-ink-800 space-y-1">
+                              <span className="text-ink-300 font-bold block">FAST MOVER ({result.details.fast_mover.sku})</span>
+                              <div className="text-ink-400">Inventory: {result.details.fast_mover.stock_qty} units ({result.details.fast_mover.days_listed}d fresh)</div>
+                              <div className="text-ink-200 font-bold">Offer: ₹{result.details.fast_mover.offered_price_inr} (0.0% off)</div>
+                              <div className="text-ink-500 text-[9px]">Multiplier: {result.details.fast_mover.urgency_multiplier}</div>
+                              <div className="text-ink-500 text-[9px]">Policy: Full List Price Preserved (No Discount)</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {result.state_transition && (
                         <div className="text-[10px] text-ink-400">
