@@ -89,6 +89,7 @@ export default function DealRoomPage() {
   const [orderRecord, setOrderRecord] = useState<any>(null);
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [animatingField, setAnimatingField] = useState<string | null>(null);
+  const [tiebreakInfo, setTiebreakInfo] = useState<any>(null);
   const [paymentResult, setPaymentResult] = useState<any>(null);
   const [refundResult, setRefundResult] = useState<any>(null);
   const [activeSafetyTest, setActiveSafetyTest] = useState<string | null>(null);
@@ -229,6 +230,7 @@ export default function DealRoomPage() {
         setCandidateOffers(candidates);
         setExplanation(data.explanation || null);
         setSignedContractPayload(data.signed_contract);
+        setTiebreakInfo(data.negotiation?.tiebreak_info || null);
 
         const newOfferData: DealTicketData = {
           offer_id: offer.offer_id,
@@ -994,8 +996,8 @@ export default function DealRoomPage() {
                 </div>
               </div>
 
-              {/* Delivery Deadline & Returns */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-ink-800">
+              {/* Delivery Deadline, Returns & Stated Priority Mandate */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-ink-800">
                 {/* Delivery Deadline */}
                 <div>
                   <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
@@ -1027,6 +1029,28 @@ export default function DealRoomPage() {
                     <option value="final sale">Final sale / No returns</option>
                   </select>
                 </div>
+
+                {/* Buyer Priority Mandate (Structured Field for Tiebreaking & Auctions) */}
+                <div>
+                  <label className="block text-xs font-mono text-ink-400 uppercase tracking-wider mb-1">
+                    BUYER PRIORITY MANDATE
+                  </label>
+                  <select
+                    value={prioritiesOrder[0]}
+                    onChange={(e) => {
+                      const selected = e.target.value as PriorityType;
+                      const remaining = (['price', 'delivery_speed', 'return_terms', 'extras'] as PriorityType[]).filter(
+                        (p) => p !== selected
+                      );
+                      setPrioritiesOrder([selected, ...remaining]);
+                    }}
+                    className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                  >
+                    <option value="price">Lowest Price (#1 Priority)</option>
+                    <option value="delivery_speed">Fastest Delivery (#1 Priority)</option>
+                    <option value="return_terms">Flexible Return Terms (#1 Priority)</option>
+                  </select>
+                </div>
               </div>
 
               {/* Additional Open-Ended Notes (Non-Evaluated by Policy Engine) */}
@@ -1047,7 +1071,7 @@ export default function DealRoomPage() {
               <div className="p-2.5 bg-ink-950 border border-ink-800 rounded text-[11px] font-mono text-ink-400 flex items-center gap-2">
                 <span className="text-signal font-bold">ℹ Note:</span>
                 <span>
-                  Buyer Priority Weighting applies when multiple merchants are competing for your order in 3-Merchant Auction mode. In single-merchant mode, the merchant's governance policy evaluates candidate viability directly.
+                  Buyer Priority Mandate acts as a bounded tiebreaker when multiple candidate offers clear merchant policy within the 10% expected profit band in single-merchant mode, or across competing merchants in 3-Merchant Auction mode.
                 </span>
               </div>
 
@@ -1116,15 +1140,33 @@ export default function DealRoomPage() {
                   </p>
                 </div>
 
-                {/* Priority Tension Surface Callout (Explaining Single-Merchant Policy Ranking vs Buyer Stated Preference) */}
-                <div className="p-3.5 bg-ink-950 border border-signal-border/60 rounded-lg text-xs font-mono flex items-start gap-2.5 shadow-sm">
-                  <span className="text-signal font-bold text-sm shrink-0">ℹ</span>
+                {/* Honest Decision Notice based on real tiebreak evaluation */}
+                <div className={`p-3.5 rounded-lg text-xs font-mono flex items-start gap-2.5 shadow-sm border ${
+                  tiebreakInfo?.applied
+                    ? 'bg-emerald-950/60 border-emerald-700/80'
+                    : 'bg-ink-950 border-signal-border/60'
+                }`}>
+                  <span className="text-signal font-bold text-sm shrink-0">
+                    {tiebreakInfo?.applied ? '✓' : 'ℹ'}
+                  </span>
                   <div>
-                    <span className="text-signal-light font-bold block mb-0.5">
-                      Single-Merchant Governance Policy Decision Notice
-                    </span>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className={`font-bold uppercase tracking-wider text-[11px] ${
+                        tiebreakInfo?.applied ? 'text-emerald-400' : 'text-signal-light'
+                      }`}>
+                        {tiebreakInfo?.applied
+                          ? 'Buyer Priority Tiebreak Applied (Within 10% Band)'
+                          : 'Single-Merchant Governance Policy Decision Notice'}
+                      </span>
+                      {tiebreakInfo?.applied && (
+                        <span className="px-1.5 py-0.2 rounded bg-emerald-900/90 text-emerald-300 text-[10px] border border-emerald-600 font-bold">
+                          Tiebreak Won by Buyer Priority
+                        </span>
+                      )}
+                    </div>
                     <p className="text-ink-300 font-sans text-xs leading-relaxed">
-                      You indicated a preference for <strong>lowest price / optimal terms</strong>. In single-merchant mode, Sprint Athletics's own policy decides among valid offers — Candidate A won because it optimizes clearance acceleration and merchant margin. Try the <strong>3-Merchant Auction</strong> if you want your stated priority to directly decide the winning merchant.
+                      {tiebreakInfo?.reason ||
+                        "Candidate A's expected profit was clearly ahead of the others, so your stated priority didn't come into play here — try a request where candidates are closer in value to see the tiebreak decide it."}
                     </p>
                   </div>
                 </div>

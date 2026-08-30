@@ -5,12 +5,16 @@ import {
 } from '@razorpay-dealflow/adapters';
 import {
   evaluateAllPolicies,
+  TIEBREAK_PROFIT_BAND_PCT,
+  BOUNDED_TIEBREAK_THRESHOLD_RATIO,
   type CandidateOfferInput,
   type MerchantPolicyConfig,
   type ProductSnapshot,
   type InventorySnapshot,
   type PolicyEvaluationResult,
 } from '@razorpay-dealflow/policy-engine';
+
+export { TIEBREAK_PROFIT_BAND_PCT, BOUNDED_TIEBREAK_THRESHOLD_RATIO };
 
 export interface ScoredCandidateOffer {
   candidate: CandidateOfferInput;
@@ -27,6 +31,18 @@ export interface ScoredCandidateOffer {
   };
 }
 
+export interface NegotiationTiebreakInfo {
+  applied: boolean;
+  near_tied_candidates_count: number;
+  top_profit_candidate_sku: string;
+  winner_sku: string;
+  top_profit_score: number;
+  winner_profit_score: number;
+  score_delta_pct: number;
+  buyer_priority: string;
+  reason: string;
+}
+
 export interface NegotiationResult {
   winning_offer: OfferSection;
   candidate_offers: ScoredCandidateOffer[];
@@ -34,6 +50,7 @@ export interface NegotiationResult {
   margin_pct: number;
   gross_profit_paise: number;
   requires_human_approval: boolean;
+  tiebreak_info: NegotiationTiebreakInfo;
 }
 
 export interface CompetingMerchantBid {
@@ -375,8 +392,76 @@ export async function processOfferNegotiation(
     throw new Error('All candidate offers breached merchant policy floor constraints.');
   }
 
+  // 1. Sort passing candidates by raw expected profit score descending
   scoredCandidates.sort((a, b) => b.expected_profit_score - a.expected_profit_score);
-  const winner = scoredCandidates[0]!;
+  const topProfitCandidate = scoredCandidates[0]!;
+
+  // 2. Bounded Tiebreak: Candidates within 10% of the top expected profit score
+  const scoreCutoff = topProfitCandidate.expected_profit_score * (1 - BOUNDED_TIEBREAK_THRESHOLD_RATIO);
+  const nearTiedCandidates = scoredCandidates.filter((c) => c.expected_profit_score >= scoreCutoff);
+
+  const buyerPriority = buyerConstraints.priorities?.[0] || 'price';
+  let winner = topProfitCandidate;
+  let tiebreakInfo: NegotiationTiebreakInfo;
+
+  if (nearTiedCandidates.length > 1 && buyerConstraints.priorities && buyerConstraints.priorities.length > 0) {
+    // Sort near-tied candidates according to the buyer's stated priority
+    const prioritySorted = [...nearTiedCandidates].sort((a, b) => {
+      if (buyerPriority === 'price') {
+        return a.candidate.final_price_paise - b.candidate.final_price_paise;
+      }
+      if (buyerPriority === 'delivery_speed') {
+        return new Date(a.candidate.delivery_promise).getTime() - new Date(b.candidate.delivery_promise).getTime();
+      }
+      if (buyerPriority === 'return_terms') {
+        return b.candidate.return_terms_days - a.candidate.return_terms_days;
+      }
+      return b.expected_profit_score - a.expected_profit_score;
+    });
+
+    winner = prioritySorted[0]!;
+    const deltaPct =
+      ((topProfitCandidate.expected_profit_score - winner.expected_profit_score) / topProfitCandidate.expected_profit_score) * 100;
+
+    let priorityExplanation = '';
+    if (buyerPriority === 'price') {
+      priorityExplanation = `Your price preference broke a near-tie between candidates — both cleared policy within the ${TIEBREAK_PROFIT_BAND_PCT}% expected profit band, and yours was the cheaper one (₹${(winner.candidate.final_price_paise / 100).toLocaleString()}).`;
+    } else if (buyerPriority === 'delivery_speed') {
+      priorityExplanation = `Your delivery speed preference broke a near-tie between candidates — both cleared policy within the ${TIEBREAK_PROFIT_BAND_PCT}% expected profit band, and yours offered faster delivery (${winner.candidate.delivery_promise.split('T')[0]}).`;
+    } else if (buyerPriority === 'return_terms') {
+      priorityExplanation = `Your return terms preference broke a near-tie between candidates — both cleared policy within the ${TIEBREAK_PROFIT_BAND_PCT}% expected profit band, and yours offered the longer ${winner.candidate.return_terms_days}-day return window.`;
+    } else {
+      priorityExplanation = `Your stated priority broke a near-tie among valid candidates within the ${TIEBREAK_PROFIT_BAND_PCT}% expected profit band.`;
+    }
+
+    tiebreakInfo = {
+      applied: true,
+      near_tied_candidates_count: nearTiedCandidates.length,
+      top_profit_candidate_sku: topProfitCandidate.candidate.sku,
+      winner_sku: winner.candidate.sku,
+      top_profit_score: topProfitCandidate.expected_profit_score,
+      winner_profit_score: winner.expected_profit_score,
+      score_delta_pct: deltaPct,
+      buyer_priority: buyerPriority,
+      reason: priorityExplanation,
+    };
+  } else {
+    // Gap exceeded 10% or only 1 candidate in band
+    tiebreakInfo = {
+      applied: false,
+      near_tied_candidates_count: nearTiedCandidates.length,
+      top_profit_candidate_sku: topProfitCandidate.candidate.sku,
+      winner_sku: topProfitCandidate.candidate.sku,
+      top_profit_score: topProfitCandidate.expected_profit_score,
+      winner_profit_score: topProfitCandidate.expected_profit_score,
+      score_delta_pct: 0,
+      buyer_priority: buyerPriority,
+      reason: `Candidate A's expected profit was clearly ahead of the others, so your stated priority didn't come into play here — try a request where candidates are closer in value to see the tiebreak decide it.`,
+    };
+  }
+
+  // Ensure winner is at index 0 of candidate_offers for client display
+  const orderedCandidates = [winner, ...scoredCandidates.filter((c) => c !== winner)];
 
   const winningCandidate = winner.candidate;
   const winningOffer: OfferSection = {
@@ -397,11 +482,12 @@ export async function processOfferNegotiation(
 
   return {
     winning_offer: winningOffer,
-    candidate_offers: scoredCandidates,
+    candidate_offers: orderedCandidates,
     explanation,
     margin_pct: winner.margin_pct,
     gross_profit_paise: winner.gross_profit_paise,
     requires_human_approval: winner.evaluation.requires_human_approval,
+    tiebreak_info: tiebreakInfo,
   };
 }
 

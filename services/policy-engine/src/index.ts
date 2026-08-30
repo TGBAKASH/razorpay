@@ -4,6 +4,13 @@ export interface PolicyCheckResult {
   checked_rule: string;
 }
 
+/**
+ * Named constant defining the bounded tiebreak profit proximity threshold.
+ * Candidates scoring within 10% of the top expected-profit candidate are eligible for buyer priority tiebreaking.
+ */
+export const TIEBREAK_PROFIT_BAND_PCT = 10.0;
+export const BOUNDED_TIEBREAK_THRESHOLD_RATIO = 0.10;
+
 export type OfferPolicyStatus = 'POLICY_APPROVED' | 'APPROVAL_PENDING' | 'POLICY_REJECTED';
 
 export interface PolicyEvaluationResult {
