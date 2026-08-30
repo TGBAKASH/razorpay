@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // Protocol sources
-export const ProtocolSourceSchema = z.enum(['ACP', 'UCP', 'AP2', 'mock-UAP', 'simulator']);
+export const ProtocolSourceSchema = z.enum(['ACP', 'UCP', 'AP2', 'mock-UAP', 'x402', 'simulator']);
 export type ProtocolSource = z.infer<typeof ProtocolSourceSchema>;
 
 // Payment method preference

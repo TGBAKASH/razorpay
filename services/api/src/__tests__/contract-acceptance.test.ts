@@ -123,6 +123,10 @@ describe('Offer Acceptance & Verification API (POST /api/offers/:id/accept)', ()
     expect(acceptBody.success).toBe(false);
     expect(acceptBody.code).toBe('INSUFFICIENT_INVENTORY');
     expect(acceptBody.error).toContain('Insufficient inventory at accept-time');
+    if (acceptBody.alternative_offer) {
+      expect(acceptBody.alternative_offer.requires_fresh_acceptance).toBe(true);
+      expect(acceptBody.alternative_offer.offer_id).not.toBe(offerId);
+    }
   });
 
   it('rejects acceptance if offer expiration timestamp is in the past (Expiry Scenario 5)', async () => {

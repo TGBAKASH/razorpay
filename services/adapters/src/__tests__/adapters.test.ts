@@ -3,6 +3,7 @@ import { adaptAcpToCCO, sampleAcpSprintProPayload } from '../acp.js';
 import { adaptUcpToCCO, sampleUcpPayload } from '../ucp.js';
 import { adaptAp2ToCCO, sampleAp2Payload } from '../ap2.js';
 import { adaptMockUapToCCO, sampleMockUapPayload } from '../mock-uap.js';
+import { adaptX402ToCCO } from '../x402.js';
 import { CommonCommerceObjectSchema } from '../common-commerce-object.js';
 
 describe('Protocol Adapters (services/adapters) - ACP, UCP, AP2, MockUAP', () => {
@@ -66,5 +67,26 @@ describe('Protocol Adapters (services/adapters) - ACP, UCP, AP2, MockUAP', () =>
     expect(cco.buyer_constraints.budget_max_paise).toBe(400000);
     expect(cco.buyer_constraints.quantity).toBe(1);
     expect(cco.buyer_constraints.payment_preference).toEqual(['upi']);
+  });
+
+  it('x402 Adapter: maps HTTP 402 Payment Required request shape into valid CCO', () => {
+    const cco = adaptX402ToCCO({
+      resource_uri: '/products/sprintpro-x2',
+      sku: 'SPRINTPRO-X2',
+      max_amount_paise: 400000,
+      currency: 'INR',
+      buyer_id: 'buyer-agent-x402-runner',
+      valid_until: '2026-09-02T23:59:59Z',
+      payment_preference: ['upi', 'card'],
+    });
+
+    const parsed = CommonCommerceObjectSchema.safeParse(cco);
+    expect(parsed.success).toBe(true);
+
+    expect(cco.intent.protocol_source).toBe('x402');
+    expect(cco.intent.buyer_agent_id).toBe('buyer-agent-x402-runner');
+    expect(cco.buyer_constraints.budget_max_paise).toBe(400000);
+    expect(cco.buyer_constraints.quantity).toBe(1);
+    expect(cco.buyer_constraints.payment_preference).toEqual(['upi', 'card']);
   });
 });

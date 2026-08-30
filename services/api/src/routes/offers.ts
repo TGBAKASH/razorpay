@@ -540,10 +540,55 @@ export async function registerOfferRoutes(fastify: FastifyInstance) {
         });
       } catch {}
 
+      // Search catalog for a qualifying substitute product within original buyer budget & category
+      const substituteProduct = catMerchant?.products.find(
+        (p) =>
+          p.sku !== payload.sku &&
+          p.inventoryQty >= payload.quantity &&
+          p.costPaise <= payload.final_price_paise
+      );
+
+      let alternativeOffer: any = null;
+
+      if (substituteProduct) {
+        const altOfferId = `off-alt-${crypto.randomUUID().substring(0, 8)}`;
+        const altUnitPricePaise = Math.min(substituteProduct.listPricePaise, payload.final_price_paise);
+        const altSignedContract = sign({
+          offer_id: altOfferId,
+          merchant_id: payload.merchant_id,
+          buyer_agent_id: payload.buyer_agent_id,
+          sku: substituteProduct.sku,
+          quantity: payload.quantity,
+          final_price_paise: altUnitPricePaise,
+          currency: 'INR',
+          payment_methods_allowed: payload.payment_methods_allowed,
+          delivery_promise: payload.delivery_promise,
+          return_terms_days: payload.return_terms_days,
+          expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          policy_version: payload.policy_version,
+        });
+
+        activeContracts.set(altOfferId, altSignedContract);
+
+        alternativeOffer = {
+          offer_id: altOfferId,
+          sku: substituteProduct.sku,
+          product_name: substituteProduct.name,
+          unit_price_paise: altUnitPricePaise,
+          quantity: payload.quantity,
+          signed_contract: altSignedContract,
+          requires_fresh_acceptance: true,
+          note: 'Brand-new alternative offer requiring fresh buyer acceptance (never automatically swapped into previous contract).',
+        };
+      }
+
       return reply.status(409).send({
         success: false,
-        error: `Insufficient inventory at accept-time (${availableQty} available vs ${payload.quantity} requested). Offer expired cleanly without charge.`,
+        error: `Insufficient inventory at accept-time (${availableQty} available vs ${payload.quantity} requested). Original offer expired cleanly without charge.${
+          alternativeOffer ? ' A new alternative offer was generated.' : ' No qualifying substitute was available.'
+        }`,
         code: 'INSUFFICIENT_INVENTORY',
+        alternative_offer: alternativeOffer,
       });
     }
 

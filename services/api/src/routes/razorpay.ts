@@ -421,6 +421,27 @@ export async function registerRazorpayRoutes(fastify: FastifyInstance) {
         }
       }
 
+      // Update Promotion Budget in Postgres
+      const finalPrice = storedOrder?.contract?.canonical_payload?.final_price_paise;
+      const qty = storedOrder?.contract?.canonical_payload?.quantity || 1;
+      const sku = storedOrder?.contract?.canonical_payload?.sku || 'SPRINTPRO-X2';
+      const listPrice = sku === 'SPRINTPRO-X2' ? 429900 : 499900;
+      const totalDiscountPaise = finalPrice ? Math.max(0, (listPrice - finalPrice) * qty) : 0;
+
+      if (totalDiscountPaise > 0 && process.env.NODE_ENV !== 'test') {
+        try {
+          const merchantId = storedOrder?.contract?.canonical_payload?.merchant_id || 'merchant-sprint-alpha';
+          await prisma.promotionBudget.updateMany({
+            where: { merchantId },
+            data: {
+              spentBudgetPaise: { increment: totalDiscountPaise },
+            },
+          });
+        } catch (budgetErr) {
+          console.error('Error updating promotion budget in DB:', budgetErr);
+        }
+      }
+
       processedWebhookEvents.add(eventId);
 
       return reply.status(200).send({
@@ -430,6 +451,94 @@ export async function registerRazorpayRoutes(fastify: FastifyInstance) {
         payment_id: paymentId,
         event_id: eventId,
         event_type: eventType,
+        verified_at: new Date().toISOString(),
+        signature_verified: true,
+      });
+    }
+
+    // Handle Refund Webhook Events (refund.processed / refund.created)
+    if (eventType === 'refund.processed' || eventType === 'refund.created') {
+      const refundEntity = payload.payload?.refund?.entity;
+      const paymentEntity = payload.payload?.payment?.entity;
+      const paymentId = refundEntity?.payment_id || paymentEntity?.id;
+      const refundAmountPaise = refundEntity?.amount || 0;
+      const refundId = refundEntity?.id || `rfd_${Date.now()}`;
+
+      let orderId = refundEntity?.notes?.order_id || paymentEntity?.order_id;
+      let storedOrder: any = null;
+      if (orderId) {
+        storedOrder = orderStore.get(orderId);
+      } else if (paymentId) {
+        for (const ord of orderStore.values()) {
+          if (ord.payment_id === paymentId) {
+            storedOrder = ord;
+            orderId = ord.order_id;
+            break;
+          }
+        }
+      }
+
+      if (storedOrder) {
+        storedOrder.status = 'refunded';
+      }
+
+      const offerId = storedOrder?.offer_id;
+      if (offerId) {
+        try {
+          stateMachine.transition(offerId, 'REFUNDED', {
+            action: 'WEBHOOK_REFUND_PROCESSED',
+            actor: 'webhook:razorpay',
+            input_data: { refund_id: refundId, payment_id: paymentId, amount_paise: refundAmountPaise },
+            policy_version: storedOrder?.contract?.canonical_payload?.policy_version || 'v1',
+            policy_checked: 'RULE_10_DAY_RETURN_DISPUTE_REFUND',
+            reason: `Refund of ₹${(refundAmountPaise / 100).toLocaleString()} confirmed via Razorpay webhook.`,
+            razorpay_response: refundEntity,
+          });
+        } catch {}
+      }
+
+      // Persist to Neon Postgres DB
+      if (process.env.NODE_ENV !== 'test' && orderId) {
+        try {
+          await prisma.razorpayOrder.updateMany({
+            where: { razorpayOrderId: orderId },
+            data: { status: 'REFUNDED' },
+          });
+
+          if (offerId) {
+            await prisma.offer.updateMany({
+              where: { id: offerId },
+              data: { status: 'REFUNDED' },
+            });
+          }
+
+          await prisma.paymentEvent.create({
+            data: {
+              id: crypto.randomUUID(),
+              razorpayOrderId: orderId,
+              razorpayPaymentId: paymentId || 'pay_unknown',
+              razorpayEventId: eventId,
+              eventType,
+              amountPaise: refundAmountPaise,
+              currency: 'INR',
+              method: paymentEntity?.method || 'upi',
+              status: 'refunded',
+              rawPayload: payload as any,
+            },
+          });
+        } catch (dbErr) {
+          console.error('Error persisting refund webhook event in DB:', dbErr);
+        }
+      }
+
+      processedWebhookEvents.add(eventId);
+
+      return reply.status(200).send({
+        status: 'processed_refund',
+        order_id: orderId,
+        offer_id: offerId,
+        refund_id: refundId,
+        event_id: eventId,
         verified_at: new Date().toISOString(),
         signature_verified: true,
       });

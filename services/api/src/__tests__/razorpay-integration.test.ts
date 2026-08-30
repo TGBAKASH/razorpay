@@ -255,4 +255,56 @@ describe('Razorpay Integration & Idempotent Webhook Handler (GEMINI.md Part 3 & 
     expect(refundBody.success).toBe(true);
     expect(refundBody.order.status).toBe('refunded');
   });
+
+  it('handles refund.processed webhook event directly from gateway, updating order status to refunded', async () => {
+    const { order } = await createSprintProOrder();
+
+    const refundWebhookPayload = {
+      entity: 'event',
+      event: 'refund.processed',
+      event_id: 'evt_refund_processed_live_001',
+      payload: {
+        refund: {
+          entity: {
+            id: 'rfd_live_test_001',
+            payment_id: 'pay_test_sprintpro_001',
+            amount: 394900,
+            status: 'processed',
+            notes: {
+              order_id: order.id,
+            },
+          },
+        },
+        payment: {
+          entity: {
+            id: 'pay_test_sprintpro_001',
+            order_id: order.id,
+            amount: 394900,
+            method: 'upi',
+          },
+        },
+      },
+    };
+
+    const rawBody = JSON.stringify(refundWebhookPayload);
+    const signature = crypto
+      .createHmac('sha256', webhookSecret)
+      .update(rawBody, 'utf8')
+      .digest('hex');
+
+    const webhookRes = await server.inject({
+      method: 'POST',
+      url: '/api/webhooks/razorpay',
+      headers: { 'x-razorpay-signature': signature, 'content-type': 'application/json' },
+      payload: rawBody,
+    });
+
+    expect(webhookRes.statusCode).toBe(200);
+    const resBody = JSON.parse(webhookRes.body);
+    expect(resBody.status).toBe('processed_refund');
+    expect(resBody.event_id).toBe('evt_refund_processed_live_001');
+
+    const storedOrder = orderStore.get(order.id);
+    expect(storedOrder?.status).toBe('refunded');
+  });
 });
