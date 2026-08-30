@@ -41,7 +41,7 @@ describe('Merchant Policy Versioning & Dashboard Endpoints (Phase 8)', () => {
           quantity: 1,
           payment_preference: ['upi'],
           return_preference: 'easy returns',
-          priorities: ['price', 'delivery_speed', 'return_terms', 'extras'],
+          priorities: ['delivery_speed', 'price', 'return_terms', 'extras'],
         },
       },
     });

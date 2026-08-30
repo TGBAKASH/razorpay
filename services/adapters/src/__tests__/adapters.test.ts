@@ -22,7 +22,7 @@ describe('Protocol Adapters (services/adapters) - ACP, UCP, AP2, MockUAP', () =>
     expect(cco.buyer_constraints.delivery_deadline).toBe('2026-09-01T23:59:59Z');
     expect(cco.buyer_constraints.quantity).toBe(1);
     expect(cco.buyer_constraints.payment_preference).toEqual(['upi', 'card']);
-    expect(cco.buyer_constraints.priorities).toEqual(['price', 'delivery_speed', 'return_terms', 'extras']);
+    expect(cco.buyer_constraints.priorities).toEqual(['delivery_speed', 'price', 'return_terms', 'extras']);
   });
 
   it('UCP Adapter: maps UCP payload into valid CCO with all required fields round-tripped', () => {

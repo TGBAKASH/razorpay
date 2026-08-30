@@ -118,14 +118,14 @@ describe('Multi-Merchant Parallel Broadcast & Multi-Attribute Auction (Phase 9)'
     const body = JSON.parse(res.body);
     const winner = body.auction.winner;
 
-    // Simulator must select Merchant B because ₹28,900 is the lowest price
+    // Simulator must select Merchant B because it offered the lowest price
     expect(winner.sku).toBe('GIFTBOX-CORP-B');
     expect(winner.merchant_name).toContain('Merchant B');
-    expect(winner.unit_price_paise).toBe(2890000); // ₹28,900
+    expect(winner.unit_price_paise).toBe(2635000); // ₹26,350
 
     // Confirm decision rationale states price was #1 priority
     expect(body.auction.decision_rationale).toContain('price was ranked #1 priority');
-    expect(body.auction.decision_rationale).toContain('₹28,900');
+    expect(body.auction.decision_rationale).toContain('₹26,350');
   });
 
   it('selects Merchant A when priorities are weighted toward Extras (Free Custom Logo Engraving)', async () => {

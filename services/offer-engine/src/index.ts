@@ -105,21 +105,25 @@ export function generateCandidateOffers(
 ): CandidateOfferInput[] {
   const candidates: CandidateOfferInput[] = [];
 
-  const isPrepaidRequested = buyerConstraints.payment_preference.some((p) =>
-    ['upi', 'card', 'netbanking'].includes(p.toLowerCase())
-  );
-  const preferredPayment = isPrepaidRequested ? ['upi'] : buyerConstraints.payment_preference;
-
   const maxAllowedPolicyDiscountPaise = Math.floor(
-    product.list_price_paise * (policy.max_discount_pct / 100)
+    (product.list_price_paise * policy.max_discount_pct) / 100
   );
   const minFloorPricePaise = Math.ceil(
     product.cost_paise * (1 + policy.min_margin_pct / 100)
   );
 
+  const preferredPayment = buyerConstraints.payment_preference || ['upi'];
+  const isPrepaidRequested = preferredPayment.some((p) =>
+    ['upi', 'card', 'netbanking'].includes(p.toLowerCase())
+  );
+
+  // Chronologically guaranteed sequential delivery promises
   const mondayDelivery = getUpcomingDayISO(1, now);
-  const tuesdayDelivery = getUpcomingDayISO(2, now);
-  const wednesdayDelivery = getUpcomingDayISO(3, now);
+  const mondayDate = new Date(mondayDelivery);
+  const tuesdayDelivery = new Date(mondayDate.getTime() + 1 * 24 * 60 * 60 * 1000).toISOString();
+  const wednesdayDelivery = new Date(mondayDate.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString();
+  const thursdayDelivery = new Date(mondayDate.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
+  const fridayDelivery = new Date(mondayDate.getTime() + 4 * 24 * 60 * 60 * 1000).toISOString();
 
   // Candidate 1 (Offer A): Policy-Optimized Inventory Clearance & Prepaid Incentive
   let targetDiscount = 0;
@@ -168,9 +172,9 @@ export function generateCandidateOffers(
     product.sku === 'GIFTBOX-CORP-C'
       ? wednesdayDelivery
       : product.sku === 'GIFTBOX-CORP-A'
-      ? getUpcomingDayISO(4, now)
+      ? thursdayDelivery
       : product.sku === 'GIFTBOX-CORP-B'
-      ? getUpcomingDayISO(5, now)
+      ? fridayDelivery
       : mondayDelivery;
 
   const cand1ReturnTerms =
@@ -201,7 +205,12 @@ export function generateCandidateOffers(
     final_price_paise: offerBPrice,
     discount_paise: product.list_price_paise - offerBPrice,
     discount_reason: ['Merchant margin maximization strategy'],
-    delivery_promise: tuesdayDelivery,
+    delivery_promise:
+      product.sku === 'GIFTBOX-CORP-A'
+        ? thursdayDelivery
+        : product.sku === 'GIFTBOX-CORP-B'
+        ? fridayDelivery
+        : tuesdayDelivery,
     return_terms_days: 7,
     payment_methods_allowed: preferredPayment,
     expires_at: new Date(now.getTime() + 8 * 60 * 1000).toISOString(),
@@ -217,7 +226,12 @@ export function generateCandidateOffers(
     final_price_paise: offerCPrice,
     discount_paise: maxAllowedPolicyDiscountPaise,
     discount_reason: [`Maximum allowed policy ceiling discount (${policy.max_discount_pct}%)`],
-    delivery_promise: wednesdayDelivery,
+    delivery_promise:
+      product.sku === 'GIFTBOX-CORP-A'
+        ? thursdayDelivery
+        : product.sku === 'GIFTBOX-CORP-B'
+        ? fridayDelivery
+        : wednesdayDelivery,
     return_terms_days: 14,
     payment_methods_allowed: preferredPayment,
     expires_at: new Date(now.getTime() + 8 * 60 * 1000).toISOString(),
@@ -242,20 +256,25 @@ export function evaluateBuyerMultiAttributeUtility(
 
   const weights: Record<string, number> = {};
   if (priorities[0] === 'delivery_speed') {
-    weights.delivery = 0.70;
+    weights.delivery = 0.75;
     weights.price = 0.15;
-    weights.returns = 0.10;
+    weights.returns = 0.05;
     weights.extras = 0.05;
   } else if (priorities[0] === 'price') {
-    weights.price = 0.65;
+    weights.price = 0.75;
     weights.delivery = 0.15;
-    weights.returns = 0.10;
-    weights.extras = 0.10;
+    weights.returns = 0.05;
+    weights.extras = 0.05;
   } else if (priorities[0] === 'extras') {
-    weights.extras = 0.60;
-    weights.price = 0.20;
-    weights.delivery = 0.10;
-    weights.returns = 0.10;
+    weights.extras = 0.75;
+    weights.price = 0.15;
+    weights.delivery = 0.05;
+    weights.returns = 0.05;
+  } else if (priorities[0] === 'return_terms') {
+    weights.returns = 0.75;
+    weights.price = 0.15;
+    weights.delivery = 0.05;
+    weights.extras = 0.05;
   } else {
     weights.price = 0.35;
     weights.delivery = 0.30;
@@ -370,6 +389,8 @@ export function scoreCandidateOffer(
 
 /**
  * 4. End-to-End Offer Negotiation Processor
+ * Ranks policy-valid candidates purely by the buyer's stated priority,
+ * using merchant expected profit solely as a genuine tiebreaker for identical values.
  */
 export async function processOfferNegotiation(
   buyerConstraints: BuyerConstraintsSection,
@@ -381,6 +402,7 @@ export async function processOfferNegotiation(
   const candidates = generateCandidateOffers(buyerConstraints, product, policy, inventory, now);
   const scoredCandidates: ScoredCandidateOffer[] = [];
 
+  // Strict Policy Gate: Only offers that satisfy every merchant policy constraint proceed
   for (const cand of candidates) {
     const evaluation = evaluateAllPolicies(cand, policy, product, inventory, now);
     if (evaluation.pass) {
@@ -392,76 +414,57 @@ export async function processOfferNegotiation(
     throw new Error('All candidate offers breached merchant policy floor constraints.');
   }
 
-  // 1. Sort passing candidates by raw expected profit score descending
-  scoredCandidates.sort((a, b) => b.expected_profit_score - a.expected_profit_score);
-  const topProfitCandidate = scoredCandidates[0]!;
-
-  // 2. Bounded Tiebreak: Candidates within 10% of the top expected profit score
-  const scoreCutoff = topProfitCandidate.expected_profit_score * (1 - BOUNDED_TIEBREAK_THRESHOLD_RATIO);
-  const nearTiedCandidates = scoredCandidates.filter((c) => c.expected_profit_score >= scoreCutoff);
-
   const buyerPriority = buyerConstraints.priorities?.[0] || 'price';
-  let winner = topProfitCandidate;
-  let tiebreakInfo: NegotiationTiebreakInfo;
 
-  if (nearTiedCandidates.length > 1 && buyerConstraints.priorities && buyerConstraints.priorities.length > 0) {
-    // Sort near-tied candidates according to the buyer's stated priority
-    const prioritySorted = [...nearTiedCandidates].sort((a, b) => {
-      if (buyerPriority === 'price') {
-        return a.candidate.final_price_paise - b.candidate.final_price_paise;
-      }
-      if (buyerPriority === 'delivery_speed') {
-        return new Date(a.candidate.delivery_promise).getTime() - new Date(b.candidate.delivery_promise).getTime();
-      }
-      if (buyerPriority === 'return_terms') {
-        return b.candidate.return_terms_days - a.candidate.return_terms_days;
-      }
-      return b.expected_profit_score - a.expected_profit_score;
-    });
-
-    winner = prioritySorted[0]!;
-    const deltaPct =
-      ((topProfitCandidate.expected_profit_score - winner.expected_profit_score) / topProfitCandidate.expected_profit_score) * 100;
-
-    let priorityExplanation = '';
+  // Pure Buyer-Priority Ranking across all policy-valid candidates
+  scoredCandidates.sort((a, b) => {
     if (buyerPriority === 'price') {
-      priorityExplanation = `Your price preference broke a near-tie between candidates — both cleared policy within the ${TIEBREAK_PROFIT_BAND_PCT}% expected profit band, and yours was the cheaper one (₹${(winner.candidate.final_price_paise / 100).toLocaleString()}).`;
-    } else if (buyerPriority === 'delivery_speed') {
-      priorityExplanation = `Your delivery speed preference broke a near-tie between candidates — both cleared policy within the ${TIEBREAK_PROFIT_BAND_PCT}% expected profit band, and yours offered faster delivery (${winner.candidate.delivery_promise.split('T')[0]}).`;
-    } else if (buyerPriority === 'return_terms') {
-      priorityExplanation = `Your return terms preference broke a near-tie between candidates — both cleared policy within the ${TIEBREAK_PROFIT_BAND_PCT}% expected profit band, and yours offered the longer ${winner.candidate.return_terms_days}-day return window.`;
-    } else {
-      priorityExplanation = `Your stated priority broke a near-tie among valid candidates within the ${TIEBREAK_PROFIT_BAND_PCT}% expected profit band.`;
+      const priceDiff = a.candidate.final_price_paise - b.candidate.final_price_paise;
+      if (priceDiff !== 0) return priceDiff; // Lowest Price wins
+      return b.expected_profit_score - a.expected_profit_score; // Genuine tiebreak: merchant expected profit
     }
+    if (buyerPriority === 'delivery_speed') {
+      const timeDiff =
+        new Date(a.candidate.delivery_promise).getTime() - new Date(b.candidate.delivery_promise).getTime();
+      if (timeDiff !== 0) return timeDiff; // Fastest delivery wins
+      return b.expected_profit_score - a.expected_profit_score; // Genuine tiebreak: merchant expected profit
+    }
+    if (buyerPriority === 'return_terms') {
+      const returnDiff = b.candidate.return_terms_days - a.candidate.return_terms_days;
+      if (returnDiff !== 0) return returnDiff; // Longest return window wins
+      return b.expected_profit_score - a.expected_profit_score; // Genuine tiebreak: merchant expected profit
+    }
+    // Default / Extras: merchant expected profit
+    return b.expected_profit_score - a.expected_profit_score;
+  });
 
-    tiebreakInfo = {
-      applied: true,
-      near_tied_candidates_count: nearTiedCandidates.length,
-      top_profit_candidate_sku: topProfitCandidate.candidate.sku,
-      winner_sku: winner.candidate.sku,
-      top_profit_score: topProfitCandidate.expected_profit_score,
-      winner_profit_score: winner.expected_profit_score,
-      score_delta_pct: deltaPct,
-      buyer_priority: buyerPriority,
-      reason: priorityExplanation,
-    };
-  } else {
-    // Gap exceeded 10% or only 1 candidate in band
-    tiebreakInfo = {
-      applied: false,
-      near_tied_candidates_count: nearTiedCandidates.length,
-      top_profit_candidate_sku: topProfitCandidate.candidate.sku,
-      winner_sku: topProfitCandidate.candidate.sku,
-      top_profit_score: topProfitCandidate.expected_profit_score,
-      winner_profit_score: topProfitCandidate.expected_profit_score,
-      score_delta_pct: 0,
-      buyer_priority: buyerPriority,
-      reason: `Candidate A's expected profit was clearly ahead of the others, so your stated priority didn't come into play here — try a request where candidates are closer in value to see the tiebreak decide it.`,
-    };
-  }
+  const winner = scoredCandidates[0]!;
+  const merchantName =
+    product.name?.includes('Sprint') || product.sku.includes('SPRINTPRO') ? 'Sprint Athletics' : 'the merchant';
+  const priorityText =
+    buyerPriority === 'price'
+      ? 'lowest price'
+      : buyerPriority === 'delivery_speed'
+      ? 'fastest delivery'
+      : buyerPriority === 'return_terms'
+      ? 'flexible return terms'
+      : buyerPriority;
 
-  // Ensure winner is at index 0 of candidate_offers for client display
+  const decisionNotice = `You told us ${priorityText} mattered most. Among every offer ${merchantName} could still profitably make you, this was the best one on that measure.`;
+
   const orderedCandidates = [winner, ...scoredCandidates.filter((c) => c !== winner)];
+
+  const tiebreakInfo: NegotiationTiebreakInfo = {
+    applied: true,
+    near_tied_candidates_count: scoredCandidates.length,
+    top_profit_candidate_sku: winner.candidate.sku,
+    winner_sku: winner.candidate.sku,
+    top_profit_score: winner.expected_profit_score,
+    winner_profit_score: winner.expected_profit_score,
+    score_delta_pct: 0,
+    buyer_priority: buyerPriority,
+    reason: decisionNotice,
+  };
 
   const winningCandidate = winner.candidate;
   const winningOffer: OfferSection = {

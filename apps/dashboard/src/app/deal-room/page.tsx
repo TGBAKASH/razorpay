@@ -1140,33 +1140,21 @@ export default function DealRoomPage() {
                   </p>
                 </div>
 
-                {/* Honest Decision Notice based on real tiebreak evaluation */}
-                <div className={`p-3.5 rounded-lg text-xs font-mono flex items-start gap-2.5 shadow-sm border ${
-                  tiebreakInfo?.applied
-                    ? 'bg-emerald-950/60 border-emerald-700/80'
-                    : 'bg-ink-950 border-signal-border/60'
-                }`}>
-                  <span className="text-signal font-bold text-sm shrink-0">
-                    {tiebreakInfo?.applied ? '✓' : 'ℹ'}
-                  </span>
+                {/* Honest Decision Notice based on pure buyer-priority ranking */}
+                <div className="p-3.5 rounded-lg text-xs font-mono flex items-start gap-2.5 shadow-sm border bg-emerald-950/60 border-emerald-700/80">
+                  <span className="text-emerald-400 font-bold text-sm shrink-0">✓</span>
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className={`font-bold uppercase tracking-wider text-[11px] ${
-                        tiebreakInfo?.applied ? 'text-emerald-400' : 'text-signal-light'
-                      }`}>
-                        {tiebreakInfo?.applied
-                          ? 'Buyer Priority Tiebreak Applied (Within 10% Band)'
-                          : 'Single-Merchant Governance Policy Decision Notice'}
+                      <span className="font-bold uppercase tracking-wider text-[11px] text-emerald-400">
+                        Buyer Stated Priority Honored
                       </span>
-                      {tiebreakInfo?.applied && (
-                        <span className="px-1.5 py-0.2 rounded bg-emerald-900/90 text-emerald-300 text-[10px] border border-emerald-600 font-bold">
-                          Tiebreak Won by Buyer Priority
-                        </span>
-                      )}
+                      <span className="px-1.5 py-0.2 rounded bg-emerald-900/90 text-emerald-300 text-[10px] border border-emerald-600 font-bold">
+                        Top Ranked Offer
+                      </span>
                     </div>
                     <p className="text-ink-300 font-sans text-xs leading-relaxed">
                       {tiebreakInfo?.reason ||
-                        "Candidate A's expected profit was clearly ahead of the others, so your stated priority didn't come into play here — try a request where candidates are closer in value to see the tiebreak decide it."}
+                        `You told us ${prioritiesOrder[0] === 'price' ? 'lowest price' : prioritiesOrder[0] === 'delivery_speed' ? 'fastest delivery' : 'flexible return terms'} mattered most. Among every offer Sprint Athletics could still profitably make you, this was the best one on that measure.`}
                     </p>
                   </div>
                 </div>
@@ -1178,6 +1166,11 @@ export default function DealRoomPage() {
                     const discountPct = ((c.candidate.discount_paise / 429900) * 100);
                     const orderTotalPaise = c.candidate.final_price_paise * c.candidate.quantity;
                     const isHeldForApproval = c.evaluation.requires_human_approval || orderTotalPaise > 1500000;
+                    const candidateName = c.candidate.discount_paise >= 50000
+                      ? 'Candidate C (Maximum Discount)'
+                      : c.candidate.discount_paise >= 30000
+                      ? 'Candidate A (Optimized Clearance)'
+                      : 'Candidate B (Standard Pricing)';
 
                     return (
                       <div
@@ -1196,7 +1189,7 @@ export default function DealRoomPage() {
 
                         <div>
                           <div className="text-xs font-mono font-bold text-ink-300 mb-2">
-                            Candidate {idx === 0 ? 'A (Optimized Clearance)' : idx === 1 ? 'B (Standard Pricing)' : 'C (Maximum Discount)'}
+                            {candidateName}
                           </div>
 
                           {/* Price & Discount */}
@@ -1225,7 +1218,7 @@ export default function DealRoomPage() {
                             <div className="flex items-center justify-between text-[11px]">
                               <span className="text-ink-400">Delivery SLA:</span>
                               <span className="text-ink-200 font-bold">
-                                {idx === 0 ? 'Monday Express Dispatch' : idx === 1 ? 'Tuesday Standard' : 'Wednesday Economy'}
+                                {c.candidate.delivery_promise.includes('T') ? new Date(c.candidate.delivery_promise).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : 'Guaranteed'}
                               </span>
                             </div>
 
@@ -1269,31 +1262,31 @@ export default function DealRoomPage() {
                 <div className="p-4 bg-ink-900 border border-ink-700 rounded-lg space-y-3">
                   <div className="flex items-center justify-between border-b border-ink-800 pb-2">
                     <h3 className="text-xs font-bold font-mono text-ink-200 uppercase tracking-wider flex items-center gap-2">
-                      <span className="w-4 h-4 rounded-full bg-signal text-white flex items-center justify-center text-[10px]">?</span>
-                      Why Candidate A Was Selected Over Candidate C
+                      <span className="w-4 h-4 rounded-full bg-signal text-white flex items-center justify-center text-[10px]">✓</span>
+                      Buyer Priority Selection Breakdown
                     </h3>
                     <span className="text-[11px] font-mono text-signal-light">Autonomous Negotiation Summary</span>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-mono">
                     <div className="bg-ink-950 p-3 rounded border border-ink-800 space-y-1">
-                      <span className="text-signal-light font-bold block text-[11px]">1. Stock Clearance Velocity</span>
+                      <span className="text-signal-light font-bold block text-[11px]">1. Strict Policy Clearance</span>
                       <p className="text-ink-300 font-sans text-[11px] leading-relaxed">
-                        Candidate A targets slow-moving inventory clearance at ₹3,949, delivering optimal inventory turnaround velocity without exceeding maximum discount thresholds.
+                        Every candidate offer is mathematically filtered by Sprint Athletics's deterministic policy (margin floor $\ge$ 18%, discount ceiling $\le$ 12%, stock allocated).
                       </p>
                     </div>
 
                     <div className="bg-ink-950 p-3 rounded border border-ink-800 space-y-1">
-                      <span className="text-signal-light font-bold block text-[11px]">2. Profit Band Evaluation</span>
+                      <span className="text-signal-light font-bold block text-[11px]">2. Buyer Priority Honored</span>
                       <p className="text-ink-300 font-sans text-[11px] leading-relaxed">
-                        Candidate A achieved a superior expected profit score compared to Candidate C (a 12.8% gap, which exceeds the 10% tiebreak band), prioritizing commercial sustainability.
+                        Among all policy-valid offers, the winner is ranked directly by your stated priority ({prioritiesOrder[0] === 'price' ? 'Lowest Price' : prioritiesOrder[0] === 'delivery_speed' ? 'Fastest Delivery' : 'Flexible Return Terms'}).
                       </p>
                     </div>
 
                     <div className="bg-ink-950 p-3 rounded border border-ink-800 space-y-1">
-                      <span className="text-signal-light font-bold block text-[11px]">3. Notes vs Priority Selector</span>
+                      <span className="text-signal-light font-bold block text-[11px]">3. Genuine Tiebreak Only</span>
                       <p className="text-ink-300 font-sans text-[11px] leading-relaxed">
-                        Free-text additional notes are treated as non-pricing buyer context for safety. To enforce a binding price tiebreaker between close offers, use the structured <strong>Buyer Priority Mandate</strong> dropdown.
+                        Merchant expected profit is only used as a tiebreaker when two candidate offers have identical values on your chosen priority dimension.
                       </p>
                     </div>
                   </div>

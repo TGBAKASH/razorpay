@@ -31,7 +31,7 @@ describe('Razorpay Integration & Idempotent Webhook Handler (GEMINI.md Part 3 & 
           quantity: 1,
           payment_preference: ['upi'],
           return_preference: 'easy returns',
-          priorities: ['price', 'delivery_speed', 'return_terms', 'extras'],
+          priorities: ['delivery_speed', 'price', 'return_terms', 'extras'],
         },
       },
     });

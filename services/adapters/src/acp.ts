@@ -110,7 +110,7 @@ export const sampleAcpSprintProPayload: AcpPayload = {
     required_by_utc: '2026-09-01T23:59:59Z', // Tuesday deadline
     payment_rails: ['UPI', 'CARD'],
     return_policy_min_days: 7,
-    negotiation_priorities: ['price', 'delivery_speed', 'return_terms', 'extras'],
+    negotiation_priorities: ['delivery_speed', 'price', 'return_terms', 'extras'],
     notes: 'Looking for fast responsive road running shoes under ₹4,000',
   },
 };

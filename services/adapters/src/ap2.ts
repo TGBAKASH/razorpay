@@ -124,7 +124,7 @@ export const sampleAp2Payload: Ap2Payload = {
     quantity: 1,
     payment_methods_accepted: ['UPI', 'CARD'],
     return_window_min_days: 10,
-    priority_order: ['price', 'delivery_speed', 'return_terms', 'extras'],
+    priority_order: ['delivery_speed', 'price', 'return_terms', 'extras'],
     query_description: 'AP2 mandate for SprintPro X2 under ₹4,000 budget',
   },
 };
