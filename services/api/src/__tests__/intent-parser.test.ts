@@ -94,4 +94,40 @@ describe('Intent Parsing & CCO Ingestion API', () => {
     expect(body.cco.intent.protocol_source).toBe('simulator');
     expect(body.cco.fulfillment.state).toBe('REQUEST_RECEIVED');
   });
+
+  it('parses mixed Hindi/English (Hinglish) query correctly with budget, category, and priorities', async () => {
+    const hinglishQuery = 'yaar mujhe wo shoes chahiye jo saste mein mile, teen hazar se zyada nahi, jaldi chahiye';
+
+    const parseResponse = await server.inject({
+      method: 'POST',
+      url: '/api/intent/parse',
+      payload: { query: hinglishQuery },
+    });
+
+    expect(parseResponse.statusCode).toBe(200);
+    const parsedBody = JSON.parse(parseResponse.body);
+    expect(parsedBody.success).toBe(true);
+    expect(parsedBody.category).toBe('running shoes');
+    expect(parsedBody.buyer_constraints.budget_max_paise).toBe(300000); // teen hazar = ₹3,000 = 300,000 paise
+    expect(parsedBody.buyer_constraints.priorities).toContain('price'); // saste mein
+    expect(parsedBody.buyer_constraints.priorities).toContain('delivery_speed'); // jaldi chahiye
+  });
+
+  it('parses natural language merchant policy rules into structured guardrails', async () => {
+    const policyPrompt = "don't discount more than 12%, keep at least 18% margin, get my approval above ₹15,000, free delivery above ₹1,499";
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/policy/interpret-nl',
+      payload: { prompt: policyPrompt },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.policy.minMarginPct).toBe(18);
+    expect(body.policy.maxDiscountPct).toBe(12);
+    expect(body.policy.humanApprovalAbovePaise).toBe(1500000);
+    expect(body.policy.freeDeliveryAbovePaise).toBe(149900);
+  });
 });

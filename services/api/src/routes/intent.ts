@@ -7,10 +7,10 @@ import {
   type SupportedProtocol,
   type CommonCommerceObject,
 } from '@razorpay-dealflow/adapters';
-import { parseBuyerIntent } from '../services/gemini-parser.js';
+import { parseBuyerIntent, parseMerchantPolicy } from '../services/gemini-parser.js';
 
 export async function registerIntentRoutes(fastify: FastifyInstance) {
-  // 1. Natural Language Intent Parsing endpoint
+  // 1. Natural Language Intent Parsing endpoint (Buyer)
   fastify.post('/api/intent/parse', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as { query?: string; reference_date?: string };
     if (!body || typeof body.query !== 'string' || body.query.trim() === '') {
@@ -31,6 +31,31 @@ export async function registerIntentRoutes(fastify: FastifyInstance) {
       return reply.status(500).send({
         success: false,
         error: `Failed to parse intent: ${message}`,
+      });
+    }
+  });
+
+  // 1b. Natural Language Policy Rules Parsing endpoint (Merchant)
+  fastify.post('/api/policy/interpret-nl', async (request: FastifyRequest, reply: FastifyReply) => {
+    const body = request.body as { prompt?: string };
+    if (!body || typeof body.prompt !== 'string' || body.prompt.trim() === '') {
+      return reply.status(400).send({
+        success: false,
+        error: 'Prompt string is required in request body',
+      });
+    }
+
+    try {
+      const result = await parseMerchantPolicy(body.prompt);
+      return reply.status(200).send({
+        success: true,
+        ...result,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown policy parsing error';
+      return reply.status(500).send({
+        success: false,
+        error: `Failed to parse merchant policy: ${message}`,
       });
     }
   });

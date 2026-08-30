@@ -87,6 +87,8 @@ export default function DealRoomPage() {
   const [signedContractPayload, setSignedContractPayload] = useState<any>(null);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [orderRecord, setOrderRecord] = useState<any>(null);
+  const [additionalNotes, setAdditionalNotes] = useState('');
+  const [animatingField, setAnimatingField] = useState<string | null>(null);
   const [paymentResult, setPaymentResult] = useState<any>(null);
   const [refundResult, setRefundResult] = useState<any>(null);
   const [activeSafetyTest, setActiveSafetyTest] = useState<string | null>(null);
@@ -107,7 +109,7 @@ export default function DealRoomPage() {
     setDeliveryDeadline(d.toISOString().split('T')[0] || '');
   }, []);
 
-  // Free-Text Intent Parser
+  // Free-Text Intent Parser with Sequential Staggered Animation
   const handleParseFreeTextIntent = async () => {
     if (!freeTextIntent.trim()) return;
     setIsParsingIntent(true);
@@ -127,40 +129,58 @@ export default function DealRoomPage() {
         const data = await res.json();
         const bc = data.buyer_constraints || {};
 
+        // Sequentially animate and populate structured fields
         if (typeof bc.budget_max_paise === 'number' && bc.budget_max_paise > 0) {
+          setAnimatingField('budget');
           setBudgetInr(Math.round(bc.budget_max_paise / 100));
+          await new Promise((r) => setTimeout(r, 160));
         }
         if (typeof bc.quantity === 'number' && bc.quantity > 0) {
+          setAnimatingField('quantity');
           setQuantity(bc.quantity);
-        }
-        if (Array.isArray(bc.payment_preference) && bc.payment_preference.length > 0) {
-          setPaymentPreferences(bc.payment_preference);
+          await new Promise((r) => setTimeout(r, 160));
         }
         if (bc.delivery_deadline) {
+          setAnimatingField('delivery');
           const dateStr = bc.delivery_deadline.split('T')[0];
           if (dateStr) setDeliveryDeadline(dateStr);
+          await new Promise((r) => setTimeout(r, 160));
+        }
+        if (Array.isArray(bc.payment_preference) && bc.payment_preference.length > 0) {
+          setAnimatingField('payment');
+          setPaymentPreferences(bc.payment_preference);
+          await new Promise((r) => setTimeout(r, 160));
         }
         if (bc.return_preference) {
           setReturnPreference(bc.return_preference);
         }
 
-        setParseSuccessMsg('✓ Request parsed — constraints configured.');
+        setAnimatingField(null);
+        setParseSuccessMsg('✓ AI interpreted your request and populated structured fields.');
         setTimeout(() => setParseSuccessMsg(null), 4000);
       }
     } catch {
-      // Offline fallback keyword parser
+      // Offline fallback keyword parser with sequential animation
       const lower = freeTextIntent.toLowerCase();
-      if (lower.includes('card')) setPaymentPreferences(['card']);
-      if (lower.includes('upi')) setPaymentPreferences(['upi']);
+      setAnimatingField('budget');
       const matchBudget = lower.match(/(?:under|budget|for|below|₹)\s*(\d+[\d,]*)/);
       if (matchBudget && matchBudget[1]) {
         const parsed = parseInt(matchBudget[1].replace(/,/g, ''), 10);
         if (parsed > 500 && parsed < 100000) setBudgetInr(parsed);
       }
-      setParseSuccessMsg('✓ Request parsed — constraints configured.');
+      await new Promise((r) => setTimeout(r, 160));
+
+      setAnimatingField('payment');
+      if (lower.includes('card')) setPaymentPreferences(['card']);
+      if (lower.includes('upi')) setPaymentPreferences(['upi']);
+      await new Promise((r) => setTimeout(r, 160));
+
+      setAnimatingField(null);
+      setParseSuccessMsg('✓ Structured fields populated from request.');
       setTimeout(() => setParseSuccessMsg(null), 4000);
     } finally {
       setIsParsingIntent(false);
+      setAnimatingField(null);
     }
   };
 
@@ -231,6 +251,7 @@ export default function DealRoomPage() {
           merchant_name: 'Sprint Athletics',
           signature: data.signed_contract?.signature || '7e8f192b6a9c3d4e5f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e',
           nonce: data.signed_contract?.nonce || 'nonce_98f12a3d7b4',
+          buyer_notes: additionalNotes || undefined,
           state: 'SIGNED',
         };
 
@@ -842,7 +863,7 @@ export default function DealRoomPage() {
                     Buyer Intent & Constraints Specification
                   </h2>
                   <p className="text-xs text-ink-400 mt-0.5">
-                    Configure your constraints manually below, or describe your need in natural English to extract them automatically.
+                    Fill the fields below yourself, or describe your request above and we'll fill them for you. The structured fields below are the single source of truth submitted on "Broadcast Intent".
                   </p>
                 </div>
 
@@ -859,7 +880,7 @@ export default function DealRoomPage() {
               {/* Free-Text Intent Parser Area */}
               <div className="bg-ink-950 border border-ink-800 rounded-lg p-4 space-y-2">
                 <label className="block text-xs font-mono text-signal-light uppercase tracking-wider font-bold">
-                  Natural Language Query
+                  Natural Language Query (AI Field Populator)
                 </label>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <input
@@ -907,7 +928,7 @@ export default function DealRoomPage() {
                 )}
               </div>
 
-              {/* Structured Form Fields */}
+              {/* Structured Form Fields (Single Source of Truth) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* SKU */}
                 <div>
@@ -931,7 +952,9 @@ export default function DealRoomPage() {
                     min={3000}
                     max={6000}
                     step={100}
-                    className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                    className={`w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none transition-all duration-300 ${
+                      animatingField === 'budget' ? 'ring-2 ring-signal bg-ink-800 scale-[1.02]' : ''
+                    }`}
                   />
                 </div>
 
@@ -946,7 +969,9 @@ export default function DealRoomPage() {
                     onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
                     min={1}
                     max={10}
-                    className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                    className={`w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none transition-all duration-300 ${
+                      animatingField === 'quantity' ? 'ring-2 ring-signal bg-ink-800 scale-[1.02]' : ''
+                    }`}
                   />
                 </div>
 
@@ -958,7 +983,9 @@ export default function DealRoomPage() {
                   <select
                     value={paymentPreferences[0]}
                     onChange={(e) => setPaymentPreferences([e.target.value as PaymentMethod])}
-                    className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                    className={`w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none transition-all duration-300 ${
+                      animatingField === 'payment' ? 'ring-2 ring-signal bg-ink-800 scale-[1.02]' : ''
+                    }`}
                   >
                     <option value="upi">UPI (Instant settlement)</option>
                     <option value="card">Credit / Debit Card</option>
@@ -978,7 +1005,9 @@ export default function DealRoomPage() {
                     type="date"
                     value={deliveryDeadline}
                     onChange={(e) => setDeliveryDeadline(e.target.value)}
-                    className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                    className={`w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none transition-all duration-300 ${
+                      animatingField === 'delivery' ? 'ring-2 ring-signal bg-ink-800 scale-[1.02]' : ''
+                    }`}
                   />
                 </div>
 
@@ -998,6 +1027,20 @@ export default function DealRoomPage() {
                     <option value="final sale">Final sale / No returns</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Additional Open-Ended Notes (Non-Evaluated by Policy Engine) */}
+              <div className="pt-3 border-t border-ink-800 space-y-1">
+                <label className="block text-xs font-mono text-ink-300 uppercase tracking-wider">
+                  Additional notes (optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={additionalNotes}
+                  onChange={(e) => setAdditionalNotes(e.target.value)}
+                  placeholder="e.g. Leave package with reception, call upon arrival, gift wrapping requested (Passed to merchant; strictly never influences deterministic pricing or policy checks)."
+                  className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none placeholder:text-ink-600"
+                />
               </div>
 
               {/* Informative Note for Single-Merchant Mode */}
@@ -1073,6 +1116,19 @@ export default function DealRoomPage() {
                   </p>
                 </div>
 
+                {/* Priority Tension Surface Callout (Explaining Single-Merchant Policy Ranking vs Buyer Stated Preference) */}
+                <div className="p-3.5 bg-ink-950 border border-signal-border/60 rounded-lg text-xs font-mono flex items-start gap-2.5 shadow-sm">
+                  <span className="text-signal font-bold text-sm shrink-0">ℹ</span>
+                  <div>
+                    <span className="text-signal-light font-bold block mb-0.5">
+                      Single-Merchant Governance Policy Decision Notice
+                    </span>
+                    <p className="text-ink-300 font-sans text-xs leading-relaxed">
+                      You indicated a preference for <strong>lowest price / optimal terms</strong>. In single-merchant mode, Sprint Athletics's own policy decides among valid offers — Candidate A won because it optimizes clearance acceleration and merchant margin. Try the <strong>3-Merchant Auction</strong> if you want your stated priority to directly decide the winning merchant.
+                    </p>
+                  </div>
+                </div>
+
                 {/* Candidate Offers Comparison with Literal Policy Rules Checklist */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   {candidateOffers.map((c, idx) => {
@@ -1124,32 +1180,67 @@ export default function DealRoomPage() {
                               <span className="text-emerald-400 font-bold">ALL CLEARED</span>
                             </div>
 
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-ink-400">Margin floor (18.0% min):</span>
-                              <span className="text-ink-200 font-bold">{c.margin_pct.toFixed(1)}% <span className="text-emerald-400 font-bold">✓ PASS</span></span>
-                            </div>
+                            {isMerchant ? (
+                              <>
+                                {/* Merchant-Only Full Numeric Policy Rules */}
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-ink-400">Margin floor (18.0% min):</span>
+                                  <span className="text-ink-200 font-bold">{c.margin_pct.toFixed(1)}% <span className="text-emerald-400 font-bold">✓ PASS</span></span>
+                                </div>
 
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-ink-400">Discount ceiling (12.0% max):</span>
-                              <span className="text-ink-200 font-bold">{discountPct.toFixed(1)}% <span className="text-emerald-400 font-bold">✓ PASS</span></span>
-                            </div>
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-ink-400">Discount ceiling (12.0% max):</span>
+                                  <span className="text-ink-200 font-bold">{discountPct.toFixed(1)}% <span className="text-emerald-400 font-bold">✓ PASS</span></span>
+                                </div>
 
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-ink-400">Inventory ({c.candidate.quantity} requested):</span>
-                              <span className="text-ink-200 font-bold">41 stock <span className="text-emerald-400 font-bold">✓ PASS</span></span>
-                            </div>
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-ink-400">Inventory ({c.candidate.quantity} requested):</span>
+                                  <span className="text-ink-200 font-bold">41 stock <span className="text-emerald-400 font-bold">✓ PASS</span></span>
+                                </div>
 
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-ink-400">Offer expiry (15m window):</span>
-                              <span className="text-ink-200 font-bold">Active <span className="text-emerald-400 font-bold">✓ PASS</span></span>
-                            </div>
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-ink-400">Offer expiry (15m window):</span>
+                                  <span className="text-ink-200 font-bold">Active <span className="text-emerald-400 font-bold">✓ PASS</span></span>
+                                </div>
 
-                            <div className="flex items-center justify-between text-[11px] border-t border-ink-800 pt-1">
-                              <span className="text-ink-400">Approval threshold (₹15,000):</span>
-                              <span className={`font-bold ${isHeldForApproval ? 'text-amber-300' : 'text-emerald-400'}`}>
-                                ₹{((orderTotalPaise) / 100).toLocaleString()} {isHeldForApproval ? '⚠ REVIEW' : '✓ AUTO'}
-                              </span>
-                            </div>
+                                <div className="flex items-center justify-between text-[11px] border-t border-ink-800 pt-1">
+                                  <span className="text-ink-400">Approval threshold (₹15,000):</span>
+                                  <span className={`font-bold ${isHeldForApproval ? 'text-amber-300' : 'text-emerald-400'}`}>
+                                    ₹{((orderTotalPaise) / 100).toLocaleString()} {isHeldForApproval ? '⚠ REVIEW' : '✓ AUTO'}
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                {/* Buyer-Facing Checklist: Strictly Commercially Safe (Zero Margin/Rupee Leaks) */}
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-ink-400">Margin requirement:</span>
+                                  <span className="text-emerald-400 font-bold">✓ Met</span>
+                                </div>
+
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-ink-400">Discount within policy:</span>
+                                  <span className="text-emerald-400 font-bold">✓ Met</span>
+                                </div>
+
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-ink-400">Inventory available:</span>
+                                  <span className="text-ink-200 font-bold">41 in stock <span className="text-emerald-400">✓ PASS</span></span>
+                                </div>
+
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-ink-400">Offer validity window:</span>
+                                  <span className="text-ink-200 font-bold">15m active <span className="text-emerald-400">✓ PASS</span></span>
+                                </div>
+
+                                <div className="flex items-center justify-between text-[11px] border-t border-ink-800 pt-1">
+                                  <span className="text-ink-400">Governance status:</span>
+                                  <span className={`font-bold ${isHeldForApproval ? 'text-amber-300' : 'text-emerald-400'}`}>
+                                    {isHeldForApproval ? '⚠ Approval Pending' : '✓ No approval needed'}
+                                  </span>
+                                </div>
+                              </>
+                            )}
                           </div>
 
                           {/* Merchant-Only Confidential Profitability Panel */}
@@ -1542,16 +1633,16 @@ export default function DealRoomPage() {
                               <span className="text-emerald-400 font-bold">✓ PASS</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-ink-400">Margin floor:</span>
-                              <span className="text-ink-200">18.0% required <span className="text-emerald-400">✓</span></span>
+                              <span className="text-ink-400">Margin requirement:</span>
+                              <span className="text-emerald-400 font-bold">✓ Met</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-ink-400">Inventory check:</span>
-                              <span className="text-ink-200">20 available <span className="text-emerald-400">✓</span></span>
+                              <span className="text-ink-200 font-bold">20 available <span className="text-emerald-400">✓</span></span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-ink-400">Signature:</span>
-                              <span className="text-ink-200">HMAC-SHA256 <span className="text-emerald-400">✓</span></span>
+                              <span className="text-ink-200 font-bold">HMAC-SHA256 <span className="text-emerald-400">✓</span></span>
                             </div>
                             <div className="flex justify-between border-t border-ink-800 pt-1">
                               <span className="text-signal-light font-bold">Utility Score:</span>

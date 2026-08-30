@@ -66,6 +66,12 @@ export default function MerchantConsolePage() {
   const [policyMessage, setPolicyMessage] = useState<string | null>(null);
   const [approverName, setApproverName] = useState('merchant_admin_akash');
 
+  // Natural Language Policy Rule State
+  const [nlPolicyText, setNlPolicyText] = useState('');
+  const [isParsingPolicy, setIsParsingPolicy] = useState(false);
+  const [policyParseMsg, setPolicyParseMsg] = useState<string | null>(null);
+  const [animatingPolicyField, setAnimatingPolicyField] = useState<string | null>(null);
+
   // Catalog State
   const [products, setProducts] = useState<Product[]>([]);
   const [csvContent, setCsvContent] = useState('');
@@ -156,6 +162,71 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
       setPendingOffers(list);
     } catch {
       setPendingOffers([]);
+    }
+  }
+
+  async function handleParseNlPolicy() {
+    if (!nlPolicyText.trim()) return;
+    setIsParsingPolicy(true);
+    setPolicyParseMsg(null);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/policy/interpret-nl`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: nlPolicyText }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const pol = data.policy || {};
+
+        if (typeof pol.maxDiscountPct === 'number') {
+          setAnimatingPolicyField('discount');
+          setActivePolicy((prev) => ({ ...prev, maxDiscountPct: pol.maxDiscountPct }));
+          await new Promise((r) => setTimeout(r, 160));
+        }
+        if (typeof pol.minMarginPct === 'number') {
+          setAnimatingPolicyField('margin');
+          setActivePolicy((prev) => ({ ...prev, minMarginPct: pol.minMarginPct }));
+          await new Promise((r) => setTimeout(r, 160));
+        }
+        if (typeof pol.humanApprovalAbovePaise === 'number') {
+          setAnimatingPolicyField('approval');
+          setActivePolicy((prev) => ({ ...prev, humanApprovalAbovePaise: pol.humanApprovalAbovePaise }));
+          await new Promise((r) => setTimeout(r, 160));
+        }
+        if (typeof pol.freeDeliveryAbovePaise === 'number') {
+          setAnimatingPolicyField('delivery');
+          setActivePolicy((prev) => ({ ...prev, freeDeliveryAbovePaise: pol.freeDeliveryAbovePaise }));
+          await new Promise((r) => setTimeout(r, 160));
+        }
+        if (typeof pol.noDiscountFastMoving === 'boolean') {
+          setActivePolicy((prev) => ({ ...prev, noDiscountFastMoving: pol.noDiscountFastMoving }));
+        }
+        if (typeof pol.clearWithinDays === 'number') {
+          setActivePolicy((prev) => ({ ...prev, clearWithinDays: pol.clearWithinDays }));
+        }
+
+        setAnimatingPolicyField(null);
+        setPolicyParseMsg('✓ AI parsed policy rules and populated structured guardrails.');
+        setTimeout(() => setPolicyParseMsg(null), 4000);
+      }
+    } catch {
+      // Deterministic fallback regex
+      const lower = nlPolicyText.toLowerCase();
+      setAnimatingPolicyField('discount');
+      const discMatch = lower.match(/(\d+(?:\.\d+)?)\s*%/);
+      if (discMatch) {
+        setActivePolicy((prev) => ({ ...prev, maxDiscountPct: parseFloat(discMatch[1]) }));
+      }
+      await new Promise((r) => setTimeout(r, 160));
+      setAnimatingPolicyField(null);
+      setPolicyParseMsg('✓ Policy fields populated from natural language.');
+      setTimeout(() => setPolicyParseMsg(null), 4000);
+    } finally {
+      setIsParsingPolicy(false);
+      setAnimatingPolicyField(null);
     }
   }
 
@@ -383,6 +454,49 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
                   </p>
                 </div>
 
+                {/* Natural Language Policy Interpreter Box */}
+                <div className="bg-ink-950 border border-ink-800 rounded-lg p-4 space-y-2">
+                  <label className="block text-xs font-mono text-signal-light uppercase tracking-wider font-bold">
+                    Natural Language Policy Rules (AI Field Populator)
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={nlPolicyText}
+                      onChange={(e) => setNlPolicyText(e.target.value)}
+                      placeholder="e.g. don't discount more than 12%, keep at least 18% margin, get my approval above ₹15,000"
+                      className="flex-1 bg-ink-900 border border-ink-700 rounded px-3 py-2 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none placeholder:text-ink-600"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleParseNlPolicy();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleParseNlPolicy}
+                      disabled={isParsingPolicy || !nlPolicyText.trim()}
+                      className="px-4 py-2 bg-signal hover:bg-signal-hover text-white text-xs font-mono font-bold rounded shadow transition-colors disabled:opacity-50 shrink-0 flex items-center gap-1.5 justify-center"
+                    >
+                      {isParsingPolicy ? (
+                        <>
+                          <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Interpreting...
+                        </>
+                      ) : (
+                        'Interpret Rules with AI →'
+                      )}
+                    </button>
+                  </div>
+
+                  {policyParseMsg && (
+                    <div className="text-xs font-mono text-emerald-400 pt-1 font-bold">
+                      {policyParseMsg}
+                    </div>
+                  )}
+                </div>
+
                 <form onSubmit={handleSavePolicy} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -397,7 +511,9 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
                           onChange={(e) =>
                             setActivePolicy({ ...activePolicy, maxDiscountPct: parseFloat(e.target.value) || 0 })
                           }
-                          className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                          className={`w-full bg-ink-950 border border-ink-700 rounded px-3 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none transition-all duration-300 ${
+                            animatingPolicyField === 'discount' ? 'ring-2 ring-signal bg-ink-800 scale-[1.02]' : ''
+                          }`}
                         />
                         <span className="font-mono text-xs text-ink-400">% max</span>
                       </div>
@@ -418,7 +534,9 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
                           onChange={(e) =>
                             setActivePolicy({ ...activePolicy, minMarginPct: parseFloat(e.target.value) || 0 })
                           }
-                          className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                          className={`w-full bg-ink-950 border border-ink-700 rounded px-3 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none transition-all duration-300 ${
+                            animatingPolicyField === 'margin' ? 'ring-2 ring-signal bg-ink-800 scale-[1.02]' : ''
+                          }`}
                         />
                         <span className="font-mono text-xs text-ink-400">% margin</span>
                       </div>
@@ -442,7 +560,9 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
                               humanApprovalAbovePaise: (parseFloat(e.target.value) || 0) * 100,
                             })
                           }
-                          className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                          className={`w-full bg-ink-950 border border-ink-700 rounded px-3 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none transition-all duration-300 ${
+                            animatingPolicyField === 'approval' ? 'ring-2 ring-signal bg-ink-800 scale-[1.02]' : ''
+                          }`}
                         />
                       </div>
                       <span className="text-[10px] text-ink-500 font-sans block mt-1">
@@ -465,7 +585,9 @@ INVALID-NEGATIVE-MARGIN,Flawed Product with Loss,Footwear / Defective,500000,400
                               freeDeliveryAbovePaise: (parseFloat(e.target.value) || 0) * 100,
                             })
                           }
-                          className="w-full bg-ink-950 border border-ink-700 rounded px-3 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none"
+                          className={`w-full bg-ink-950 border border-ink-700 rounded px-3 py-1.5 text-xs font-mono text-ink-100 focus:border-signal focus:outline-none transition-all duration-300 ${
+                            animatingPolicyField === 'delivery' ? 'ring-2 ring-signal bg-ink-800 scale-[1.02]' : ''
+                          }`}
                         />
                       </div>
                       <span className="text-[10px] text-ink-500 font-sans block mt-1">

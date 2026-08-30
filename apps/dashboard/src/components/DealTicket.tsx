@@ -20,6 +20,7 @@ export interface DealTicketData {
   merchant_name?: string;
   signature?: string;
   nonce?: string;
+  buyer_notes?: string;
   payment_id?: string;
   payment_amount_paise?: number;
   state?:
@@ -260,6 +261,18 @@ export function DealTicket({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Additional Notes (Buyer Context, Non-Evaluated) */}
+      {ticket.buyer_notes && (
+        <div className="mb-3 p-2 bg-black/[0.02] border border-black/5 rounded">
+          <span className="text-[10px] font-mono text-ledger-muted uppercase tracking-wider block mb-0.5 font-bold">
+            Buyer Context Notes (Non-Evaluated):
+          </span>
+          <p className="text-[11px] font-sans text-ledger-ink/90 italic">
+            "{ticket.buyer_notes}"
+          </p>
         </div>
       )}
 

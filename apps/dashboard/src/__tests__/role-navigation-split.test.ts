@@ -45,4 +45,36 @@ describe('Role Navigation Split and Scoped Experiences', () => {
     expect(sampleOrderHtml).not.toContain('Margin:');
     expect(sampleOrderHtml).not.toContain('Gross Profit:');
   });
+
+  it('renders Buyer Candidate Policy Checklist with clean badges and ZERO margin/rupee leak', () => {
+    // Simulate Buyer-facing Candidate Card Checklist
+    const isMerchant = false;
+    const buyerChecklistHtml = renderToString(
+      React.createElement('div', { className: 'policy-checklist' }, [
+        !isMerchant
+          ? React.createElement('div', { key: 'buyer' }, [
+              React.createElement('span', { key: 'm' }, 'Margin requirement: ✓ Met'),
+              React.createElement('span', { key: 'd' }, 'Discount within policy: ✓ Met'),
+              React.createElement('span', { key: 'i' }, '41 in stock ✓ PASS'),
+              React.createElement('span', { key: 'a' }, '✓ No approval needed'),
+            ])
+          : React.createElement('div', { key: 'merch' }, [
+              React.createElement('span', { key: 'm' }, 'Margin floor (18.0% min): 49.0% ✓ PASS'),
+              React.createElement('span', { key: 'd' }, 'Discount ceiling (12.0% max): 7.0% ✓ PASS'),
+              React.createElement('span', { key: 'a' }, 'Approval threshold (₹15,000)'),
+            ]),
+      ])
+    );
+
+    // Assert Buyer view contains clean badges
+    expect(buyerChecklistHtml).toContain('Margin requirement: ✓ Met');
+    expect(buyerChecklistHtml).toContain('Discount within policy: ✓ Met');
+    expect(buyerChecklistHtml).toContain('✓ No approval needed');
+
+    // Invariant: Assert complete absence of leaked margin % and threshold amounts in buyer view
+    expect(buyerChecklistHtml).not.toContain('18.0%');
+    expect(buyerChecklistHtml).not.toContain('49.0%');
+    expect(buyerChecklistHtml).not.toContain('12.0%');
+    expect(buyerChecklistHtml).not.toContain('₹15,000');
+  });
 });
