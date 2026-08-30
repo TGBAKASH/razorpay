@@ -97,8 +97,8 @@ razorpay/
 │   │
 │   ├── offer-engine/                     # Autonomous Negotiation & Candidate Optimization Engine
 │   │   ├── src/
-│   │   │   └── index.ts                  # Clearance A / Standard B / Discount C Generation,
-│   │   │                                 # Bounded 10% Tiebreak, Multi-Attribute Utility
+│   │   │   └── index.ts                  # Inventory-Aware Deterministic Expected-Profit Candidate Generation,
+│   │   │                                 # Pure Buyer-Priority Ranking, Multi-Attribute Utility Auction
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
@@ -276,7 +276,8 @@ DealFlow translates any incoming agent protocol into the canonical **Common Comm
         │      ├── list_price_paise (Int: 429900 = ₹4,299)
         │      ├── inventory_qty (Int: 41)
         │      ├── movement_rate ("slow" | "normal" | "fast")
-        │      └── warehouse_location ("BLR-WH-01")
+        │      ├── warehouse_location ("BLR-WH-01")
+        │      └── listed_at (DateTime timestamp for inventory age)
         │
         ├──< [promotion_budgets]
         │      ├── id (PK, UUID)

@@ -22,6 +22,7 @@ export interface ProductData {
   expiryDate?: string | null;
   warehouseLocation: string;
   clearanceFlag: boolean;
+  listedAt?: string;
 }
 
 export interface MerchantData {
@@ -76,6 +77,7 @@ export const CATALOG_MERCHANTS: MerchantData[] = [
         warehouseLocation: 'BLR-WH-01',
         clearanceFlag: false,
         expiryDate: null,
+        listedAt: '2026-06-15T00:00:00Z', // 75+ days aged inventory
       },
     ],
   },
@@ -107,6 +109,7 @@ export const CATALOG_MERCHANTS: MerchantData[] = [
         movementRate: 'normal',
         warehouseLocation: 'BLR-WH-01',
         clearanceFlag: false,
+        listedAt: '2026-08-01T00:00:00Z',
       },
     ],
   },
@@ -138,6 +141,7 @@ export const CATALOG_MERCHANTS: MerchantData[] = [
         movementRate: 'fast',
         warehouseLocation: 'BLR-WH-02',
         clearanceFlag: false,
+        listedAt: '2026-08-20T00:00:00Z',
       },
     ],
   },
@@ -169,6 +173,7 @@ export const CATALOG_MERCHANTS: MerchantData[] = [
         movementRate: 'normal',
         warehouseLocation: 'BLR-WH-01',
         clearanceFlag: false,
+        listedAt: '2026-08-10T00:00:00Z',
       },
     ],
   },

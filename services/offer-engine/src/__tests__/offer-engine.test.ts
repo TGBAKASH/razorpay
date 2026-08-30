@@ -3,6 +3,8 @@ import {
   generateCandidateOffers,
   scoreCandidateOffer,
   processOfferNegotiation,
+  computeDeterministicAcceptanceProbability,
+  computeDeterministicExpectedProfit,
 } from '../index.js';
 import type { BuyerConstraintsSection } from '@razorpay-dealflow/adapters';
 import type {
@@ -231,5 +233,32 @@ describe('Offer Engine (Rules + Gemini Explanation + Heuristic Ranking)', () => 
       expect(c.margin_pct).toBeGreaterThanOrEqual(30.0);
     });
     expect(result.winning_offer).toBeDefined();
+  });
+
+  it('computes deterministic acceptance probability and expected profit accurately (Part 2 formula)', () => {
+    // 1. Exact match with budget (gap_ratio = 0): base_prob = 0.50
+    const probNormal = computeDeterministicAcceptanceProbability(400000, 400000, 'normal', 10);
+    expect(probNormal).toBeCloseTo(0.50, 2);
+
+    // 2. Slow movement rate applies 1.15x urgency multiplier
+    const probSlow = computeDeterministicAcceptanceProbability(400000, 400000, 'slow', 60);
+    expect(probSlow).toBeCloseTo(0.50 * 1.15, 2); // 0.575
+
+    // 3. Fast movement rate applies 0.85x urgency multiplier
+    const probFast = computeDeterministicAcceptanceProbability(400000, 400000, 'fast', 5);
+    expect(probFast).toBeCloseTo(0.50 * 0.85, 2); // 0.425
+
+    // 4. Undercutting budget increases acceptance probability
+    // Price = 380,000 paise (₹3,800), Budget = 400,000 paise (₹4,000)
+    // gap_ratio = (400,000 - 380,000) / 400,000 = 0.05
+    // base_prob = 0.50 + 0.05 * 2.0 = 0.60
+    const probUndercut = computeDeterministicAcceptanceProbability(380000, 400000, 'normal', 10);
+    expect(probUndercut).toBeCloseTo(0.60, 2);
+
+    // 5. Expected profit calculation: prob * (price - cost)
+    // Cost = 265,000 paise, Price = 394,900 paise -> Profit = 129,900 paise
+    const expProfit = computeDeterministicExpectedProfit(394900, 265000, 400000, 'slow', 60);
+    expect(expProfit).toBeGreaterThan(0);
+    expect(Number.isFinite(expProfit)).toBe(true);
   });
 });

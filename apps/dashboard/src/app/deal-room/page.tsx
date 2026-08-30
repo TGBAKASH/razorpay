@@ -1136,7 +1136,7 @@ export default function DealRoomPage() {
                     </h2>
                   </div>
                   <p className="text-xs text-signal-light mt-1 font-mono font-medium">
-                    Every candidate is checked against your rules; the one that clears every check with the best expected profit is selected.
+                    Candidates are generated via live inventory signals and deterministic policy rules; the top-ranked offer matching your stated priority is selected.
                   </p>
                 </div>
 

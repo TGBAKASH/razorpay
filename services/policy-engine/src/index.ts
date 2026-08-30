@@ -57,6 +57,7 @@ export interface ProductSnapshot {
   expiry_date?: string | null;
   warehouse_location: string;
   clearance_flag: boolean;
+  listed_at?: string | null;
 }
 
 export interface InventorySnapshot {

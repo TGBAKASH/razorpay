@@ -60,6 +60,7 @@ model Product {
   expiryDate        DateTime? @map("expiry_date")
   warehouseLocation String    @map("warehouse_location") // e.g. "BLR-WH-01"
   clearanceFlag     Boolean   @default(false) @map("clearance_flag")
+  listedAt          DateTime  @default(now()) @map("listed_at")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
