@@ -12,6 +12,15 @@
 
 ---
 
+### 🌐 Live Production Deployments
+- **Live Dashboard UI**: [https://dealflow-dashboard.onrender.com](https://dealflow-dashboard.onrender.com)
+- **Live Backend API**: [https://dealflow-api.onrender.com](https://dealflow-api.onrender.com)
+- **API Health Check**: [https://dealflow-api.onrender.com/api/healthz](https://dealflow-api.onrender.com/api/healthz)
+
+*(Also fully runnable locally on `http://localhost:3000` via `npm run dev:dashboard`)*
+
+---
+
 ## 🌟 Key Highlights & Innovations
 
 1. **Deterministic Commercial Math Only ("An LLM Never Touches Contract Numbers")**:
