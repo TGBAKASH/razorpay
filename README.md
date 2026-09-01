@@ -13,9 +13,9 @@
 ---
 
 ### 🌐 Live Production Deployments
-- **Live Dashboard UI**: [https://dealflow-dashboard.onrender.com](https://dealflow-dashboard.onrender.com)
-- **Live Backend API**: [https://dealflow-api.onrender.com](https://dealflow-api.onrender.com)
-- **API Health Check**: [https://dealflow-api.onrender.com/api/healthz](https://dealflow-api.onrender.com/api/healthz)
+- **Live Dashboard App (Vercel)**: [https://razorpay-build.vercel.app/](https://razorpay-build.vercel.app/)
+- **Live Backend API (Render)**: [https://razorpay-build-kfjo.onrender.com](https://razorpay-build-kfjo.onrender.com)
+- **API Health Check**: [https://razorpay-build-kfjo.onrender.com/api/healthz](https://razorpay-build-kfjo.onrender.com/api/healthz)
 
 *(Also fully runnable locally on `http://localhost:3000` via `npm run dev:dashboard`)*
 
