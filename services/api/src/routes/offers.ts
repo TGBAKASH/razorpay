@@ -18,6 +18,7 @@ import { CATALOG_MERCHANTS } from '../data/seed-catalog.js';
 import { prisma } from '../db.js';
 import { requireMerchantRole } from '../middleware/role-guard.js';
 import { inventoryService } from '../services/inventory-service.js';
+import { agentNegotiationService } from '../services/agent-negotiation-service.js';
 
 export const activeContracts = new Map<string, SignedOfferContract>();
 export const negotiationFeed: {
@@ -28,6 +29,39 @@ export const negotiationFeed: {
 }[] = [];
 
 export async function registerOfferRoutes(fastify: FastifyInstance) {
+  // 0. Autonomous Agent-to-Agent Negotiation (4-Round Bounded Safety Net)
+  fastify.post('/api/negotiation/agent-dialog', async (request: FastifyRequest, reply: FastifyReply) => {
+    const body = request.body as {
+      sku?: string;
+      merchant_id?: string;
+      buyer_agent_id?: string;
+      buyer_constraints?: any;
+      force_fallback?: boolean;
+    };
+
+    const sku = body?.sku || 'SPRINTPRO-X2';
+    const merchantId = body?.merchant_id || 'merchant-sprint';
+    const buyerConstraints = body?.buyer_constraints || {
+      budget_max_paise: 400000,
+      currency: 'INR',
+      delivery_deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+      quantity: 1,
+      payment_preference: ['upi'],
+      return_preference: 'easy returns',
+      priorities: ['price', 'delivery_speed'],
+    };
+
+    const result = await agentNegotiationService.runAgentToAgentNegotiation({
+      sku,
+      merchantId,
+      buyerAgentId: body?.buyer_agent_id,
+      buyerConstraints,
+      forceFallbackForTesting: body?.force_fallback,
+    });
+
+    return reply.status(200).send(result);
+  });
+
   // 1. Generate & Sign Offer Contract endpoint
   fastify.post('/api/offers/generate', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as any;

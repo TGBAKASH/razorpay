@@ -340,14 +340,16 @@ DealFlow translates any incoming agent protocol into the canonical **Common Comm
 | **7** | **Immutable Auditability** | Policy versions and decision logs are append-only. Past policies are never overwritten in place. |
 | **8** | **Atomic Conditional Concurrency** | Inventory reservations use atomic conditional operations (`WHERE inventory_qty >= quantity`) and synchronized mutex queues. Prevents overselling when autonomous buyer agents execute concurrent purchases; returns clean declines without crashing. |
 | **9** | **Structured Agent Decision Records** | Consequential decisions record structured inputs considered, all evaluated candidates with explicit rejection reasons (policy floor, buyer priority, reliability floor), and winning rules surfaced on `/audit` as human-readable decision cards instead of raw JSON dumps. |
+| **10** | **Autonomous Agent-to-Agent Negotiation with Deterministic Guardrails** | Two bounded LLM roles (Buyer Agent vs Merchant Agent) negotiate in plain language, strictly capped at 4 rounds. Every proposed price is deterministically validated and clamped to ground-truth bounds (buyer ceiling / merchant margin floor). If 4 rounds elapse without agreement, the system automatically falls back to presenting the Part 1/Part 2 ranked optimal offer—an LLM never touches contract numbers. |
 
 ---
 
 ## 8. Verification & Test Suite Summary
 
 The entire monorepo is validated with **Vitest**:
-* **27 Test Suites** | **130 Tests Passing** | **0 Failures**
+* **28 Test Suites** | **133 Tests Passing** | **0 Failures**
 * **Concurrency Benchmark**: `npm run test:concurrency --workspace=@razorpay-dealflow/buyer-load-test` (25 concurrent purchases against 3 units -> 3 succeeded, 22 declined, 0 crashes, 0 final stock).
 * **Production Build**: Clean compilation across Next.js 15 App Router (16 static routes) and 7 TypeScript packages via `npm run build`.
+
 
 

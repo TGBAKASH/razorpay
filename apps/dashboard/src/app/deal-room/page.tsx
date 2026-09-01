@@ -102,6 +102,72 @@ export default function DealRoomPage() {
   const [auctionWinner, setAuctionWinner] = useState<CompetingBid | null>(null);
   const [auctionRationale, setAuctionRationale] = useState<string | null>(null);
 
+  // Agent-to-Agent Autonomous Negotiation State (4-Round Bounded Safety Net)
+  const [isAgentNegotiating, setIsAgentNegotiating] = useState(false);
+  const [agentNegotiationResult, setAgentNegotiationResult] = useState<any>(null);
+  const [showAgentDialogModal, setShowAgentDialogModal] = useState(false);
+
+  const handleRunAgentNegotiation = async () => {
+    setIsAgentNegotiating(true);
+    setShowAgentDialogModal(true);
+    setAgentNegotiationResult(null);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/negotiation/agent-dialog`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sku: 'SPRINTPRO-X2',
+          buyer_constraints: {
+            budget_max_paise: budgetInr * 100,
+            currency: 'INR',
+            delivery_deadline: deliveryDeadline ? `${deliveryDeadline}T23:59:59Z` : '2026-09-07T23:59:59Z',
+            quantity,
+            payment_preference: paymentPreferences,
+            return_preference: returnPreference,
+            priorities: prioritiesOrder,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAgentNegotiationResult(data);
+      }
+    } catch (err) {
+      console.error('Agent negotiation failed:', err);
+    } finally {
+      setIsAgentNegotiating(false);
+    }
+  };
+
+  const handleApplyNegotiatedContract = () => {
+    if (!agentNegotiationResult?.signed_contract) return;
+    const contract = agentNegotiationResult.signed_contract;
+    const payload = contract.canonical_payload;
+
+    setSignedContractPayload(contract);
+    setSingleOffer({
+      offer_id: payload.offer_id,
+      sku: payload.sku,
+      product_name: 'SprintPro X2 Running Shoes',
+      quantity: payload.quantity,
+      list_price_paise: 429900,
+      final_price_paise: payload.final_price_paise,
+      discount_paise: Math.max(0, 429900 - payload.final_price_paise),
+      delivery_promise: payload.delivery_promise,
+      return_terms_days: payload.return_terms_days,
+      payment_methods_allowed: payload.payment_methods_allowed,
+      expires_at: payload.expires_at,
+      state: 'POLICY_APPROVED',
+      signature: contract.signature,
+      nonce: payload.nonce,
+    });
+    setExplanation(agentNegotiationResult.summary_rationale);
+    setShowAgentDialogModal(false);
+    setFlowStep('contract');
+  };
+
   useEffect(() => {
     const d = new Date();
     const currentDay = d.getDay();
@@ -1125,13 +1191,23 @@ export default function DealRoomPage() {
 
               {/* Action Button & Safety Invariant Tests */}
               <div className="pt-4 border-t border-ink-800 flex flex-wrap items-center justify-between gap-4">
-                <button
-                  onClick={handleStartNegotiation}
-                  disabled={isProcessing}
-                  className="px-6 py-2.5 bg-signal hover:bg-signal-hover text-white font-mono font-bold text-xs rounded transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isProcessing ? 'Merchant Agent is Reasoning...' : 'Broadcast Intent & Negotiate Deal →'}
-                </button>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={handleStartNegotiation}
+                    disabled={isProcessing || isAgentNegotiating}
+                    className="px-6 py-2.5 bg-signal hover:bg-signal-hover text-white font-mono font-bold text-xs rounded transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-signal focus-visible:outline-none disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isProcessing ? 'Merchant Agent is Reasoning...' : 'Broadcast Intent & Negotiate Deal →'}
+                  </button>
+
+                  <button
+                    onClick={handleRunAgentNegotiation}
+                    disabled={isProcessing || isAgentNegotiating}
+                    className="px-4 py-2.5 bg-ink-800 hover:bg-ink-700 text-signal-light border border-signal/40 font-mono font-bold text-xs rounded transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isAgentNegotiating ? 'Agents Negotiating (4 Rounds)...' : '🤖 Run 4-Round Agent Negotiation'}
+                  </button>
+                </div>
 
                 {/* Subtle Safety Invariant Tests */}
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1816,6 +1892,151 @@ export default function DealRoomPage() {
           </div>
         )}
       </main>
+
+      {/* Autonomous Agent Negotiation Modal (4-Round Bounded Safety Net) */}
+      {showAgentDialogModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-ink-900 border border-ink-700 rounded-lg max-w-3xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto text-ink-100 font-mono">
+            <div className="flex items-center justify-between border-b border-ink-800 pb-3">
+              <div>
+                <div className="text-[10px] font-bold uppercase text-signal tracking-wider">
+                  Live Agent-to-Agent Negotiation (4 Rounds Max)
+                </div>
+                <h3 className="text-base font-bold text-ink-100 flex items-center gap-2">
+                  <span>🤖 Autonomous Buyer Agent</span>
+                  <span className="text-ink-500 font-normal text-xs">vs</span>
+                  <span>🏪 Sprint Athletics Merchant Agent</span>
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowAgentDialogModal(false)}
+                className="text-ink-500 hover:text-ink-200 text-lg leading-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Bounded Parameters Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] bg-ink-950 p-2.5 rounded border border-ink-800">
+              <div>
+                <div className="text-ink-500 text-[10px]">Buyer Hard Ceiling:</div>
+                <div className="font-bold text-signal-light">
+                  {agentNegotiationResult ? `₹${agentNegotiationResult.buyer_ceiling_inr}` : `₹${budgetInr.toFixed(2)}`}
+                </div>
+              </div>
+              <div>
+                <div className="text-ink-500 text-[10px]">Merchant Hard Floor:</div>
+                <div className="font-bold text-amber-400">
+                  {agentNegotiationResult ? `₹${agentNegotiationResult.merchant_floor_inr}` : '₹3,232.00 (18%)'}
+                </div>
+              </div>
+              <div>
+                <div className="text-ink-500 text-[10px]">Part 2 Target Optimal:</div>
+                <div className="font-bold text-emerald-400">
+                  {agentNegotiationResult ? `₹${agentNegotiationResult.optimal_target_inr}` : '₹3,783.12'}
+                </div>
+              </div>
+              <div>
+                <div className="text-ink-500 text-[10px]">Safety Cap:</div>
+                <div className="font-bold text-ink-300">
+                  {agentNegotiationResult ? `${agentNegotiationResult.rounds_completed} / 4 Rounds` : 'Max 4 Rounds'}
+                </div>
+              </div>
+            </div>
+
+            {/* Live Transcript Stream */}
+            <div className="space-y-3 min-h-[220px] max-h-[380px] overflow-y-auto pr-1">
+              {isAgentNegotiating && (
+                <div className="flex flex-col items-center justify-center py-12 space-y-3 text-xs text-ink-400">
+                  <div className="w-6 h-6 border-2 border-signal border-t-transparent rounded-full animate-spin"></div>
+                  <div>Autonomous agents are conversing and evaluating concession steps...</div>
+                  <div className="text-[10px] text-ink-600">Deterministic bounds are actively clamping all moves</div>
+                </div>
+              )}
+
+              {agentNegotiationResult?.transcript?.map((turn: any, idx: number) => {
+                const isBuyer = turn.speaker === 'buyer_agent';
+                return (
+                  <div
+                    key={idx}
+                    className={`flex flex-col ${isBuyer ? 'items-start' : 'items-end'}`}
+                  >
+                    <div
+                      className={`max-w-[85%] rounded-lg p-3 text-xs border space-y-1.5 ${
+                        isBuyer
+                          ? 'bg-sky-950/40 border-sky-800/80 text-sky-100'
+                          : 'bg-ink-950 border-ink-700 text-ink-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-4 text-[10px] font-bold">
+                        <span className={isBuyer ? 'text-sky-400' : 'text-amber-400'}>
+                          {isBuyer ? '👤 Buyer Agent' : '🏪 Merchant Agent'} • Round {turn.round}
+                        </span>
+                        <span className="font-mono text-ink-300">
+                          {isBuyer ? 'Bid: ' : 'Counter: '}
+                          <span className="text-ink-100 font-bold">₹{turn.clamped_price_inr}</span>
+                        </span>
+                      </div>
+
+                      <p className="leading-relaxed text-[11px] font-sans">{turn.message}</p>
+
+                      {turn.was_clamped && (
+                        <div className="bg-rose-950/60 border border-rose-800/80 rounded px-2 py-1 text-[10px] text-rose-300">
+                          🛡 <span className="font-bold">Deterministic Clamping:</span> {turn.clamping_reason}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Negotiation Outcome Banner */}
+            {agentNegotiationResult && (
+              <div
+                className={`p-3 rounded border text-xs space-y-1.5 ${
+                  agentNegotiationResult.agreement_reached
+                    ? 'bg-emerald-950/50 border-emerald-700/80 text-emerald-200'
+                    : 'bg-amber-950/50 border-amber-700/80 text-amber-200'
+                }`}
+              >
+                <div className="flex items-center justify-between font-bold">
+                  <span>
+                    {agentNegotiationResult.agreement_reached
+                      ? `✓ Mutual Consensus Reached at ₹${agentNegotiationResult.final_price_inr}`
+                      : `🛡 Fallback Safety Net Activated: Presented Deterministic Winner`}
+                  </span>
+                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-black/40">
+                    {agentNegotiationResult.governing_rule}
+                  </span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-ink-300 font-sans">
+                  {agentNegotiationResult.summary_rationale}
+                </p>
+              </div>
+            )}
+
+            {/* Actions Bar */}
+            <div className="flex items-center justify-between pt-3 border-t border-ink-800 text-xs">
+              <button
+                onClick={() => setShowAgentDialogModal(false)}
+                className="px-4 py-1.5 text-ink-400 hover:text-ink-200"
+              >
+                Close
+              </button>
+
+              {agentNegotiationResult && (
+                <button
+                  onClick={handleApplyNegotiatedContract}
+                  className="px-5 py-2 bg-signal hover:bg-signal-hover text-white font-bold rounded transition-colors shadow-sm flex items-center gap-2"
+                >
+                  Accept Negotiated Contract & Proceed to Sign →
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Persistent Footer */}
       <footer className="border-t border-ink-800 bg-ink-900 py-4 mt-12">
