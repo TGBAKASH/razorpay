@@ -19,6 +19,8 @@ export interface AgentNegotiationResult {
   success: boolean;
   agreement_reached: boolean;
   fallback_applied: boolean;
+  deadline_urgency_active: boolean;
+  hours_until_deadline: number | null;
   rounds_completed: number;
   buyer_ceiling_inr: string;
   merchant_floor_inr: string;
@@ -36,6 +38,7 @@ export class AgentNegotiationService {
    * Runs an autonomous 2-role negotiation capped strictly at 4 rounds.
    * Deterministically validates and clamps all LLM proposed numbers.
    * Falls back gracefully to Part 1 / Part 2 optimal candidate if no consensus.
+   * Exhibits visible, plain-language urgency when deadline is under 24 hours.
    */
   async runAgentToAgentNegotiation(params: {
     sku: string;
@@ -102,8 +105,18 @@ export class AgentNegotiationService {
     const merchantFloorPaise = Math.ceil(costPaise / (1 - minMarginPct / 100)); // 323171 -> 323200
     const buyerCeilingPaise = buyerConstraints.budget_max_paise || 400000; // ₹4,000.00
 
+    // Deadline-Aware Posture Calculation (< 24 Hours = Urgent Posture)
+    const deadlineDate = buyerConstraints.delivery_deadline ? new Date(buyerConstraints.delivery_deadline) : null;
+    const hoursUntilDeadline =
+      deadlineDate && !isNaN(deadlineDate.getTime())
+        ? Math.round(((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60)) * 10) / 10
+        : null;
+    const isUrgentDeadline = hoursUntilDeadline !== null && hoursUntilDeadline > 0 && hoursUntilDeadline <= 24;
+
     const transcript: AgentNegotiationTurn[] = [];
-    let currentBuyerBidPaise = Math.round(listPricePaise * 0.82); // Initial opening ask ~18% off
+    let currentBuyerBidPaise = isUrgentDeadline
+      ? Math.min(buyerCeilingPaise, Math.round(listPricePaise * 0.90))
+      : Math.round(listPricePaise * 0.82);
     let currentMerchantAskPaise = listPricePaise;
     let agreementReached = false;
     let finalAgreedPricePaise = targetOptimalPricePaise;
@@ -121,12 +134,18 @@ export class AgentNegotiationService {
       let proposedBuyerPricePaise = 0;
 
       if (r === 1) {
-        proposedBuyerPricePaise = Math.round(listPricePaise * 0.82); // e.g. ₹3,525.00
-        rawBuyerMessage = `Hello, I represent a verified buyer looking for ${product.name}. We are seeking a quantity of ${buyerConstraints.quantity} delivered by ${new Date(buyerConstraints.delivery_deadline).toLocaleDateString()}. List price is ₹${(listPricePaise / 100).toFixed(2)}, but based on market rates, our opening proposal is ₹${(proposedBuyerPricePaise / 100).toFixed(2)}.`;
+        if (isUrgentDeadline) {
+          proposedBuyerPricePaise = Math.min(buyerCeilingPaise, Math.round(listPricePaise * 0.90));
+          rawBuyerMessage = `Hello, I represent a verified buyer looking for ${product.name}. With our delivery deadline under 24 hours away (${deadlineDate?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || 'urgent'}), time is critical. Given the deadline, I can move a bit further on price to close this now, opening at ₹${(proposedBuyerPricePaise / 100).toFixed(2)} to secure immediate dispatch.`;
+        } else {
+          proposedBuyerPricePaise = Math.round(listPricePaise * 0.82); // e.g. ₹3,525.00
+          rawBuyerMessage = `Hello, I represent a verified buyer looking for ${product.name}. We are seeking a quantity of ${buyerConstraints.quantity} delivered by ${deadlineDate ? deadlineDate.toLocaleDateString() : 'standard SLA'}. List price is ₹${(listPricePaise / 100).toFixed(2)}, but based on market rates, our opening proposal is ₹${(proposedBuyerPricePaise / 100).toFixed(2)}.`;
+        }
       } else {
         // Concede gradually toward merchant counter, bounded by ceiling
         const gap = currentMerchantAskPaise - currentBuyerBidPaise;
-        const concession = Math.round(gap * 0.4);
+        const concessionFactor = isUrgentDeadline ? 0.70 : 0.40; // 70% concession when urgent vs 40% standard
+        const concession = Math.round(gap * concessionFactor);
         proposedBuyerPricePaise = currentBuyerBidPaise + concession;
 
         // In test cases, simulate an accidental out-of-bounds LLM proposal to prove safety clamping
@@ -134,7 +153,11 @@ export class AgentNegotiationService {
           proposedBuyerPricePaise = buyerCeilingPaise + 10000; // Intentionally over ceiling to trigger clamping
         }
 
-        rawBuyerMessage = `Thank you for the counter-proposal of ₹${(currentMerchantAskPaise / 100).toFixed(2)}. While we appreciate the expedited fulfillment terms, our budget mandate requires strict cost efficiency. We can meet you halfway at ₹${(proposedBuyerPricePaise / 100).toFixed(2)}.`;
+        if (isUrgentDeadline) {
+          rawBuyerMessage = `Thank you for the counter-proposal of ₹${(currentMerchantAskPaise / 100).toFixed(2)}. Given the deadline, I can move a bit further on price to close this now and secure same-day fulfillment. We can meet you at ₹${(proposedBuyerPricePaise / 100).toFixed(2)}.`;
+        } else {
+          rawBuyerMessage = `Thank you for the counter-proposal of ₹${(currentMerchantAskPaise / 100).toFixed(2)}. While we appreciate the expedited fulfillment terms, our budget mandate requires strict cost efficiency. We can meet you halfway at ₹${(proposedBuyerPricePaise / 100).toFixed(2)}.`;
+        }
       }
 
       // DETERMINISTIC CLAMPING: Buyer Price cannot exceed Buyer Hard Ceiling
@@ -247,7 +270,8 @@ export class AgentNegotiationService {
       governingRule = 'RULE_AGENT_NEGOTIATION_FALLBACK_TO_PART2_OPTIMAL';
       summaryRationale = `Negotiation completed 4 rounds without direct convergence. Safety net activated: automatically presenting the standard Part 1/Part 2 ranked optimal candidate (₹${(targetOptimalPricePaise / 100).toFixed(2)}) preserving merchant policy floor and buyer priority.`;
     } else {
-      summaryRationale = `Autonomous agents reached mutual convergence within ${roundsCompleted} rounds at ₹${(finalAgreedPricePaise / 100).toFixed(2)}, clearing the 18% merchant floor and buyer budget ceiling.`;
+      const urgencyNote = isUrgentDeadline ? ' with active deadline-aware posture (<24h urgency)' : '';
+      summaryRationale = `Autonomous agents reached mutual convergence within ${roundsCompleted} rounds at ₹${(finalAgreedPricePaise / 100).toFixed(2)}${urgencyNote}, clearing the 18% merchant floor and buyer budget ceiling.`;
     }
 
     // 4. Sign Immutable HMAC Contract
@@ -320,6 +344,8 @@ export class AgentNegotiationService {
         agreed_price_paise: finalAgreedPricePaise,
         buyer_ceiling_paise: buyerCeilingPaise,
         merchant_floor_paise: merchantFloorPaise,
+        deadline_urgency_active: isUrgentDeadline,
+        hours_until_deadline: hoursUntilDeadline,
       },
       decision_record: decisionRecord,
       policy_version: 'v1',
@@ -343,6 +369,8 @@ export class AgentNegotiationService {
       success: true,
       agreement_reached: agreementReached,
       fallback_applied: fallbackApplied,
+      deadline_urgency_active: isUrgentDeadline,
+      hours_until_deadline: hoursUntilDeadline,
       rounds_completed: roundsCompleted,
       buyer_ceiling_inr: (buyerCeilingPaise / 100).toFixed(2),
       merchant_floor_inr: (merchantFloorPaise / 100).toFixed(2),

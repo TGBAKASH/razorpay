@@ -113,6 +113,16 @@ export default function DealRoomPage() {
     setAgentNegotiationResult(null);
 
     try {
+      let deadlineIso = '2026-09-07T23:59:59Z';
+      if (deliveryDeadline) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (deliveryDeadline <= todayStr) {
+          deadlineIso = new Date(Date.now() + 10 * 3600 * 1000).toISOString();
+        } else {
+          deadlineIso = `${deliveryDeadline}T23:59:59Z`;
+        }
+      }
+
       const res = await fetch(`${API_BASE_URL}/api/negotiation/agent-dialog`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -121,7 +131,7 @@ export default function DealRoomPage() {
           buyer_constraints: {
             budget_max_paise: budgetInr * 100,
             currency: 'INR',
-            delivery_deadline: deliveryDeadline ? `${deliveryDeadline}T23:59:59Z` : '2026-09-07T23:59:59Z',
+            delivery_deadline: deadlineIso,
             quantity,
             payment_preference: paymentPreferences,
             return_preference: returnPreference,
@@ -1125,6 +1135,28 @@ export default function DealRoomPage() {
                       animatingField === 'delivery' ? 'ring-2 ring-signal bg-ink-800 scale-[1.02]' : ''
                     }`}
                   />
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const today = new Date().toISOString().split('T')[0] || '';
+                        setDeliveryDeadline(today);
+                      }}
+                      className="text-[10px] font-mono px-2 py-0.5 bg-amber-950/40 hover:bg-amber-900/60 border border-amber-800 text-amber-300 rounded transition-colors"
+                    >
+                      ⚡ Urgent (&lt; 24h)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date(Date.now() + 5 * 24 * 3600 * 1000);
+                        setDeliveryDeadline(d.toISOString().split('T')[0] || '');
+                      }}
+                      className="text-[10px] font-mono px-2 py-0.5 bg-ink-950 hover:bg-ink-800 border border-ink-800 text-ink-400 rounded transition-colors"
+                    >
+                      Standard (5 Days)
+                    </button>
+                  </div>
                 </div>
 
                 {/* Return Preference */}
@@ -1943,6 +1975,19 @@ export default function DealRoomPage() {
                 </div>
               </div>
             </div>
+
+            {/* Urgent Deadline Posture Indicator */}
+            {agentNegotiationResult?.deadline_urgency_active && (
+              <div className="bg-amber-950/60 border border-amber-700/80 rounded px-3 py-1.5 text-xs text-amber-200 flex items-center justify-between">
+                <span className="flex items-center gap-1.5 font-bold">
+                  <span>⚡</span>
+                  <span>Deadline-Aware Posture Active</span>
+                </span>
+                <span className="text-[11px] font-mono text-amber-300">
+                  {agentNegotiationResult.hours_until_deadline}h until deadline • Conceding faster on price within ceiling
+                </span>
+              </div>
+            )}
 
             {/* Live Transcript Stream */}
             <div className="space-y-3 min-h-[220px] max-h-[380px] overflow-y-auto pr-1">

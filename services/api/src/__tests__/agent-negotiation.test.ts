@@ -131,4 +131,80 @@ describe('Agent-to-Agent Autonomous Negotiation (4-Round Safety Net)', () => {
       expect(clampedTurn.clamping_reason).toContain('ceiling');
     }
   });
+
+  it('exhibits visible deadline-aware urgency in plain language when deadline is under 24 hours', async () => {
+    const urgentDeadline = new Date(Date.now() + 10 * 3600 * 1000).toISOString(); // 10 hours from now
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/negotiation/agent-dialog',
+      payload: {
+        sku: 'SPRINTPRO-X2',
+        buyer_agent_id: 'buyer-agent-urgent-test',
+        buyer_constraints: {
+          budget_max_paise: 400000,
+          currency: 'INR',
+          delivery_deadline: urgentDeadline,
+          quantity: 1,
+          payment_preference: ['upi'],
+          return_preference: 'easy returns',
+          priorities: ['delivery_speed', 'price'],
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    // Invariant 1: Urgency flag is active and hours calculated
+    expect(result.deadline_urgency_active).toBe(true);
+    expect(result.hours_until_deadline).toBeGreaterThan(0);
+    expect(result.hours_until_deadline).toBeLessThanOrEqual(24);
+
+    // Invariant 2: Buyer agent visibly states urgency in its own words (never a silent adjustment)
+    const buyerTurns = result.transcript.filter((t: any) => t.speaker === 'buyer_agent');
+    expect(buyerTurns.length).toBeGreaterThan(0);
+
+    const hasUrgencyLanguage = buyerTurns.some((t: any) =>
+      t.message.includes('Given the deadline, I can move a bit further on price to close this now') ||
+      t.message.includes('deadline under 24 hours away')
+    );
+    expect(hasUrgencyLanguage).toBe(true);
+
+    // Invariant 3: Ground-truth ceiling and floor remain inviolate
+    expect(result.final_price_paise).toBeLessThanOrEqual(400000);
+    expect(result.final_price_paise).toBeGreaterThanOrEqual(323200);
+
+    // Invariant 4: Summary rationale records deadline posture
+    expect(result.summary_rationale).toContain('deadline-aware posture');
+  });
+
+  it('maintains standard cost-efficiency posture without urgency language when deadline is distant (> 24h)', async () => {
+    const standardDeadline = new Date(Date.now() + 5 * 24 * 3600 * 1000).toISOString(); // 5 days from now
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/negotiation/agent-dialog',
+      payload: {
+        sku: 'SPRINTPRO-X2',
+        buyer_agent_id: 'buyer-agent-standard-test',
+        buyer_constraints: {
+          budget_max_paise: 400000,
+          currency: 'INR',
+          delivery_deadline: standardDeadline,
+          quantity: 1,
+          payment_preference: ['upi'],
+          return_preference: 'easy returns',
+          priorities: ['price', 'delivery_speed'],
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+
+    expect(result.deadline_urgency_active).toBe(false);
+    const buyerTurns = result.transcript.filter((t: any) => t.speaker === 'buyer_agent');
+    for (const t of buyerTurns) {
+      expect(t.message).not.toContain('deadline under 24 hours away');
+    }
+  });
 });
