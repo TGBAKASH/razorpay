@@ -10,7 +10,7 @@ import {
 import { sign } from '@razorpay-dealflow/contract-service';
 import { CATALOG_MERCHANTS } from '../data/seed-catalog.js';
 import { activeContracts } from './offers.js';
-import { stateMachine } from '../services/state-machine.js';
+import { stateMachine, type AgentDecisionRecord } from '../services/state-machine.js';
 
 export async function registerAuctionRoutes(fastify: FastifyInstance) {
   fastify.post('/api/auction/broadcast', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -155,6 +155,75 @@ export async function registerAuctionRoutes(fastify: FastifyInstance) {
     activeContracts.set(winningOfferId, winningBid.signed_contract);
 
     stateMachine.setCurrentState(winningOfferId, 'REQUEST_RECEIVED');
+
+    const primaryPriority = buyerConstraints.priorities?.[0] || 'price';
+    const alternativesRejected = auctionResult.competing_bids
+      .filter((b) => b.merchant_id !== winningBid.merchant_id)
+      .map((b) => {
+        let rejectionStage: 'POLICY_FLOOR' | 'BUYER_PRIORITY' | 'RELIABILITY_FLOOR' | 'INVENTORY_EXHAUSTED' = 'BUYER_PRIORITY';
+        let reason = '';
+
+        if (b.excluded_by_floor) {
+          rejectionStage = 'RELIABILITY_FLOOR';
+          reason = b.exclusion_reason || `Merchant reliability (${b.reliability?.star_rating.toFixed(1)}★) fell below required buyer reliability floor (${buyerConstraints.min_reliability_stars?.toFixed(1)}★).`;
+        } else {
+          rejectionStage = 'BUYER_PRIORITY';
+          if (primaryPriority === 'price') {
+            const diffPaise = b.unit_price_paise - winningBid.unit_price_paise;
+            reason = `Passed reliability floor, but ranked lower on buyer priority #1 (Price). Offered ₹${(b.unit_price_paise / 100).toFixed(2)} vs winner at ₹${(winningBid.unit_price_paise / 100).toFixed(2)} (+₹${(diffPaise / 100).toFixed(2)} higher). Total utility: ${b.utility_scores.total_utility.toFixed(3)} vs winner: ${winningBid.utility_scores.total_utility.toFixed(3)}.`;
+          } else if (primaryPriority === 'delivery_speed') {
+            reason = `Passed reliability floor, but ranked lower on buyer priority #1 (Delivery Speed). Offered ${b.delivery_day_label} delivery vs winner on ${winningBid.delivery_day_label}. Total utility: ${b.utility_scores.total_utility.toFixed(3)}.`;
+          } else {
+            reason = `Passed reliability floor, but scored lower total multi-attribute utility (${b.utility_scores.total_utility.toFixed(3)}) than winner (${winningBid.utility_scores.total_utility.toFixed(3)}).`;
+          }
+        }
+
+        return {
+          candidate_id: b.merchant_id,
+          label: `${b.merchant_name} (${b.product_name})`,
+          price_inr: (b.unit_price_paise / 100).toFixed(2),
+          delivery_promise: b.delivery_promise,
+          rejection_stage: rejectionStage,
+          reason,
+        };
+      });
+
+    const governingAuctionRule = (buyerConstraints.min_reliability_stars ?? 0) > 0
+      ? 'RULE_RELIABILITY_WEIGHTED_AUCTION_UTILITY'
+      : 'RULE_MULTI_ATTRIBUTE_AUCTION_DECISION';
+
+    const auctionDecisionRecord: AgentDecisionRecord = {
+      decision_type: 'AUCTION_BID_SELECTION',
+      inputs_considered: {
+        buyer: {
+          buyer_agent_id: buyerAgentId,
+          priorities: buyerConstraints.priorities || ['price'],
+          budget_ceiling_inr: (buyerConstraints.budget_max_paise / 100).toFixed(2),
+          delivery_deadline: buyerConstraints.delivery_deadline,
+          quantity: buyerConstraints.quantity,
+          payment_preferences: buyerConstraints.payment_preference || ['upi'],
+          min_reliability_stars: buyerConstraints.min_reliability_stars,
+        },
+        merchant_policy: {
+          policy_version: winningBid.signed_contract.canonical_payload.policy_version || 'v1',
+          min_margin_pct: 18.0,
+          max_discount_pct: 12.0,
+          no_discount_fast_moving: true,
+          human_approval_threshold_inr: '15000.00',
+        },
+        candidates_count: rawBids.length,
+      },
+      alternatives_rejected: alternativesRejected,
+      final_decision: {
+        selected_candidate: `${winningBid.merchant_name} (${winningBid.product_name})`,
+        price_inr: (winningBid.unit_price_paise / 100).toFixed(2),
+        discount_inr: (winningBid.discount_paise / 100).toFixed(2),
+        delivery_promise: winningBid.delivery_promise,
+        governing_rule: governingAuctionRule,
+        rationale: auctionResult.decision_rationale,
+      },
+    };
+
     stateMachine.transition(winningOfferId, 'OFFER_GENERATED', {
       action: 'AUCTION_WINNER_SELECTED',
       actor: `buyer_agent:${buyerAgentId}`,
@@ -164,8 +233,9 @@ export async function registerAuctionRoutes(fastify: FastifyInstance) {
         unit_price_paise: winningBid.unit_price_paise,
         utility_score: winningBid.utility_scores.total_utility,
       },
+      decision_record: auctionDecisionRecord,
       policy_version: winningBid.signed_contract.canonical_payload.policy_version,
-      policy_checked: 'RULE_MULTI_ATTRIBUTE_AUCTION_DECISION',
+      policy_checked: governingAuctionRule,
       reason: auctionResult.decision_rationale,
     });
 

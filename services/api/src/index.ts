@@ -75,19 +75,23 @@ export function buildServer(): FastifyInstance {
         });
 
       if (dbEntries.length > 0) {
-        const formattedDbLogs = dbEntries.map((e) => ({
-          id: e.id,
-          offer_id: e.offerId || '',
-          from_state: null,
-          to_state: e.result === 'FAIL' ? 'FAILED' : 'POLICY_APPROVED',
-          action: e.action,
-          actor: e.actor,
-          input_data: (e.inputData as any) || {},
-          policy_version: e.policyVersion || 'v1',
-          policy_checked: e.policyChecked || 'STATE_MACHINE_RULE',
-          reason: e.reason,
-          timestamp: e.timestamp.toISOString(),
-        }));
+        const formattedDbLogs = dbEntries.map((e) => {
+          const inputData = (e.inputData as any) || {};
+          return {
+            id: e.id,
+            offer_id: e.offerId || '',
+            from_state: null,
+            to_state: e.result === 'FAIL' ? 'FAILED' : 'POLICY_APPROVED',
+            action: e.action,
+            actor: e.actor,
+            input_data: inputData,
+            decision_record: inputData.decision_record || undefined,
+            policy_version: e.policyVersion || 'v1',
+            policy_checked: e.policyChecked || 'STATE_MACHINE_RULE',
+            reason: e.reason,
+            timestamp: e.timestamp.toISOString(),
+          };
+        });
 
         // Merge and deduplicate by id
         const map = new Map<string, any>();

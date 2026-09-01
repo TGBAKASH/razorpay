@@ -12,7 +12,7 @@ import {
   nonceStore,
   type SignedOfferContract,
 } from '@razorpay-dealflow/contract-service';
-import { stateMachine } from '../services/state-machine.js';
+import { stateMachine, type AgentDecisionRecord } from '../services/state-machine.js';
 import { importCatalogFromCsv } from '../importers/catalog-csv-importer.js';
 import { CATALOG_MERCHANTS } from '../data/seed-catalog.js';
 import { prisma } from '../db.js';
@@ -199,12 +199,91 @@ export async function registerOfferRoutes(fastify: FastifyInstance) {
       signedContract.status = targetState as any;
 
       stateMachine.setCurrentState(offerId, 'REQUEST_RECEIVED');
+
+      const buyerPriority = cco.buyer_constraints.priorities?.[0] || 'price';
+      const alternativesRejected = negotiationResult.candidate_offers
+        .filter((c) => c.candidate.final_price_paise !== winningOffer.final_price_paise || c.candidate.delivery_promise !== winningOffer.delivery_promise)
+        .map((c, idx) => {
+          const candidateLabel = `Candidate ${String.fromCharCode(65 + idx)} (${c.candidate.discount_reason?.[0] || 'Alternative Offer'})`;
+          let rejectionStage: 'POLICY_FLOOR' | 'BUYER_PRIORITY' | 'RELIABILITY_FLOOR' | 'INVENTORY_EXHAUSTED' = 'BUYER_PRIORITY';
+          let reason = '';
+
+          if (!c.evaluation.pass) {
+            rejectionStage = 'POLICY_FLOOR';
+            const failedCheck = c.evaluation.checks.find((chk: any) => !chk.passed);
+            reason = failedCheck ? failedCheck.reason : 'Failed merchant policy floor constraint.';
+          } else {
+            rejectionStage = 'BUYER_PRIORITY';
+            if (buyerPriority === 'price') {
+              const diffPaise = c.candidate.final_price_paise - winningOffer.final_price_paise;
+              reason = `Passed policy floor, but rejected on Buyer Priority #1 (Lowest Price). Offered ₹${(c.candidate.final_price_paise / 100).toFixed(2)} vs winning offer at ₹${(winningOffer.final_price_paise / 100).toFixed(2)} (+₹${(diffPaise / 100).toFixed(2)} higher).`;
+            } else if (buyerPriority === 'delivery_speed') {
+              reason = `Passed policy floor, but rejected on Buyer Priority #1 (Fastest Delivery). Offered delivery at ${c.candidate.delivery_promise} vs winning offer at ${winningOffer.delivery_promise}.`;
+            } else if (buyerPriority === 'return_terms') {
+              reason = `Passed policy floor, but rejected on Buyer Priority #1 (Return Window). Offered ${c.candidate.return_terms_days} days vs winning offer at ${winningOffer.return_terms_days} days.`;
+            } else {
+              reason = `Passed policy floor, but ranked lower on buyer priority '${buyerPriority}'.`;
+            }
+          }
+
+          return {
+            candidate_id: `cand-${idx + 1}`,
+            label: candidateLabel,
+            price_inr: (c.candidate.final_price_paise / 100).toFixed(2),
+            delivery_promise: c.candidate.delivery_promise,
+            rejection_stage: rejectionStage,
+            reason,
+          };
+        });
+
+      const governingRule =
+        buyerPriority === 'price'
+          ? 'RULE_BUYER_PRIORITY_LOWEST_PRICE'
+          : buyerPriority === 'delivery_speed'
+          ? 'RULE_BUYER_PRIORITY_FASTEST_DELIVERY'
+          : buyerPriority === 'return_terms'
+          ? 'RULE_BUYER_PRIORITY_LONGEST_RETURNS'
+          : 'RULE_BUYER_PRIORITY_OPTIMIZED';
+
+      const decisionRecord: AgentDecisionRecord = {
+        decision_type: 'SINGLE_MERCHANT_OFFER',
+        inputs_considered: {
+          buyer: {
+            buyer_agent_id: cco.intent.buyer_agent_id,
+            priorities: cco.buyer_constraints.priorities || ['price'],
+            budget_ceiling_inr: (cco.buyer_constraints.budget_max_paise / 100).toFixed(2),
+            delivery_deadline: cco.buyer_constraints.delivery_deadline,
+            quantity: winningOffer.quantity,
+            payment_preferences: cco.buyer_constraints.payment_preference || ['upi'],
+            min_reliability_stars: cco.buyer_constraints.min_reliability_stars,
+          },
+          merchant_policy: {
+            policy_version: activePolicy.policyVersion || 'v1',
+            min_margin_pct: activePolicy.minMarginPct ?? 18.0,
+            max_discount_pct: activePolicy.maxDiscountPct ?? 12.0,
+            no_discount_fast_moving: activePolicy.noDiscountFastMoving ?? true,
+            human_approval_threshold_inr: ((activePolicy.humanApprovalAbovePaise ?? 1500000) / 100).toFixed(2),
+          },
+          candidates_count: negotiationResult.candidate_offers.length,
+        },
+        alternatives_rejected: alternativesRejected,
+        final_decision: {
+          selected_candidate: `Winning Offer (${winningOffer.sku})`,
+          price_inr: (winningOffer.final_price_paise / 100).toFixed(2),
+          discount_inr: (winningOffer.discount_paise / 100).toFixed(2),
+          delivery_promise: winningOffer.delivery_promise,
+          governing_rule: governingRule,
+          rationale: negotiationResult.explanation,
+        },
+      };
+
       stateMachine.transition(offerId, 'OFFER_GENERATED', {
         action: 'EVALUATE_CANDIDATE_OFFERS',
         actor: `buyer_agent:${cco.intent.buyer_agent_id}`,
         input_data: { sku: productSnapshot.sku, quantity: winningOffer.quantity },
+        decision_record: decisionRecord,
         policy_version: activePolicy.policyVersion || 'v1',
-        policy_checked: 'MARGIN_FLOOR_AND_DISCOUNT_CEILING',
+        policy_checked: governingRule,
         reason: negotiationResult.explanation,
       });
 

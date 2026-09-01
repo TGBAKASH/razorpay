@@ -30,6 +30,45 @@ export const ALLOWED_TRANSITIONS: Record<DealFlowState, DealFlowState[]> = {
   REFUNDED: [],
 };
 
+export interface AgentDecisionRecord {
+  decision_type: 'SINGLE_MERCHANT_OFFER' | 'AUCTION_BID_SELECTION' | 'INVENTORY_RESERVATION';
+  inputs_considered: {
+    buyer: {
+      buyer_agent_id: string;
+      priorities: string[];
+      budget_ceiling_inr: string;
+      delivery_deadline: string;
+      quantity: number;
+      payment_preferences: string[];
+      min_reliability_stars?: number;
+    };
+    merchant_policy: {
+      policy_version: string;
+      min_margin_pct: number;
+      max_discount_pct: number;
+      no_discount_fast_moving: boolean;
+      human_approval_threshold_inr: string;
+    };
+    candidates_count: number;
+  };
+  alternatives_rejected: Array<{
+    candidate_id: string;
+    label: string;
+    price_inr: string;
+    delivery_promise: string;
+    rejection_stage: 'POLICY_FLOOR' | 'BUYER_PRIORITY' | 'RELIABILITY_FLOOR' | 'INVENTORY_EXHAUSTED';
+    reason: string;
+  }>;
+  final_decision: {
+    selected_candidate: string;
+    price_inr: string;
+    discount_inr: string;
+    delivery_promise: string;
+    governing_rule: string;
+    rationale: string;
+  };
+}
+
 export interface AuditLogEntry {
   id: string;
   offer_id: string;
@@ -38,6 +77,7 @@ export interface AuditLogEntry {
   action: string; // What happened
   actor: string; // Who/what initiated it
   input_data: Record<string, any>; // What data was used
+  decision_record?: AgentDecisionRecord; // Consequential decision breakdown
   policy_version: string; // Which policy_version approved it
   policy_checked: string; // Which specific rule was checked
   reason: string; // Why this particular offer/decision was selected over alternatives
@@ -50,6 +90,7 @@ export interface TransitionContext {
   action: string;
   actor: string;
   input_data: Record<string, any>;
+  decision_record?: AgentDecisionRecord;
   policy_version?: string;
   policy_checked?: string;
   reason: string;
@@ -124,6 +165,12 @@ export class StateMachineManager {
     // Apply state transition
     this.offerStates.set(offerId, toState);
 
+    const decisionRecord = context.decision_record || context.input_data?.decision_record;
+    const enrichedInputData = {
+      ...(context.input_data || {}),
+      ...(decisionRecord ? { decision_record: decisionRecord } : {}),
+    };
+
     // Create immutable audit log entry
     const entry: AuditLogEntry = {
       id: crypto.randomUUID(),
@@ -132,7 +179,8 @@ export class StateMachineManager {
       to_state: toState,
       action: context.action,
       actor: context.actor,
-      input_data: context.input_data || {},
+      input_data: enrichedInputData,
+      decision_record: decisionRecord,
       policy_version: context.policy_version || 'v1',
       policy_checked: context.policy_checked || 'RULE_STATE_MACHINE_TRANSITION',
       reason: context.reason,
