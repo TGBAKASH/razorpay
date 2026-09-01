@@ -338,11 +338,14 @@ DealFlow translates any incoming agent protocol into the canonical **Common Comm
 | **5** | **Zero Margin Leakage** | Buyer candidate cards display only PASS/FAIL badges and value qualifications. Raw margins and internal metrics are merchant-gated. |
 | **6** | **Atomic Settlement** | Razorpay orders are linked 1:1 with signed contracts. Payments are validated via webhook signatures before committing to the ledger. |
 | **7** | **Immutable Auditability** | Policy versions and decision logs are append-only. Past policies are never overwritten in place. |
+| **8** | **Atomic Conditional Concurrency** | Inventory reservations use atomic conditional operations (`WHERE inventory_qty >= quantity`) and synchronized mutex queues. Prevents overselling when autonomous buyer agents execute concurrent purchases; returns clean declines without crashing. |
 
 ---
 
 ## 8. Verification & Test Suite Summary
 
 The entire monorepo is validated with **Vitest**:
-* **24 Test Suites** | **115 Tests Passing** | **0 Failures**
-* **Production Build**: Clean compilation across Next.js 15 App Router and 7 TypeScript packages via `npm run build --workspaces`.
+* **26 Test Suites** | **128 Tests Passing** | **0 Failures**
+* **Concurrency Benchmark**: `npm run test:concurrency --workspace=@razorpay-dealflow/buyer-load-test` (25 concurrent purchases against 3 units -> 3 succeeded, 22 declined, 0 crashes, 0 final stock).
+* **Production Build**: Clean compilation across Next.js 15 App Router (16 static routes) and 7 TypeScript packages via `npm run build`.
+

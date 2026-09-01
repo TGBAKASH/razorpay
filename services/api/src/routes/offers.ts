@@ -17,6 +17,7 @@ import { importCatalogFromCsv } from '../importers/catalog-csv-importer.js';
 import { CATALOG_MERCHANTS } from '../data/seed-catalog.js';
 import { prisma } from '../db.js';
 import { requireMerchantRole } from '../middleware/role-guard.js';
+import { inventoryService } from '../services/inventory-service.js';
 
 export const activeContracts = new Map<string, SignedOfferContract>();
 export const negotiationFeed: {
@@ -520,23 +521,44 @@ export async function registerOfferRoutes(fastify: FastifyInstance) {
       });
     }
 
-    // Step 4: Live Inventory & Catalog Price Re-Check
+    // Step 4: Atomic Live Inventory Reservation
     const catMerchant = CATALOG_MERCHANTS.find((m) => m.id === payload.merchant_id || m.slug === 'sprint-athletics');
     const catProduct = catMerchant?.products.find((p) => p.sku === payload.sku);
 
-    const availableQty = body.live_inventory_override !== undefined
-      ? body.live_inventory_override
-      : catProduct?.inventoryQty ?? 41;
+    let isReservationSuccessful = false;
+    let availableQtyReported = 0;
 
-    if (availableQty < payload.quantity || availableQty <= 0) {
+    if (body.live_inventory_override !== undefined) {
+      // Manual simulation override (e.g. Scenario 1 preset test)
+      availableQtyReported = body.live_inventory_override;
+      if (body.live_inventory_override >= payload.quantity && body.live_inventory_override > 0) {
+        isReservationSuccessful = true;
+        if (catProduct) {
+          catProduct.inventoryQty = Math.max(0, catProduct.inventoryQty - payload.quantity);
+        }
+      } else {
+        isReservationSuccessful = false;
+      }
+    } else {
+      // Live production & concurrent autonomous agent traffic: atomic conditional reservation
+      const reservation = await inventoryService.reserveInventoryAtomically(
+        payload.sku,
+        payload.quantity,
+        payload.merchant_id
+      );
+      isReservationSuccessful = reservation.success;
+      availableQtyReported = reservation.remainingQty;
+    }
+
+    if (!isReservationSuccessful) {
       try {
         stateMachine.transition(offerId, 'EXPIRED', {
           action: 'ACCEPT_LIVE_INVENTORY_CHECK_FAILED',
           actor: 'system:accept_verifier',
-          input_data: { requested: payload.quantity, available: availableQty },
+          input_data: { requested: payload.quantity, available: availableQtyReported },
           policy_version: payload.policy_version,
           policy_checked: 'RULE_INVENTORY_AVAILABLE',
-          reason: `Insufficient inventory at accept-time (${availableQty} available vs ${payload.quantity} requested). Offer expired cleanly without charge.`,
+          reason: `Insufficient inventory at accept-time (${availableQtyReported} available vs ${payload.quantity} requested). Offer expired cleanly without charge.`,
         });
       } catch {}
 
@@ -584,28 +606,23 @@ export async function registerOfferRoutes(fastify: FastifyInstance) {
 
       return reply.status(409).send({
         success: false,
-        error: `Insufficient inventory at accept-time (${availableQty} available vs ${payload.quantity} requested). Original offer expired cleanly without charge.${
+        error: `Insufficient inventory at accept-time (${availableQtyReported} available vs ${payload.quantity} requested). Original offer expired cleanly without charge.${
           alternativeOffer ? ' A new alternative offer was generated.' : ' No qualifying substitute was available.'
         }`,
         code: 'INSUFFICIENT_INVENTORY',
+        sold_out: availableQtyReported === 0,
+        remaining_inventory: availableQtyReported,
         alternative_offer: alternativeOffer,
       });
-    }
-
-    // Decrement inventory in catalog & database
-    if (catProduct) {
-      catProduct.inventoryQty -= payload.quantity;
-    }
-    if (process.env.NODE_ENV !== 'test') {
-      prisma.product.updateMany({
-        where: { sku: payload.sku },
-        data: { inventoryQty: { decrement: payload.quantity } },
-      }).catch(() => {});
     }
 
     // Step 5: Mark Nonce Consumed & Contract State ACCEPTED
     const consumed = nonceStore.consumeNonce(payload.nonce, offerId);
     if (!consumed) {
+      // Revert atomically reserved stock if nonce consumption fails
+      if (body.live_inventory_override === undefined) {
+        await inventoryService.releaseInventoryAtomically(payload.sku, payload.quantity, payload.merchant_id);
+      }
       return reply.status(409).send({
         success: false,
         error: 'Failed to consume nonce (concurrency race condition).',

@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "simulate": "tsx src/cli.ts",
     "simulate:500": "tsx src/cli.ts 500",
-    "simulate:1000": "tsx src/cli.ts 1000"
+    "simulate:1000": "tsx src/cli.ts 1000",
+    "test:concurrency": "tsx src/cli-concurrency.ts"
   },
   "dependencies": {
     "@razorpay-dealflow/adapters": "^0.1.0",
