@@ -78,7 +78,7 @@ Return valid JSON:
   "proposed_price_inr": number
 }`;
 
-    const candidateModels = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-pro'];
+    const candidateModels = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-pro-latest'];
 
     for (const model of candidateModels) {
       try {
