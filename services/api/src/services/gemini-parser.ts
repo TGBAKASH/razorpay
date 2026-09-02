@@ -103,10 +103,32 @@ export function extractIntentDeterministically(
     category = 'apparel';
   }
 
-  // 2. Budget extraction (Paise, Numbers, and Hindi number words)
+  // 1. Quantity extraction (handles "29 shoes", "29 pairs", "29 units", "10 gift boxes", etc.)
+  let quantity = 1;
+  const qtyMatch = lower.match(/(?:^|\s)(\d+)\s*(?:shoes?|running shoes?|pairs?|units?|items?|pieces?|boxes?|gift boxes?|hampers?)/i)
+    || lower.match(/(?:need|want|order|buy|get)\s+(\d+)\b/i);
+  if (qtyMatch && qtyMatch[1]) {
+    const q = parseInt(qtyMatch[1], 10);
+    if (!isNaN(q) && q > 0) quantity = q;
+  }
+
+  // 2. Budget extraction (handles "at 3000 each", "at 3000 per shoe", "under 4000", Hindi number phrases)
   let budget_max_paise: number | undefined;
 
-  // Check Hindi number phrases first: e.g. "teen hazar", "do hazar", "ek hazar", "char hazar", "panch hazar"
+  const perUnitMatch = lower.match(/(?:at|for|around|approx|@)\s*(?:₹|rs\.?|inr)?\s*([0-9,]+(?:\.[0-9]+)?)\s*(k|thousand)?\s*(?:each|per\s+(?:piece|unit|item|pair|shoe|box))/i)
+    || lower.match(/(?:₹|rs\.?|inr)?\s*([0-9,]+(?:\.[0-9]+)?)\s*(k|thousand)?\s*(?:each|per\s+(?:piece|unit|item|pair|shoe|box))/i);
+
+  if (perUnitMatch && perUnitMatch[1]) {
+    let unitNum = parseFloat(perUnitMatch[1].replace(/,/g, ''));
+    if (perUnitMatch[2]?.toLowerCase() === 'k' || perUnitMatch[2]?.toLowerCase() === 'thousand') {
+      unitNum *= 1000;
+    }
+    if (!isNaN(unitNum) && unitNum > 0) {
+      budget_max_paise = Math.round(quantity * unitNum * 100);
+    }
+  }
+
+  // Check Hindi number phrases
   const hindiNumberMap: Record<string, number> = {
     'ek hazar': 1000,
     'do hazar': 2000,
@@ -117,17 +139,22 @@ export function extractIntentDeterministically(
     'bees hazar': 20000,
   };
 
-  for (const [phrase, value] of Object.entries(hindiNumberMap)) {
-    if (lower.includes(phrase)) {
-      budget_max_paise = value * 100;
-      break;
+  if (!budget_max_paise) {
+    for (const [phrase, value] of Object.entries(hindiNumberMap)) {
+      if (lower.includes(phrase)) {
+        const isPerUnit = lower.includes('each') || lower.includes('per');
+        budget_max_paise = value * 100 * (isPerUnit ? quantity : 1);
+        break;
+      }
     }
   }
 
+  // Check standard budget expressions (e.g. "budget 3000", "under 4000", "at 3000", "₹3000")
   if (!budget_max_paise) {
     const budgetMatch = query.match(
-      /(?:under|below|max|budget of|within|se zyada nahi|kam)?\s*(?:₹|rs\.?|inr)?\s*([0-9,]+(?:\.[0-9]+)?)\s*(k|thousand|rupees|rs|paise)?/i
-    );
+      /(?:under|below|max|budget of|budget|within|se zyada nahi|kam|at|for)\s*(?:₹|rs\.?|inr)?\s*([0-9,]+(?:\.[0-9]+)?)\s*(k|thousand|rupees|rs|paise)?/i
+    ) || query.match(/(?:₹|rs\.?|inr)\s*([0-9,]+(?:\.[0-9]+)?)\s*(k|thousand|rupees|rs|paise)?/i);
+
     if (budgetMatch && budgetMatch[1]) {
       const numStr = budgetMatch[1].replace(/,/g, '');
       let num = parseFloat(numStr);
@@ -140,7 +167,9 @@ export function extractIntentDeterministically(
         if (unit === 'paise') {
           budget_max_paise = Math.round(num);
         } else {
-          budget_max_paise = Math.round(num * 100);
+          const isPerUnit = lower.includes('each') || lower.includes('per');
+          const multiplier = isPerUnit ? quantity : 1;
+          budget_max_paise = Math.round(num * multiplier * 100);
         }
       }
     }
@@ -167,14 +196,7 @@ export function extractIntentDeterministically(
     delivery_deadline = d.toISOString();
   }
 
-  // 4. Quantity
-  let quantity = 1;
-  const qtyMatch = lower.match(/(?:^|\s)(\d+)\s+(?:units|items|pieces|pairs|boxes|running shoes|gift boxes)/i);
-  if (qtyMatch && qtyMatch[1]) {
-    quantity = parseInt(qtyMatch[1], 10);
-  }
-
-  // 5. Payment preference
+  // 4. Payment preference
   const payment_preference: PaymentPreferenceMethod[] = [];
   if (lower.includes('upi') || lower.includes('gpay') || lower.includes('phonepe') || lower.includes('paytm')) {
     payment_preference.push('upi');
@@ -189,7 +211,7 @@ export function extractIntentDeterministically(
     payment_preference.push('cod');
   }
 
-  // 6. Return preference
+  // 5. Return preference
   let return_preference: string | undefined;
   if (lower.includes('no return') || lower.includes('final sale')) {
     return_preference = 'none';
@@ -201,7 +223,7 @@ export function extractIntentDeterministically(
     return_preference = 'easy returns';
   }
 
-  // 7. Priorities (including order of occurrence and Hindi terms: "saste", "sasta", "kam daam", "jaldi", "turant")
+  // 6. Priorities (including order of occurrence and Hindi terms: "saste", "sasta", "kam daam", "jaldi", "turant")
   const priceIndex = lower.search(/\b(cheap|cheapest|lowest price|best price|saste|sasta|kam daam|bachat|discount)\b/);
   const fastIndex = lower.search(/\b(fast|fastest|quick|express|speed|jaldi|turant|urgent|same day|next day|delivered by)\b/);
   const returnIndex = lower.search(/\b(return|returns|replacement|easy return)\b/);
@@ -212,7 +234,6 @@ export function extractIntentDeterministically(
   if (priceIndex !== -1) {
     detectedPriorities.push({ type: 'price', index: priceIndex });
   } else if (budgetWordIndex !== -1 && fastIndex === -1) {
-    // "budget 3000" alone without fast delivery mentioned defaults to price priority
     detectedPriorities.push({ type: 'price', index: budgetWordIndex });
   }
 
@@ -266,18 +287,21 @@ Reference Date: ${refDate.toISOString()}
 JSON Schema:
 {
   "category": string | null (e.g. "running shoes", "corporate gift box"),
-  "budget_max_paise": integer | null (e.g. ₹3,000 / teen hazar = 300000),
+  "quantity": integer (e.g. "need 29 shoes" -> 29),
+  "unit_budget_inr": number | null (e.g. if user asks for 3000 each, unit_budget_inr = 3000),
+  "budget_max_paise": integer | null (CRITICAL: Total budget ceiling in paise. If quantity is 29 and unit price is 3000 each, total is 29 * 3000 * 100 = 8700000 paise. If total budget is stated, e.g. "budget 30000", budget_max_paise = 3000000),
   "delivery_deadline": ISO8601 date string | null,
-  "quantity": integer,
   "payment_preference": ["upi" | "card" | "netbanking" | "cod"],
   "return_preference": string | null,
   "priorities": ["price" | "delivery_speed" | "return_terms" | "extras"]
 }
 
 Important Rules:
+- If quantity is mentioned (e.g. "29 shoes"), extract quantity = 29.
+- If user says "at 3000 each" or "3000 per shoe", total budget ceiling is quantity * unit price * 100 paise.
 - Hindi words like "teen hazar" = 3000 INR = 300000 paise.
-- If the user explicitly asks for "fast delivery", "fastest delivery", "express", "urgent", "jaldi", "turant", or specifies a delivery date priority, put "delivery_speed" first in priorities: ["delivery_speed", ...] (even if a budget number like "budget 3000" is also present).
-- A budget ceiling like "budget 3000" or "under 4000" sets "budget_max_paise", but is NOT priority = price unless words like "cheap", "cheapest", "lowest price", "saste", or "sasta" are explicitly requested as a priority.
+- If the user explicitly asks for "fast delivery", "fastest delivery", "express", "urgent", "jaldi", "turant", or specifies a delivery date priority, put "delivery_speed" first in priorities: ["delivery_speed", ...] (even if a budget number like "at 3000 each" is also present).
+- A budget ceiling sets "budget_max_paise", but is NOT priority = price unless words like "cheap", "cheapest", "lowest price", "saste", or "sasta" are explicitly requested as a priority.
 - If both price and speed are mentioned, follow their exact order of occurrence:
   - "cheapest and fastest" -> ["price", "delivery_speed", "return_terms", "extras"]
   - "fastest and cheapest" -> ["delivery_speed", "price", "return_terms", "extras"]
@@ -303,11 +327,17 @@ Important Rules:
         if (text) {
           console.log(`[Gemini Response] Successful structured extraction: ${text.substring(0, 120)}...`);
           const parsed = JSON.parse(text);
+          const q = typeof parsed.quantity === 'number' && parsed.quantity > 0 ? parsed.quantity : 1;
+          let bPaise = typeof parsed.budget_max_paise === 'number' ? Math.round(parsed.budget_max_paise) : undefined;
+          if (typeof parsed.unit_budget_inr === 'number' && parsed.unit_budget_inr > 0 && q > 1) {
+            bPaise = Math.round(q * parsed.unit_budget_inr * 100);
+          }
+
           extracted = {
             category: parsed.category || undefined,
-            budget_max_paise: typeof parsed.budget_max_paise === 'number' ? Math.round(parsed.budget_max_paise) : undefined,
+            budget_max_paise: bPaise,
             delivery_deadline: parsed.delivery_deadline || undefined,
-            quantity: parsed.quantity || 1,
+            quantity: q,
             payment_preference: Array.isArray(parsed.payment_preference) && parsed.payment_preference.length > 0 ? parsed.payment_preference : undefined,
             return_preference: parsed.return_preference || undefined,
             priorities: Array.isArray(parsed.priorities) && parsed.priorities.length > 0 ? parsed.priorities : ['price', 'delivery_speed', 'return_terms', 'extras'],

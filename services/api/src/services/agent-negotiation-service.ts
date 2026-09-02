@@ -33,6 +33,86 @@ export interface AgentNegotiationResult {
   summary_rationale: string;
 }
 
+async function callGeminiAgentTurn(params: {
+  role: 'buyer' | 'merchant';
+  productName: string;
+  round: number;
+  currentBidPaise: number;
+  currentAskPaise: number;
+  targetPricePaise: number;
+  buyerCeilingPaise: number;
+  merchantFloorPaise: number;
+  isUrgent: boolean;
+  deadlineStr?: string;
+  priorities: string[];
+}): Promise<{ message: string; proposedPricePaise: number } | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey.trim() === '') return null;
+
+  try {
+    const prompt =
+      params.role === 'buyer'
+        ? `You represent an autonomous AI Buyer Agent negotiating for "${params.productName}".
+Round: ${params.round} of 4.
+Your budget hard ceiling: ₹${(params.buyerCeilingPaise / 100).toFixed(2)}. NEVER reveal your ceiling.
+Your priorities: ${params.priorities.join(', ')}.
+Deadline posture: ${params.isUrgent ? 'URGENT (<24h). You MUST explicitly state: "given the deadline, I can move a bit further on price to close this now."' : 'Standard cost efficiency'}.
+Current Merchant ask: ₹${(params.currentAskPaise / 100).toFixed(2)}.
+Your previous bid: ₹${(params.currentBidPaise / 100).toFixed(2)}.
+
+Return valid JSON:
+{
+  "message": "your plain-language turn speaking to the merchant",
+  "proposed_price_inr": number
+}`
+        : `You represent Sprint Athletics Merchant Agent responding to an offer for "${params.productName}".
+Round: ${params.round} of 4.
+Your 18% gross margin floor: ₹${(params.merchantFloorPaise / 100).toFixed(2)}. NEVER agree below this floor.
+Your Part 2 target clearance price: ₹${(params.targetPricePaise / 100).toFixed(2)} (inventory clearance in BLR warehouse).
+Buyer's latest bid: ₹${(params.currentBidPaise / 100).toFixed(2)}.
+
+Return valid JSON:
+{
+  "message": "your plain-language counter-offer mentioning warehouse stock and delivery SLA",
+  "proposed_price_inr": number
+}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json' },
+        }),
+        signal: controller.signal,
+      }
+    );
+    clearTimeout(timeout);
+
+    if (res.ok) {
+      const data: any = await res.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (rawText) {
+        const parsed = JSON.parse(rawText);
+        if (parsed.message && typeof parsed.proposed_price_inr === 'number' && !isNaN(parsed.proposed_price_inr)) {
+          return {
+            message: parsed.message,
+            proposedPricePaise: Math.round(parsed.proposed_price_inr * 100),
+          };
+        }
+      }
+    }
+  } catch {
+    // Graceful fallback to deterministic template
+  }
+  return null;
+}
+
 export class AgentNegotiationService {
   /**
    * Runs an autonomous 2-role negotiation capped strictly at 4 rounds.
@@ -133,7 +213,25 @@ export class AgentNegotiationService {
       let rawBuyerMessage = '';
       let proposedBuyerPricePaise = 0;
 
-      if (r === 1) {
+      // Try Gemini 1.5 Flash LLM for dynamic turn
+      const geminiBuyer = await callGeminiAgentTurn({
+        role: 'buyer',
+        productName: product.name,
+        round: r,
+        currentBidPaise: currentBuyerBidPaise,
+        currentAskPaise: currentMerchantAskPaise,
+        targetPricePaise: targetOptimalPricePaise,
+        buyerCeilingPaise,
+        merchantFloorPaise,
+        isUrgent: isUrgentDeadline,
+        deadlineStr: deadlineDate?.toLocaleDateString(),
+        priorities: buyerConstraints.priorities || ['delivery_speed', 'price'],
+      });
+
+      if (geminiBuyer) {
+        rawBuyerMessage = geminiBuyer.message;
+        proposedBuyerPricePaise = geminiBuyer.proposedPricePaise;
+      } else if (r === 1) {
         if (isUrgentDeadline) {
           proposedBuyerPricePaise = Math.min(buyerCeilingPaise, Math.round(listPricePaise * 0.90));
           rawBuyerMessage = `Hello, I represent a verified buyer looking for ${product.name}. With our delivery deadline under 24 hours away (${deadlineDate?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || 'urgent'}), time is critical. Given the deadline, I can move a bit further on price to close this now, opening at ₹${(proposedBuyerPricePaise / 100).toFixed(2)} to secure immediate dispatch.`;
@@ -208,7 +306,25 @@ export class AgentNegotiationService {
       let rawMerchantMessage = '';
       let proposedMerchantCounterPaise = 0;
 
-      if (r === 1) {
+      // Try Gemini 1.5 Flash LLM for merchant response
+      const geminiMerchant = await callGeminiAgentTurn({
+        role: 'merchant',
+        productName: product.name,
+        round: r,
+        currentBidPaise: currentBuyerBidPaise,
+        currentAskPaise: currentMerchantAskPaise,
+        targetPricePaise: targetOptimalPricePaise,
+        buyerCeilingPaise,
+        merchantFloorPaise,
+        isUrgent: isUrgentDeadline,
+        deadlineStr: deadlineDate?.toLocaleDateString(),
+        priorities: buyerConstraints.priorities || ['delivery_speed', 'price'],
+      });
+
+      if (geminiMerchant) {
+        rawMerchantMessage = geminiMerchant.message;
+        proposedMerchantCounterPaise = geminiMerchant.proposedPricePaise;
+      } else if (r === 1) {
         // Merchant counters toward Part 2 target price
         proposedMerchantCounterPaise = Math.round(listPricePaise * 0.93); // ₹3,998.00
         rawMerchantMessage = `Thank you for your inquiry for ${product.name}. While ₹${(currentBuyerBidPaise / 100).toFixed(2)} is below our margin target for fast-dispatched inventory in ${product.warehouseLocation}, we can offer an initial discounted rate of ₹${(proposedMerchantCounterPaise / 100).toFixed(2)} including express shipping.`;

@@ -257,7 +257,7 @@ export default function DealRoomPage() {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       const res = await fetch(`${API_BASE_URL}/api/negotiation/agent-dialog`, {
         method: 'POST',
@@ -325,6 +325,16 @@ export default function DealRoomPage() {
     d.setDate(d.getDate() + daysToAdd);
     setDeliveryDeadline(d.toISOString().split('T')[0] || '');
 
+    // Fetch live Razorpay Key ID from backend
+    fetch(`${API_BASE_URL}/api/orders/public-key`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.key_id) {
+          setRazorpayKeyId(data.key_id);
+        }
+      })
+      .catch(() => {});
+
     // Dynamically inject Razorpay Checkout.js script
     if (typeof window !== 'undefined' && !(window as any).Razorpay) {
       const script = document.createElement('script');
@@ -386,7 +396,8 @@ export default function DealRoomPage() {
         }
 
         const lowerQuery = freeTextIntent.toLowerCase();
-        if (lowerQuery.includes('gift') || lowerQuery.includes('hamper') || lowerQuery.includes('corporate') || (bc.quantity && bc.quantity >= 10)) {
+        const isB2BRfp = lowerQuery.includes('gift') || lowerQuery.includes('hamper') || lowerQuery.includes('corporate') || lowerQuery.includes('rfp') || lowerQuery.includes('auction');
+        if (isB2BRfp) {
           setDealMode('auction');
           if (bc.quantity) setAuctionQuantity(bc.quantity);
           if (bc.budget_max_paise) setAuctionBudget(Math.round(bc.budget_max_paise / 100));
@@ -395,9 +406,8 @@ export default function DealRoomPage() {
         }
 
         setAnimatingField(null);
-        const isGifting = lowerQuery.includes('gift') || lowerQuery.includes('hamper') || lowerQuery.includes('corporate');
-        const parsedBadge = isGifting
-          ? '🎁 Corporate Gifting RFP Detected • Switched to 3-Merchant Parallel Auction'
+        const parsedBadge = isB2BRfp
+          ? '🏢 B2B Multi-Merchant RFP Detected • Switched to Parallel Auction'
           : data.parsed_by === 'gemini_1.5_flash'
           ? '🤖 Interpreted via Gemini 1.5 Flash • Structured fields & priorities populated.'
           : '⚡ Interpreted via Commerce Engine • Structured fields & priorities populated.';
@@ -407,19 +417,36 @@ export default function DealRoomPage() {
     } catch {
       // Offline fallback keyword parser with sequential animation
       const lower = freeTextIntent.toLowerCase();
-      if (lower.includes('gift') || lower.includes('hamper') || lower.includes('corporate')) {
+      const isB2BRfp = lower.includes('gift') || lower.includes('hamper') || lower.includes('corporate') || lower.includes('rfp') || lower.includes('auction');
+      if (isB2BRfp) {
         setDealMode('auction');
         setAuctionQuantity(20);
         setAuctionBudget(30000);
         setAuctionPriority(lower.includes('fast') ? 'speed' : 'price');
       }
 
-      setAnimatingField('budget');
-      const matchBudget = lower.match(/(?:under|budget|for|below|₹)\s*(\d+[\d,]*)/);
-      if (matchBudget && matchBudget[1]) {
-        const parsed = parseInt(matchBudget[1].replace(/,/g, ''), 10);
-        if (parsed > 500 && parsed < 100000) setBudgetInr(parsed);
+      // Quantity extraction
+      let offlineQty = 1;
+      const qtyMatch = lower.match(/(?:^|\s)(\d+)\s*(?:shoes?|running shoes?|pairs?|units?|items?|pieces?|boxes?)/i)
+        || lower.match(/(?:need|want|order|buy|get)\s+(\d+)\b/i);
+      if (qtyMatch && qtyMatch[1]) {
+        offlineQty = parseInt(qtyMatch[1], 10);
+        setQuantity(offlineQty);
       }
+
+      setAnimatingField('budget');
+      let offlineBudget = 3000;
+      const perUnitMatch = lower.match(/(?:at|for|around|approx|@)\s*(?:₹|rs\.?|inr)?\s*([0-9,]+(?:\.[0-9]+)?)\s*(k|thousand)?\s*(?:each|per\s+(?:piece|unit|item|pair|shoe|box))/i);
+      if (perUnitMatch && perUnitMatch[1]) {
+        const unitVal = parseFloat(perUnitMatch[1].replace(/,/g, ''));
+        offlineBudget = Math.round(unitVal * offlineQty);
+      } else {
+        const matchBudget = lower.match(/(?:under|budget|for|below|₹)\s*(\d+[\d,]*)/);
+        if (matchBudget && matchBudget[1]) {
+          offlineBudget = parseInt(matchBudget[1].replace(/,/g, ''), 10);
+        }
+      }
+      if (offlineBudget > 100) setBudgetInr(offlineBudget);
       await new Promise((r) => setTimeout(r, 160));
 
       setAnimatingField('payment');
@@ -632,24 +659,52 @@ export default function DealRoomPage() {
         },
       ];
 
-      // Pure Buyer-Priority Sorting across policy-valid candidates
+      // Balanced Multi-Attribute Utility Ranking
       const p1 = prioritiesOrder[0] || 'price';
+      const unitBudgetPaise = quantity > 1 ? (budgetInr * 100) / quantity : budgetInr * 100;
+      const nowMs = Date.now();
+
       fallbackCandidates.sort((a, b) => {
         if (p1 === 'price') {
           const diff = a.candidate.final_price_paise - b.candidate.final_price_paise;
           if (diff !== 0) return diff; // Lowest Price wins
           return b.expected_profit_score - a.expected_profit_score;
         }
+
         if (p1 === 'delivery_speed') {
-          const diff = new Date(a.candidate.delivery_promise).getTime() - new Date(b.candidate.delivery_promise).getTime();
-          if (diff !== 0) return diff; // Fastest delivery wins
+          // Balanced Multi-Attribute Utility: 60% Delivery Speed + 40% Price Affordability
+          // Prevents selecting an exorbitant candidate when another express candidate is available at a major discount
+          const getSpeedScore = (c: typeof a) => {
+            const hours = Math.max(1, (new Date(c.candidate.delivery_promise).getTime() - nowMs) / 3600000);
+            return Math.max(0, 100 - hours * 0.75); // Earlier SLA = higher score
+          };
+
+          const getPriceScore = (c: typeof a) => {
+            const price = c.candidate.final_price_paise;
+            if (price <= unitBudgetPaise) return 100;
+            const overPct = (price - unitBudgetPaise) / unitBudgetPaise;
+            return Math.max(0, 100 - overPct * 180); // Penalize over-budget markups
+          };
+
+          const utilityA = 0.60 * getSpeedScore(a) + 0.40 * getPriceScore(a);
+          const utilityB = 0.60 * getSpeedScore(b) + 0.40 * getPriceScore(b);
+
+          if (Math.abs(utilityB - utilityA) > 1.5) {
+            return utilityB - utilityA; // Higher compound utility wins
+          }
+
+          // If utility is near-tied, earlier delivery breaks the tie
+          const timeDiff = new Date(a.candidate.delivery_promise).getTime() - new Date(b.candidate.delivery_promise).getTime();
+          if (timeDiff !== 0) return timeDiff;
           return b.expected_profit_score - a.expected_profit_score;
         }
+
         if (p1 === 'return_terms') {
           const diff = b.candidate.return_terms_days - a.candidate.return_terms_days;
           if (diff !== 0) return diff; // Longest return window wins
           return b.expected_profit_score - a.expected_profit_score;
         }
+
         return b.expected_profit_score - a.expected_profit_score;
       });
 
@@ -692,8 +747,8 @@ export default function DealRoomPage() {
         final_price_paise: winnerCand.candidate.final_price_paise,
         discount_paise: winnerCand.candidate.discount_paise,
         discount_reasons: winnerCand.candidate.discount_reason || [
-          'Prepaid UPI payment incentive (zero COD return risk)',
-          'Clearance bracket volume match (41 pairs available)',
+          'Prepaid payment incentive',
+          'Clearance bracket volume match',
           'Guaranteed delivery satisfied',
         ],
         delivery_promise: winnerCand.candidate.delivery_promise,
@@ -719,7 +774,9 @@ export default function DealRoomPage() {
         const formattedDelivery = winnerCand.candidate.delivery_promise.includes('T')
           ? new Date(winnerCand.candidate.delivery_promise).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
           : winnerCand.candidate.delivery_promise;
-        explanationNotice = `You told us fastest delivery mattered most. Among every offer Sprint Athletics could still profitably make you, this offered the earliest guaranteed delivery (${formattedDelivery}).`;
+        const formattedPrice = (winnerCand.candidate.final_price_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        const candLabel = winnerCand.candidate.discount_paise >= 50000 ? 'Candidate C (Maximum Discount)' : 'Candidate A (Optimized Clearance)';
+        explanationNotice = `Multi-Attribute Decision Engine selected ${candLabel}: Guaranteed express delivery (${formattedDelivery}) at ₹${formattedPrice}, optimizing dispatch speed while protecting your budget mandate from standard list price markups.`;
       } else if (p1 === 'return_terms') {
         explanationNotice = `You told us flexible return terms mattered most. Among every offer Sprint Athletics could still profitably make you, this offered the longest return window (${winnerCand.candidate.return_terms_days} days).`;
       } else {
@@ -835,13 +892,14 @@ export default function DealRoomPage() {
   const handleOpenRazorpayCheckout = () => {
     if (typeof window === 'undefined') return;
 
-    const rzpKey = razorpayKeyId || RAZORPAY_KEY_ID || 'rzp_test_placeholder_key_id';
+    // Use live fetched key, fallback to user's Render test key
+    const rzpKey = razorpayKeyId || RAZORPAY_KEY_ID || 'rzp_test_TUqquyIiB68XkF';
     const amountPaise = orderRecord?.amount || orderRecord?.amount_paise || (singleOffer?.final_price_paise || 394900) * quantity;
-    const rzpOrderId =
-      orderRecord?.order_id ||
-      (orderRecord?.id && orderRecord.id.startsWith('order_') && !orderRecord.id.includes('sprintpro')
-        ? orderRecord.id
-        : undefined);
+    const rzpOrderId = orderRecord?.order_id || orderRecord?.id;
+
+    // In Razorpay Checkout.js, order_id MUST be a real Razorpay Order ID (starts with order_ followed by 14 alphanumeric characters: ^order_[A-Za-z0-9]{14}$)
+    // If it's a simulated or local ID, omitting order_id allows Razorpay Standard Checkout to open smoothly in Test Mode!
+    const isRealRazorpayOrderId = typeof rzpOrderId === 'string' && /^order_[A-Za-z0-9]{14}$/.test(rzpOrderId);
 
     if (!(window as any).Razorpay) {
       console.warn('[Razorpay] SDK script not yet loaded, running instant webhook simulation');
@@ -849,13 +907,12 @@ export default function DealRoomPage() {
       return;
     }
 
-    const options = {
+    const options: any = {
       key: rzpKey,
       amount: amountPaise,
       currency: 'INR',
       name: 'Razorpay DealFlow',
-      description: `Cryptographic Contract #${singleOffer?.offer_id || 'deal-001'}`,
-      order_id: rzpOrderId,
+      description: `Contract #${singleOffer?.offer_id || 'deal-001'} (${quantity}x ${singleOffer?.product_name || 'SprintPro X2'})`,
       prefill: {
         name: 'Akash (Buyer Agent)',
         email: 'buyer-agent@dealflow.ai',
@@ -874,6 +931,10 @@ export default function DealRoomPage() {
         },
       },
     };
+
+    if (isRealRazorpayOrderId) {
+      options.order_id = rzpOrderId;
+    }
 
     try {
       const rzpInstance = new (window as any).Razorpay(options);
@@ -1175,7 +1236,7 @@ export default function DealRoomPage() {
                   : 'text-ink-400 hover:text-ink-200'
               }`}
             >
-              3-Merchant Auction (Gifting)
+              🏢 B2B Multi-Merchant RFP Auction (Bulk Procurement)
             </button>
           </div>
         </div>
@@ -1361,11 +1422,11 @@ export default function DealRoomPage() {
                       setAuctionQuantity(20);
                       setAuctionBudget(30000);
                       setAuctionPriority('speed');
-                      setFreeTextIntent('need 20 corporate gift boxes under 30000 by friday with fast delivery');
+                      setFreeTextIntent('need 20 bulk procurement boxes under 30000 by friday with fast delivery');
                     }}
                     className="text-[11px] font-mono px-2.5 py-1 rounded bg-sky-950/40 hover:bg-sky-900/50 text-sky-300 border border-sky-800/80 transition-colors flex items-center gap-1"
                   >
-                    <span>🎁 3-Merchant Gifting Auction (20 Qty)</span>
+                    <span>🏢 B2B Multi-Merchant RFP Auction (Bulk Procurement)</span>
                   </button>
                 </div>
 
@@ -2064,10 +2125,10 @@ export default function DealRoomPage() {
                 <div>
                   <h2 className="text-base font-bold text-ink-100 font-display flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-signal text-white flex items-center justify-center text-xs font-mono">1</span>
-                    Corporate Gifting Multi-Merchant RFP Broadcast
+                    🏢 B2B Multi-Merchant RFP Auction (Bulk Procurement)
                   </h2>
                   <p className="text-xs text-ink-400 mt-0.5">
-                    Broadcast intent for 20 custom corporate gift boxes in parallel to 3 competing merchants.
+                    Broadcast high-volume commercial RFP in parallel across certified merchants to drive competitive downward pricing pressure.
                   </p>
                 </div>
               </div>

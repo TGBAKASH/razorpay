@@ -31,6 +31,13 @@ export const offerToOrderMap = new Map<string, string>(); // offer_id -> razorpa
 export const processedWebhookEvents = new Set<string>();
 
 export async function registerRazorpayRoutes(fastify: FastifyInstance) {
+  // Public endpoint for dashboard to retrieve live Razorpay Test Key ID
+  fastify.get('/api/orders/public-key', async () => {
+    return {
+      key_id: defaultRazorpayClient.getKeyId(),
+    };
+  });
+
   // 1. Create Razorpay Order bound 1:1 to verified OfferContract
   fastify.post('/api/orders/create', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as {
