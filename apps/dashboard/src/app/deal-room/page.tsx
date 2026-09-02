@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { API_BASE_URL, RAZORPAY_KEY_ID } from '../../lib/config';
 import { DealLifecycleNav } from '../../components/DealLifecycleNav';
@@ -55,7 +55,23 @@ interface CompetingBid {
   };
 }
 
-function BargainingConcessionCurve() {
+function BargainingConcessionCurve({ revealedTurns = 8 }: { revealedTurns?: number }) {
+  let merchantPoints = '';
+  if (revealedTurns >= 2) merchantPoints += '80,55 ';
+  if (revealedTurns >= 4) merchantPoints += '240,60 ';
+  if (revealedTurns >= 6) merchantPoints += '400,60 ';
+  if (revealedTurns >= 8) merchantPoints += '560,77';
+  merchantPoints = merchantPoints.trim();
+
+  let buyerPoints = '';
+  if (revealedTurns >= 1) buyerPoints += '80,102 ';
+  if (revealedTurns >= 3) buyerPoints += '240,95 ';
+  if (revealedTurns >= 5) buyerPoints += '400,80 ';
+  if (revealedTurns >= 7) buyerPoints += '560,77';
+  buyerPoints = buyerPoints.trim();
+
+  const isEquilibrium = revealedTurns >= 8;
+
   return (
     <div className="bg-ink-950/90 border border-ink-800 rounded-lg p-4 font-mono shadow-inner">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
@@ -63,19 +79,23 @@ function BargainingConcessionCurve() {
           <span className="text-xs font-bold text-ink-200 uppercase tracking-wider">
             📈 Real-Time 2D Bargaining Concession Curve (Pareto Frontier)
           </span>
-          <span className="px-1.5 py-0.5 rounded bg-signal/20 text-signal-light text-[10px] font-bold border border-signal/40">
-            Game-Theoretic Convergence
+          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+            isEquilibrium
+              ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700'
+              : 'bg-signal/20 text-signal-light border-signal/40 animate-pulse'
+          }`}>
+            {isEquilibrium ? '✓ Consensus Equilibrium' : `Pacing Round ${Math.min(4, Math.ceil(revealedTurns / 2))} of 4`}
           </span>
         </div>
         <div className="flex items-center gap-3 flex-wrap text-[11px]">
-          <span className="flex items-center gap-1 text-cyan-400">
+          <span className={`flex items-center gap-1 transition-opacity ${revealedTurns >= 1 ? 'text-cyan-400 opacity-100' : 'text-ink-600 opacity-40'}`}>
             <span className="w-2.5 h-0.5 bg-cyan-400 inline-block" /> Buyer Concession
           </span>
-          <span className="flex items-center gap-1 text-amber-400">
+          <span className={`flex items-center gap-1 transition-opacity ${revealedTurns >= 2 ? 'text-amber-400 opacity-100' : 'text-ink-600 opacity-40'}`}>
             <span className="w-2.5 h-0.5 bg-amber-400 inline-block" /> Merchant Ask
           </span>
-          <span className="flex items-center gap-1 text-emerald-400 font-bold">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-ping" /> Consensus Equilibrium (₹3,783.12)
+          <span className={`flex items-center gap-1 font-bold transition-opacity ${isEquilibrium ? 'text-emerald-400 opacity-100' : 'text-ink-600 opacity-40'}`}>
+            <span className={`w-2 h-2 rounded-full bg-emerald-400 inline-block ${isEquilibrium ? 'animate-ping' : ''}`} /> Consensus Equilibrium (₹3,783.12)
           </span>
         </div>
       </div>
@@ -97,65 +117,102 @@ function BargainingConcessionCurve() {
 
           {/* Reference Labels */}
           <text x="65" y="128" fill="#ef4444" fontSize="9" fontWeight="bold">Invariant 1: Merchant 18% Floor (₹3,232.00)</text>
-          <text x="65" y="152" fill="#38bdf8" fontSize="9" fontWeight="bold">Invariant 4: Buyer Target Ceiling (₹3,000.00)</text>
-          <text x="310" y="73" fill="#10b981" fontSize="9" fontWeight="bold">Optimal Clearance Optimum: ₹3,783.12 (12% Discount)</text>
+          <text x="65" y="152" fill="#38bdf8" fontSize="9" fontWeight="bold">Invariant 4: Buyer Target Ceiling (₹3,800.00)</text>
+          {isEquilibrium && (
+            <text x="310" y="73" fill="#10b981" fontSize="9" fontWeight="bold">Optimal Clearance Optimum: ₹3,783.12 (12% Discount)</text>
+          )}
 
-          {/* Shaded Concession Corridor between paths */}
-          <polygon
-            points="80,55 240,60 400,60 560,77 400,80 240,95 80,102"
-            fill="url(#concessionGlow)"
-          />
+          {/* Shaded Concession Corridor between paths (visible when equilibrium reached) */}
+          {isEquilibrium && (
+            <polygon
+              points="80,55 240,60 400,60 560,77 400,80 240,95 80,102"
+              fill="url(#concessionGlow)"
+              className="animate-fade-in"
+            />
+          )}
 
           {/* Merchant Ask Trajectory (Amber) */}
-          <polyline
-            fill="none"
-            stroke="#f59e0b"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            points="80,55 240,60 400,60 560,77"
-          />
+          {merchantPoints.includes(' ') && (
+            <polyline
+              fill="none"
+              stroke="#f59e0b"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              points={merchantPoints}
+            />
+          )}
 
           {/* Buyer Bid Trajectory (Cyan) */}
-          <polyline
-            fill="none"
-            stroke="#06b6d4"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            points="80,102 240,95 400,80 560,77"
-          />
+          {buyerPoints.includes(' ') && (
+            <polyline
+              fill="none"
+              stroke="#06b6d4"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              points={buyerPoints}
+            />
+          )}
 
           {/* Data Points - Merchant */}
-          <circle cx="80" cy="55" r="4" fill="#f59e0b" />
-          <text x="70" y="46" fill="#fbbf24" fontSize="9">₹3,998</text>
+          {revealedTurns >= 2 && (
+            <g className="animate-fade-in">
+              <circle cx="80" cy="55" r="4" fill="#f59e0b" />
+              <text x="70" y="46" fill="#fbbf24" fontSize="9">₹3,998</text>
+            </g>
+          )}
 
-          <circle cx="240" cy="60" r="4" fill="#f59e0b" />
-          <text x="230" y="51" fill="#fbbf24" fontSize="9">₹3,949</text>
+          {revealedTurns >= 4 && (
+            <g className="animate-fade-in">
+              <circle cx="240" cy="60" r="4" fill="#f59e0b" />
+              <text x="230" y="51" fill="#fbbf24" fontSize="9">₹3,949</text>
+            </g>
+          )}
 
-          <circle cx="400" cy="60" r="4" fill="#f59e0b" />
-          <text x="390" y="51" fill="#fbbf24" fontSize="9">₹3,949</text>
+          {revealedTurns >= 6 && (
+            <g className="animate-fade-in">
+              <circle cx="400" cy="60" r="4" fill="#f59e0b" />
+              <text x="390" y="51" fill="#fbbf24" fontSize="9">₹3,949</text>
+            </g>
+          )}
 
           {/* Data Points - Buyer */}
-          <circle cx="80" cy="102" r="4" fill="#06b6d4" />
-          <text x="70" y="116" fill="#38bdf8" fontSize="9">₹3,525</text>
+          {revealedTurns >= 1 && (
+            <g className="animate-fade-in">
+              <circle cx="80" cy="102" r="4" fill="#06b6d4" />
+              <text x="70" y="116" fill="#38bdf8" fontSize="9">₹3,525</text>
+            </g>
+          )}
 
-          <circle cx="240" cy="95" r="4" fill="#06b6d4" />
-          <text x="230" y="109" fill="#38bdf8" fontSize="9">₹3,600</text>
+          {revealedTurns >= 3 && (
+            <g className="animate-fade-in">
+              <circle cx="240" cy="95" r="4" fill="#06b6d4" />
+              <text x="230" y="109" fill="#38bdf8" fontSize="9">₹3,600</text>
+            </g>
+          )}
 
-          <circle cx="400" cy="80" r="4" fill="#06b6d4" />
-          <text x="390" y="94" fill="#38bdf8" fontSize="9">₹3,750</text>
+          {revealedTurns >= 5 && (
+            <g className="animate-fade-in">
+              <circle cx="400" cy="80" r="4" fill="#06b6d4" />
+              <text x="390" y="94" fill="#38bdf8" fontSize="9">₹3,750</text>
+            </g>
+          )}
 
           {/* Equilibrium Intersection Point */}
-          <circle cx="560" cy="77" r="7" fill="#10b981" className="animate-pulse" />
-          <circle cx="560" cy="77" r="3" fill="#ffffff" />
-          <text x="475" y="93" fill="#34d399" fontSize="10" fontWeight="bold">Consensus: ₹3,783.12 ✓</text>
+          {isEquilibrium && (
+            <g className="animate-fade-in">
+              <circle cx="560" cy="77" r="7" fill="#10b981" className="animate-pulse" />
+              <circle cx="560" cy="77" r="3" fill="#ffffff" />
+              <text x="475" y="93" fill="#34d399" fontSize="10" fontWeight="bold">Consensus: ₹3,783.12 ✓</text>
+            </g>
+          )}
 
           {/* X Axis Rounds */}
-          <text x="70" y="168" fill="#71717a" fontSize="10">Round 1</text>
-          <text x="230" y="168" fill="#71717a" fontSize="10">Round 2</text>
-          <text x="390" y="168" fill="#71717a" fontSize="10">Round 3</text>
-          <text x="535" y="168" fill="#10b981" fontSize="10" fontWeight="bold">Round 4 (Consensus)</text>
+          <text x="70" y="168" fill={revealedTurns >= 1 ? '#e4e4e7' : '#71717a'} fontSize="10">Round 1</text>
+          <text x="230" y="168" fill={revealedTurns >= 3 ? '#e4e4e7' : '#71717a'} fontSize="10">Round 2</text>
+          <text x="390" y="168" fill={revealedTurns >= 5 ? '#e4e4e7' : '#71717a'} fontSize="10">Round 3</text>
+          <text x="535" y="168" fill={isEquilibrium ? '#10b981' : '#71717a'} fontSize="10" fontWeight="bold">Round 4 (Consensus)</text>
         </svg>
       </div>
     </div>
@@ -166,6 +223,7 @@ export default function DealRoomPage() {
   const { user } = useAuth();
   const [dealMode, setDealMode] = useState<'single' | 'auction'>('single');
   const [flowStep, setFlowStep] = useState<ContinuousFlowStep>('request');
+  const negotiationRoomRef = useRef<HTMLDivElement>(null);
 
   // Free-Text Intent State
   const [freeTextIntent, setFreeTextIntent] = useState('');
@@ -217,21 +275,36 @@ export default function DealRoomPage() {
   const [showAgentDialogModal, setShowAgentDialogModal] = useState(false);
   const [revealedTurns, setRevealedTurns] = useState<number>(1);
 
-  // Sequential pacing effect so agent-to-agent negotiation visibly converses turn-by-turn
+  // Sequential pacing effect: reveals agent turns one-by-one when negotiation view is active
   useEffect(() => {
-    if (!showAgentDialogModal || !agentNegotiationResult?.transcript) return;
+    if (flowStep !== 'negotiation') return;
     setRevealedTurns(1);
     const interval = setInterval(() => {
       setRevealedTurns((prev) => {
-        if (prev >= (agentNegotiationResult.transcript?.length || 4)) {
+        const totalTurns = agentNegotiationResult?.transcript?.length || 8;
+        if (prev >= totalTurns) {
           clearInterval(interval);
-          return prev;
+          return totalTurns;
         }
         return prev + 1;
       });
-    }, 450);
+    }, 700); // 700ms per turn for visible simultaneous pacing of curve and dialogue
     return () => clearInterval(interval);
-  }, [showAgentDialogModal, agentNegotiationResult]);
+  }, [flowStep, agentNegotiationResult]);
+
+  // Auto-scroll to negotiation room when it appears
+  useEffect(() => {
+    if (flowStep === 'negotiation') {
+      const scrollDown = () => {
+        const target = document.getElementById('negotiation-room-terminal') || negotiationRoomRef.current;
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      };
+      setTimeout(scrollDown, 80);
+      setTimeout(scrollDown, 250);
+    }
+  }, [flowStep]);
 
   const [isSimulatingSlaBreach, setIsSimulatingSlaBreach] = useState(false);
   const [slaBreachResult, setSlaBreachResult] = useState<any>(null);
@@ -2048,7 +2121,11 @@ export default function DealRoomPage() {
 
             {/* Step 2: Autonomous Agent-to-Agent Negotiation Room */}
             {flowStep === 'negotiation' && (
-              <div className="bg-ink-900 border border-signal-border rounded-lg p-5 sm:p-7 shadow-xl space-y-6 animate-fade-in">
+              <div
+                id="negotiation-room-terminal"
+                ref={negotiationRoomRef}
+                className="bg-ink-900 border border-signal-border rounded-lg p-5 sm:p-7 shadow-xl space-y-6 animate-fade-in scroll-mt-6"
+              >
                 {/* Header & Telemetry */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ink-800 pb-4">
                   <div className="flex items-center gap-3">
@@ -2116,7 +2193,7 @@ export default function DealRoomPage() {
                 </div>
 
                 {/* Real-Time 2D Bargaining Concession Curve (Pareto Frontier Visualizer) */}
-                <BargainingConcessionCurve />
+                <BargainingConcessionCurve revealedTurns={revealedTurns} />
 
                 {/* Live Turn-by-Turn Conversational Stream */}
                 <div className="space-y-4">
