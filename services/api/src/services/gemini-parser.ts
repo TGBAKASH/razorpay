@@ -10,6 +10,7 @@ export interface ParseIntentResult {
   missing_fields: string[];
   is_complete: boolean;
   raw_query: string;
+  parsed_by?: 'gemini_1.5_flash' | 'deterministic_rules';
 }
 
 export interface ParsePolicyResult {
@@ -200,37 +201,33 @@ export function extractIntentDeterministically(
     return_preference = 'easy returns';
   }
 
-  // 7. Priorities (including Hindi terms: "saste", "sasta", "kam daam", "jaldi", "turant")
-  const priorities: PriorityFactor[] = [];
-  if (
-    lower.includes('cheap') ||
-    lower.includes('budget') ||
-    lower.includes('price') ||
-    lower.includes('under') ||
-    lower.includes('discount') ||
-    lower.includes('saste') ||
-    lower.includes('sasta') ||
-    lower.includes('kam daam') ||
-    lower.includes('bachat')
-  ) {
-    priorities.push('price');
+  // 7. Priorities (including order of occurrence and Hindi terms: "saste", "sasta", "kam daam", "jaldi", "turant")
+  const priceIndex = lower.search(/\b(cheap|cheapest|lowest price|best price|saste|sasta|kam daam|bachat|discount)\b/);
+  const fastIndex = lower.search(/\b(fast|fastest|quick|express|speed|jaldi|turant|urgent|same day|next day|delivered by)\b/);
+  const returnIndex = lower.search(/\b(return|returns|replacement|easy return)\b/);
+  const budgetWordIndex = lower.search(/\b(budget|under|below|max)\b/);
+
+  const detectedPriorities: { type: PriorityFactor; index: number }[] = [];
+
+  if (priceIndex !== -1) {
+    detectedPriorities.push({ type: 'price', index: priceIndex });
+  } else if (budgetWordIndex !== -1 && fastIndex === -1) {
+    // "budget 3000" alone without fast delivery mentioned defaults to price priority
+    detectedPriorities.push({ type: 'price', index: budgetWordIndex });
   }
-  if (
-    lower.includes('fast') ||
-    lower.includes('express') ||
-    lower.includes('speed') ||
-    lower.includes('tuesday') ||
-    lower.includes('friday') ||
-    lower.includes('tomorrow') ||
-    lower.includes('delivered by') ||
-    lower.includes('jaldi') ||
-    lower.includes('turant')
-  ) {
-    if (!priorities.includes('delivery_speed')) priorities.push('delivery_speed');
+
+  if (fastIndex !== -1) {
+    detectedPriorities.push({ type: 'delivery_speed', index: fastIndex });
   }
-  if (lower.includes('return') || lower.includes('replacement')) {
-    if (!priorities.includes('return_terms')) priorities.push('return_terms');
+
+  if (returnIndex !== -1) {
+    detectedPriorities.push({ type: 'return_terms', index: returnIndex });
   }
+
+  // Sort by first occurrence in query to respect user precedence (e.g. "fastest and cheapest" vs "cheapest and fastest")
+  detectedPriorities.sort((a, b) => a.index - b.index);
+
+  const priorities: PriorityFactor[] = detectedPriorities.map((p) => p.type);
   const allPriorities: PriorityFactor[] = ['price', 'delivery_speed', 'return_terms', 'extras'];
   allPriorities.forEach((p) => {
     if (!priorities.includes(p)) priorities.push(p);
@@ -256,6 +253,7 @@ export async function parseBuyerIntent(
 ): Promise<ParseIntentResult> {
   const refDate = referenceDateString ? new Date(referenceDateString) : new Date();
   let extracted: ReturnType<typeof extractIntentDeterministically> | null = null;
+  let parsedBy: 'gemini_1.5_flash' | 'deterministic_rules' = 'deterministic_rules';
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (apiKey && apiKey.trim() !== '') {
@@ -278,8 +276,11 @@ JSON Schema:
 
 Important Rules:
 - Hindi words like "teen hazar" = 3000 INR = 300000 paise.
-- Hindi words like "saste" / "sasta" = priority "price".
-- Hindi words like "jaldi" / "turant" = priority "delivery_speed".
+- If the user explicitly asks for "fast delivery", "fastest delivery", "express", "urgent", "jaldi", "turant", or specifies a delivery date priority, put "delivery_speed" first in priorities: ["delivery_speed", ...] (even if a budget number like "budget 3000" is also present).
+- A budget ceiling like "budget 3000" or "under 4000" sets "budget_max_paise", but is NOT priority = price unless words like "cheap", "cheapest", "lowest price", "saste", or "sasta" are explicitly requested as a priority.
+- If both price and speed are mentioned, follow their exact order of occurrence:
+  - "cheapest and fastest" -> ["price", "delivery_speed", "return_terms", "extras"]
+  - "fastest and cheapest" -> ["delivery_speed", "price", "return_terms", "extras"]
 - Return ONLY valid JSON, no markdown formatting.`;
 
       console.log(`[Gemini Outbound] POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent with query: "${rawQuery}"`);
@@ -311,6 +312,7 @@ Important Rules:
             return_preference: parsed.return_preference || undefined,
             priorities: Array.isArray(parsed.priorities) && parsed.priorities.length > 0 ? parsed.priorities : ['price', 'delivery_speed', 'return_terms', 'extras'],
           };
+          parsedBy = 'gemini_1.5_flash';
         }
       }
     } catch (apiErr) {
@@ -321,6 +323,7 @@ Important Rules:
 
   if (!extracted) {
     extracted = extractIntentDeterministically(rawQuery, refDate);
+    parsedBy = 'deterministic_rules';
   }
 
   const missing_fields: string[] = [];
@@ -345,6 +348,7 @@ Important Rules:
     missing_fields,
     is_complete: missing_fields.length === 0,
     raw_query: rawQuery,
+    parsed_by: parsedBy,
   };
 }
 
