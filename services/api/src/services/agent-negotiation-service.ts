@@ -78,35 +78,41 @@ Return valid JSON:
   "proposed_price_inr": number
 }`;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3500);
+    const candidateModels = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-pro'];
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: 'application/json' },
-        }),
-        signal: controller.signal,
-      }
-    );
-    clearTimeout(timeout);
+    for (const model of candidateModels) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3500);
 
-    if (res.ok) {
-      const data: any = await res.json();
-      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (rawText) {
-        const parsed = JSON.parse(rawText);
-        if (parsed.message && typeof parsed.proposed_price_inr === 'number' && !isNaN(parsed.proposed_price_inr)) {
-          return {
-            message: parsed.message,
-            proposedPricePaise: Math.round(parsed.proposed_price_inr * 100),
-          };
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: 'application/json' },
+            }),
+            signal: controller.signal,
+          }
+        );
+        clearTimeout(timeout);
+
+        if (res.ok) {
+          const data: any = await res.json();
+          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            const parsed = JSON.parse(rawText);
+            if (parsed.message && typeof parsed.proposed_price_inr === 'number' && !isNaN(parsed.proposed_price_inr)) {
+              return {
+                message: parsed.message,
+                proposedPricePaise: Math.round(parsed.proposed_price_inr * 100),
+              };
+            }
+          }
         }
-      }
+      } catch {}
     }
   } catch {
     // Graceful fallback to deterministic template

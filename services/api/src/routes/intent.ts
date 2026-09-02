@@ -48,26 +48,57 @@ export async function registerIntentRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const testRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: 'Respond with JSON {"ping": "pong"}' }] }],
-            generationConfig: { responseMimeType: 'application/json' },
-          }),
-        }
-      );
+      // 1. List available models
+      const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+      let availableModels: string[] = [];
+      if (listRes.ok) {
+        const listData: any = await listRes.json();
+        availableModels = (listData.models || []).map((m: any) => m.name.replace(/^models\//, ''));
+      }
 
-      const status = testRes.status;
-      const bodyText = await testRes.text();
+      // 2. Try candidate models: gemini-2.0-flash, gemini-1.5-flash-latest, gemini-1.5-pro, gemini-pro
+      const candidateModels = availableModels.length > 0 
+        ? availableModels.filter(m => m.includes('flash') || m.includes('pro'))
+        : ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro', 'gemini-pro'];
+
+      let workingModel: string | null = null;
+      let workingResponse: string | null = null;
+      let lastErrStatus: number | null = null;
+      let lastErrText: string | null = null;
+
+      for (const model of candidateModels) {
+        try {
+          const testRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: 'Respond with JSON {"ping": "pong"}' }] }],
+                generationConfig: { responseMimeType: 'application/json' },
+              }),
+            }
+          );
+          if (testRes.ok) {
+            workingModel = model;
+            workingResponse = await testRes.text();
+            break;
+          } else {
+            lastErrStatus = testRes.status;
+            lastErrText = await testRes.text();
+          }
+        } catch {}
+      }
 
       return {
         configured: true,
         key_prefix: key.substring(0, 8) + '...',
-        google_http_status: status,
-        google_response: bodyText.substring(0, 300),
+        available_models_count: availableModels.length,
+        available_models: availableModels.slice(0, 10),
+        working_model: workingModel,
+        working_response: workingResponse,
+        last_error_status: lastErrStatus,
+        last_error_text: lastErrText ? lastErrText.substring(0, 200) : null,
       };
     } catch (err: any) {
       return {

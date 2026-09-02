@@ -308,46 +308,51 @@ Important Rules:
   - "fastest and cheapest" -> ["delivery_speed", "price", "return_terms", "extras"]
 - Return ONLY valid JSON, no markdown formatting.`;
 
-      console.log(`[Gemini Outbound] Calling Gemini 1.5 Flash for query: "${rawQuery}"`);
+      const candidateModels = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-pro'];
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: 'application/json' },
-          }),
-        }
-      );
+      for (const model of candidateModels) {
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { responseMimeType: 'application/json' },
+              }),
+            }
+          );
 
-      if (response.ok) {
-        const data: any = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          console.log(`[Gemini Response] Successful structured extraction: ${text.substring(0, 120)}...`);
-          const parsed = JSON.parse(text);
-          const q = typeof parsed.quantity === 'number' && parsed.quantity > 0 ? parsed.quantity : 1;
-          let bPaise = typeof parsed.budget_max_paise === 'number' ? Math.round(parsed.budget_max_paise) : undefined;
-          if (typeof parsed.unit_budget_inr === 'number' && parsed.unit_budget_inr > 0 && q > 1) {
-            bPaise = Math.round(q * parsed.unit_budget_inr * 100);
+          if (response.ok) {
+            const data: any = await response.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              console.log(`[Gemini Response via ${model}] Successful structured extraction: ${text.substring(0, 120)}...`);
+              const parsed = JSON.parse(text);
+              const q = typeof parsed.quantity === 'number' && parsed.quantity > 0 ? parsed.quantity : 1;
+              let bPaise = typeof parsed.budget_max_paise === 'number' ? Math.round(parsed.budget_max_paise) : undefined;
+              if (typeof parsed.unit_budget_inr === 'number' && parsed.unit_budget_inr > 0 && q > 1) {
+                bPaise = Math.round(q * parsed.unit_budget_inr * 100);
+              }
+
+              extracted = {
+                category: parsed.category || undefined,
+                budget_max_paise: bPaise,
+                delivery_deadline: parsed.delivery_deadline || undefined,
+                quantity: q,
+                payment_preference: Array.isArray(parsed.payment_preference) && parsed.payment_preference.length > 0 ? parsed.payment_preference : undefined,
+                return_preference: parsed.return_preference || undefined,
+                priorities: Array.isArray(parsed.priorities) && parsed.priorities.length > 0 ? parsed.priorities : ['price', 'delivery_speed', 'return_terms', 'extras'],
+              };
+              parsedBy = 'gemini_1.5_flash';
+              break;
+            }
+          } else {
+            const errBody = await response.text();
+            console.error(`[Gemini Error on ${model}] HTTP ${response.status}: ${errBody.substring(0, 150)}`);
           }
-
-          extracted = {
-            category: parsed.category || undefined,
-            budget_max_paise: bPaise,
-            delivery_deadline: parsed.delivery_deadline || undefined,
-            quantity: q,
-            payment_preference: Array.isArray(parsed.payment_preference) && parsed.payment_preference.length > 0 ? parsed.payment_preference : undefined,
-            return_preference: parsed.return_preference || undefined,
-            priorities: Array.isArray(parsed.priorities) && parsed.priorities.length > 0 ? parsed.priorities : ['price', 'delivery_speed', 'return_terms', 'extras'],
-          };
-          parsedBy = 'gemini_1.5_flash';
-        }
-      } else {
-        const errBody = await response.text();
-        console.error(`[Gemini Error] HTTP ${response.status}: ${errBody}`);
+        } catch {}
       }
     } catch (apiErr) {
       console.warn('[Gemini Outbound] Request failed, engaging deterministic fallback:', apiErr);
