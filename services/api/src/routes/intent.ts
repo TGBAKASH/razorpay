@@ -35,6 +35,49 @@ export async function registerIntentRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // 1a. Gemini API Key Status Check
+  fastify.get('/api/debug/gemini-status', async () => {
+    const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY || '';
+    const key = rawKey.trim();
+    if (!key) {
+      return {
+        configured: false,
+        message: 'No GEMINI_API_KEY found in process.env',
+        env_keys_checked: ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GEMINI_KEY'],
+      };
+    }
+
+    try {
+      const testRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: 'Respond with JSON {"ping": "pong"}' }] }],
+            generationConfig: { responseMimeType: 'application/json' },
+          }),
+        }
+      );
+
+      const status = testRes.status;
+      const bodyText = await testRes.text();
+
+      return {
+        configured: true,
+        key_prefix: key.substring(0, 8) + '...',
+        google_http_status: status,
+        google_response: bodyText.substring(0, 300),
+      };
+    } catch (err: any) {
+      return {
+        configured: true,
+        key_prefix: key.substring(0, 8) + '...',
+        network_error: err.message,
+      };
+    }
+  });
+
   // 1b. Natural Language Policy Rules Parsing endpoint (Merchant)
   fastify.post('/api/policy/interpret-nl', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as { prompt?: string };

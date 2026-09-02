@@ -275,9 +275,10 @@ export async function parseBuyerIntent(
   const refDate = referenceDateString ? new Date(referenceDateString) : new Date();
   let extracted: ReturnType<typeof extractIntentDeterministically> | null = null;
   let parsedBy: 'gemini_1.5_flash' | 'deterministic_rules' = 'deterministic_rules';
-  const apiKey = process.env.GEMINI_API_KEY;
+  const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY || '';
+  const apiKey = rawKey.trim();
 
-  if (apiKey && apiKey.trim() !== '') {
+  if (apiKey !== '') {
     try {
       const prompt = `You are an AI intent parser for an agentic commerce negotiation engine.
 Analyze the buyer's query (which may be in English, Hindi, or mixed Hinglish) and extract structured constraints in JSON format.
@@ -307,7 +308,7 @@ Important Rules:
   - "fastest and cheapest" -> ["delivery_speed", "price", "return_terms", "extras"]
 - Return ONLY valid JSON, no markdown formatting.`;
 
-      console.log(`[Gemini Outbound] POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent with query: "${rawQuery}"`);
+      console.log(`[Gemini Outbound] Calling Gemini 1.5 Flash for query: "${rawQuery}"`);
 
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
@@ -344,6 +345,9 @@ Important Rules:
           };
           parsedBy = 'gemini_1.5_flash';
         }
+      } else {
+        const errBody = await response.text();
+        console.error(`[Gemini Error] HTTP ${response.status}: ${errBody}`);
       }
     } catch (apiErr) {
       console.warn('[Gemini Outbound] Request failed, engaging deterministic fallback:', apiErr);

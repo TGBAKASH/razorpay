@@ -46,8 +46,9 @@ async function callGeminiAgentTurn(params: {
   deadlineStr?: string;
   priorities: string[];
 }): Promise<{ message: string; proposedPricePaise: number } | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey.trim() === '') return null;
+  const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY || '';
+  const apiKey = rawKey.trim();
+  if (!apiKey) return null;
 
   try {
     const prompt =
