@@ -801,8 +801,11 @@ export default function DealRoomPage() {
     setShowAgentDialogModal(false);
     setFlowStep('contract');
     setTimeout(() => {
-      window.scrollTo({ top: 600, behavior: 'smooth' });
-    }, 100);
+      const el = document.getElementById('agent-settlement-visualizer-section');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 120);
   };
 
   useEffect(() => {

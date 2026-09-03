@@ -513,10 +513,18 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                   </div>
                 </div>
 
-                <div className="pt-1">
+                <div className="pt-2">
                   <button
-                    onClick={handleApplyNegotiatedContract}
-                    className="w-full py-2.5 bg-[#0052CC] hover:bg-[#0747A6] text-white font-sans font-semibold text-xs sm:text-sm rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                    onClick={() => {
+                      handleApplyNegotiatedContract();
+                      setTimeout(() => {
+                        const el = document.getElementById('agent-settlement-visualizer-section');
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }, 120);
+                    }}
+                    className="w-full py-3 bg-[#0052CC] hover:bg-[#0747A6] text-white font-sans font-semibold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm hover:shadow-md"
                   >
                     <span>Accept Negotiated Contract &amp; Proceed to Settlement →</span>
                   </button>
