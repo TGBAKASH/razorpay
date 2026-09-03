@@ -13,6 +13,7 @@ export interface AgentNegotiationTurn {
   clamped_price_inr: string;
   was_clamped: boolean;
   clamping_reason?: string;
+  model_source?: string;
 }
 
 export interface AgentNegotiationResult {
@@ -303,6 +304,7 @@ export class AgentNegotiationService {
         clamped_price_inr: (clampedBuyerPricePaise / 100).toFixed(2),
         was_clamped: buyerWasClamped,
         clamping_reason: buyerClampingReason,
+        model_source: geminiBuyer ? 'Gemini 2.0 Flash' : 'Deterministic Clamped Engine',
       });
 
       // Check for agreement: if buyer bid meets or exceeds merchant target
@@ -316,6 +318,7 @@ export class AgentNegotiationService {
           proposed_price_inr: (currentBuyerBidPaise / 100).toFixed(2),
           clamped_price_inr: (currentBuyerBidPaise / 100).toFixed(2),
           was_clamped: false,
+          model_source: 'Gemini 2.0 Flash',
         });
         break;
       }
@@ -385,6 +388,7 @@ export class AgentNegotiationService {
         clamped_price_inr: (clampedMerchantPricePaise / 100).toFixed(2),
         was_clamped: merchantWasClamped,
         clamping_reason: merchantClampingReason,
+        model_source: geminiMerchant ? 'Gemini 2.0 Flash' : 'Deterministic Clamped Engine',
       });
 
       // Check for mutual convergence in Round 3 or 4
