@@ -120,8 +120,8 @@ export function AgentSettlementProofVisualizer({
             </div>
             <div className="mt-1 flex items-center justify-between text-[11px]">
               <span className="text-slate-500">Debit Status:</span>
-              <span className={`font-semibold ${animationStep >= 3 ? 'text-emerald-700' : 'text-slate-400'}`}>
-                {animationStep >= 3 ? `-₹${amountInr} Debited ✓` : 'Standby'}
+              <span className={`font-semibold ${animationStep >= 3 ? 'text-emerald-700' : 'text-slate-500'}`}>
+                {animationStep >= 3 ? `-₹${amountInr} Debited ✓` : 'Standby (Pending S2S Debit)'}
               </span>
             </div>
           </div>
@@ -134,7 +134,7 @@ export function AgentSettlementProofVisualizer({
             <div className="text-xs font-sans font-bold text-slate-900">Razorpay S2S Rails</div>
             <div className="text-[10px] text-slate-500 mt-0.5">Recurring Mandate Engine</div>
             <div className="mt-2.5 py-1 px-2 rounded-lg bg-slate-50 border border-slate-200 text-[10px] font-mono text-slate-600">
-              {animationStep === 0 && 'Ready for Agent Invocation'}
+              {animationStep === 0 && 'Standby: Click Simulate to Execute'}
               {animationStep === 1 && 'Verifying Mandate Pre-Auth...'}
               {animationStep === 2 && 'Cryptographic Nonce Validated'}
               {animationStep === 3 && `Transferring ₹${amountInr}...`}
@@ -160,8 +160,8 @@ export function AgentSettlementProofVisualizer({
             </div>
             <div className="mt-1 flex items-center justify-between text-[11px]">
               <span className="text-slate-500">Credit Status:</span>
-              <span className={`font-semibold ${animationStep >= 4 ? 'text-emerald-700' : 'text-slate-400'}`}>
-                {animationStep >= 4 ? `+₹${amountInr} Credited ✓` : 'Awaiting Settlement'}
+              <span className={`font-semibold ${animationStep >= 4 ? 'text-emerald-700' : 'text-slate-500'}`}>
+                {animationStep >= 4 ? `+₹${amountInr} Credited ✓` : 'Standby (Awaiting S2S Credit)'}
               </span>
             </div>
           </div>
@@ -169,56 +169,56 @@ export function AgentSettlementProofVisualizer({
       </div>
 
       {/* Step-by-Step Execution Pipeline Timeline */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-sans">
-        <div className={`p-3 rounded-xl border transition-all ${
-          animationStep >= 1 ? 'bg-blue-50/80 border-blue-200 text-blue-900' : 'bg-slate-50 border-slate-200 text-slate-500'
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-sans">
+        <div className={`p-3.5 rounded-xl border transition-all ${
+          animationStep >= 1 ? 'bg-blue-50/80 border-blue-200 text-blue-900 font-semibold' : 'bg-white border-slate-200 text-slate-500'
         }`}>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-bold uppercase">Step 1</span>
-            <span>{animationStep >= 1 ? '✓' : '○'}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Step 1</span>
+            <span className="font-bold">{animationStep >= 1 ? '✓' : '○'}</span>
           </div>
-          <div className="font-semibold text-xs">Mandate Pre-Auth</div>
-          <div className="text-[11px] opacity-75 mt-0.5">₹5,000 ceiling verified</div>
+          <div className="font-semibold text-xs text-slate-900">Mandate Pre-Auth</div>
+          <div className="text-[11px] opacity-75 mt-0.5 font-normal">₹5,000 ceiling verified</div>
         </div>
 
-        <div className={`p-3 rounded-xl border transition-all ${
-          animationStep >= 2 ? 'bg-blue-50/80 border-blue-200 text-blue-900' : 'bg-slate-50 border-slate-200 text-slate-500'
+        <div className={`p-3.5 rounded-xl border transition-all ${
+          animationStep >= 2 ? 'bg-blue-50/80 border-blue-200 text-blue-900 font-semibold' : 'bg-white border-slate-200 text-slate-500'
         }`}>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-bold uppercase">Step 2</span>
-            <span>{animationStep >= 2 ? '✓' : '○'}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Step 2</span>
+            <span className="font-bold">{animationStep >= 2 ? '✓' : '○'}</span>
           </div>
-          <div className="font-semibold text-xs">HMAC Nonce Seal</div>
-          <div className="text-[11px] opacity-75 mt-0.5">Dual-agent contract hash</div>
+          <div className="font-semibold text-xs text-slate-900">HMAC Nonce Seal</div>
+          <div className="text-[11px] opacity-75 mt-0.5 font-normal">Dual-agent contract hash</div>
         </div>
 
-        <div className={`p-3 rounded-xl border transition-all ${
-          animationStep >= 3 ? 'bg-blue-50/80 border-blue-200 text-blue-900' : 'bg-slate-50 border-slate-200 text-slate-500'
+        <div className={`p-3.5 rounded-xl border transition-all ${
+          animationStep >= 3 ? 'bg-blue-50/80 border-blue-200 text-blue-900 font-semibold' : 'bg-white border-slate-200 text-slate-500'
         }`}>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-bold uppercase">Step 3</span>
-            <span>{animationStep >= 3 ? '✓' : '○'}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Step 3</span>
+            <span className="font-bold">{animationStep >= 3 ? '✓' : '○'}</span>
           </div>
-          <div className="font-semibold text-xs">S2S Direct Debit</div>
-          <div className="text-[11px] opacity-75 mt-0.5">Zero-click token execution</div>
+          <div className="font-semibold text-xs text-slate-900">S2S Direct Debit</div>
+          <div className="text-[11px] opacity-75 mt-0.5 font-normal">Zero-click token execution</div>
         </div>
 
-        <div className={`p-3 rounded-xl border transition-all ${
-          animationStep >= 4 ? 'bg-emerald-50 border-emerald-200 text-emerald-900 font-semibold' : 'bg-slate-50 border-slate-200 text-slate-500'
+        <div className={`p-3.5 rounded-xl border transition-all ${
+          animationStep >= 4 ? 'bg-emerald-50 border-emerald-200 text-emerald-900 font-semibold' : 'bg-white border-slate-200 text-slate-500'
         }`}>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-bold uppercase">Step 4</span>
-            <span>{animationStep >= 4 ? '✓' : '○'}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Step 4</span>
+            <span className="font-bold">{animationStep >= 4 ? '✓' : '○'}</span>
           </div>
-          <div className="font-semibold text-xs">Merchant Credited</div>
-          <div className="text-[11px] opacity-75 mt-0.5">Instant settlement captured</div>
+          <div className="font-semibold text-xs text-slate-900">Merchant Credited</div>
+          <div className="text-[11px] opacity-75 mt-0.5 font-normal">Instant settlement captured</div>
         </div>
       </div>
 
       {/* Bank Transfer Receipt & Cryptographic Proof Card */}
       {animationStep >= 4 && (
-        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3 animate-fade-in text-xs font-sans">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+        <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 space-y-3.5 animate-fade-in text-xs font-sans">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
             <div className="flex items-center gap-2">
               <span className="text-emerald-700 font-bold text-sm">✓</span>
               <span className="font-bold text-slate-900">
@@ -230,7 +230,7 @@ export function AgentSettlementProofVisualizer({
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
             <div>
               <span className="text-[10px] text-slate-500 uppercase block">Settlement Amount</span>
               <span className="font-mono font-bold text-slate-900 text-sm">₹{amountInr}</span>
@@ -240,7 +240,7 @@ export function AgentSettlementProofVisualizer({
               <span className="font-mono font-semibold text-slate-900">{paymentId}</span>
             </div>
             <div>
-              <span className="text-[10px] text-slate-500 uppercase block">NPCI RRN</span>
+              <span className="text-[10px] text-slate-500 uppercase block">NPCI RRN (Ref No)</span>
               <span className="font-mono font-semibold text-blue-700">{liveRrn}</span>
             </div>
             <div>
@@ -249,12 +249,12 @@ export function AgentSettlementProofVisualizer({
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-500">
+          <div className="pt-2.5 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-500">
             <div>
               Contract Signature: <span className="font-mono text-slate-700">{signature.substring(0, 24)}...</span>
             </div>
             <div className="text-emerald-700 font-semibold">
-              100% Autonomous &bull; Zero Human Intervention &bull; SLA Protected
+              100% Autonomous &bull; Zero Human Intervention &bull; Protected by Delivery Guarantee (SLA: Service Level Agreement)
             </div>
           </div>
         </div>

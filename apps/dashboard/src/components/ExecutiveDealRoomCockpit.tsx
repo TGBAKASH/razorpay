@@ -114,18 +114,28 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
     buyerMandate && buyerMandate.status?.toLowerCase() === 'active'
   );
 
-  const negotiatedPricePaise = singleOffer?.final_price_paise || (agentNegotiationResult?.final_price_paise || 378312);
+  const isNegotiationDone = Boolean(
+    (singleOffer && singleOffer.state !== 'CREATED') ||
+    (agentNegotiationResult && revealedTurns >= 8) ||
+    flowStep === 'contract' ||
+    flowStep === 'checkout' ||
+    flowStep === 'paid'
+  );
+
   const listPricePaise = singleOffer?.list_price_paise || 429900;
-  const savingsPaise = Math.max(0, listPricePaise - negotiatedPricePaise);
+  const negotiatedPricePaise = isNegotiationDone
+    ? (singleOffer?.final_price_paise || agentNegotiationResult?.final_price_paise || 378312)
+    : listPricePaise;
+  const savingsPaise = isNegotiationDone ? Math.max(0, listPricePaise - negotiatedPricePaise) : 0;
 
   return (
-    <div className="space-y-6">
-      {/* 2-Column Split Cockpit Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <div className="space-y-10">
+      {/* 2-Column Split Cockpit Layout with Generous Breathing Room */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* LEFT COLUMN: Sovereign Deal Desk (Omnibox & Live Agent Arena) */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className="lg:col-span-7 space-y-8">
           {/* Card 1: Intent Omnibox */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-5">
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-7 sm:p-8 shadow-sm space-y-6">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-sans font-bold text-slate-900 tracking-tight flex items-center gap-2">
@@ -494,7 +504,7 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                     <span className="text-emerald-800 font-mono font-bold text-sm">₹515.88 (12%)</span>
                   </div>
                   <div>
-                    <span className="text-slate-500 text-[11px] block">Guaranteed SLA</span>
+                    <span className="text-slate-500 text-[11px] block">Guaranteed Delivery (SLA)</span>
                     <span className="text-slate-800 font-semibold text-xs sm:text-sm">Thursday, Sep 3</span>
                   </div>
                   <div>
@@ -517,30 +527,42 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
         </div>
 
         {/* RIGHT COLUMN: The Executive Settlement Desk & Live Deal Ticket */}
-        <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
+        <div className="lg:col-span-5 space-y-8 lg:sticky lg:top-24">
           {/* Card: Live Deal Ticket */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-7 sm:p-8 shadow-sm space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3.5">
               <h3 className="text-sm font-sans font-bold text-slate-900 tracking-tight">
                 Cryptographic Deal Ticket
               </h3>
-              <span className="text-[11px] font-sans font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                {singleOffer ? 'Contract Sealed' : 'Awaiting Settlement'}
+              <span className={`text-[11px] font-sans font-semibold px-2.5 py-0.5 rounded-full border ${
+                isNegotiationDone
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-slate-100 text-slate-600 border-slate-200'
+              }`}>
+                {isNegotiationDone ? 'Consensus Contract Sealed' : 'Standard Catalog Rate'}
               </span>
             </div>
 
             {/* Financial Numbers Highlight */}
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <div className="flex items-baseline gap-3">
                 <span className="text-4xl font-sans font-black text-slate-900 tracking-tight">
                   ₹{(negotiatedPricePaise / 100).toFixed(2)}
                 </span>
-                <span className="text-base font-sans text-slate-400 line-through">
-                  ₹{(listPricePaise / 100).toFixed(2)}
-                </span>
-                {savingsPaise > 0 && (
-                  <span className="text-xs font-sans font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                    Save ₹{(savingsPaise / 100).toFixed(2)}
+                {isNegotiationDone ? (
+                  <>
+                    <span className="text-base font-sans text-slate-400 line-through">
+                      ₹{(listPricePaise / 100).toFixed(2)}
+                    </span>
+                    {savingsPaise > 0 && (
+                      <span className="text-xs font-sans font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        Save ₹{(savingsPaise / 100).toFixed(2)} (12%)
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-xs font-sans font-medium text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                    Catalog Base Price
                   </span>
                 )}
               </div>
@@ -550,30 +572,56 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
             </div>
 
             {/* Key Commercial Terms */}
-            <div className="space-y-2.5 pt-2 border-t border-slate-100 text-xs font-sans">
+            <div className="space-y-3 pt-3 border-t border-slate-100 text-xs font-sans">
               <div className="flex items-center justify-between py-1 border-b border-slate-50">
                 <span className="text-slate-500">Merchant Partner</span>
                 <span className="text-slate-900 font-semibold">Sprint Athletics (BLR-WH-01)</span>
               </div>
               <div className="flex items-center justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500">Fulfillment SLA</span>
-                <span className="text-emerald-700 font-semibold">Guaranteed 48h Express</span>
+                <div>
+                  <span className="text-slate-500 block">Delivery Commitment (SLA)</span>
+                  <span className="text-[10px] text-slate-400">Service Level Agreement</span>
+                </div>
+                <span className="text-emerald-700 font-semibold text-right">Guaranteed 48h Express</span>
               </div>
               <div className="flex items-center justify-between py-1 border-b border-slate-50">
                 <span className="text-slate-500">Replacement Guarantee</span>
                 <span className="text-slate-900 font-semibold">14-Day Free Replacement</span>
               </div>
               <div className="flex items-center justify-between py-1">
-                <span className="text-slate-500">Cryptographic Seal</span>
-                <span className="text-blue-700 font-mono text-[11px] truncate max-w-[170px]" title={signedContractPayload?.signature || 'HMAC-SHA256 Nonce-Sealed'}>
-                  {signedContractPayload?.signature ? `${signedContractPayload.signature.substring(0, 16)}...` : 'HMAC-SHA256 Locked'}
+                <span className="text-slate-500">Cryptographic Contract Seal</span>
+                <span className="text-blue-700 font-mono text-[11px] truncate max-w-[170px]" title={signedContractPayload?.signature || 'Awaiting Consensus Lock'}>
+                  {isNegotiationDone && signedContractPayload?.signature
+                    ? `${signedContractPayload.signature.substring(0, 16)}...`
+                    : isNegotiationDone
+                    ? 'HMAC-SHA256 Locked'
+                    : 'Awaiting Negotiation Lock'}
                 </span>
               </div>
             </div>
 
             {/* Settlement Action Deck */}
             <div className="pt-3 border-t border-slate-200 space-y-3">
-              {singleOffer?.state === 'PAID' || paymentResult?.status === 'captured' ? (
+              {!isNegotiationDone ? (
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-center">
+                  <div className="text-xs font-sans text-slate-600 font-medium">
+                    Run agent negotiation to unlock dynamic discounts and Pareto-optimal pricing
+                  </div>
+                  <button
+                    onClick={() => {
+                      handleRunAgentNegotiation();
+                      setTimeout(() => {
+                        const el = document.getElementById('negotiation-chat-section');
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }, 150);
+                    }}
+                    disabled={isAgentNegotiating}
+                    className="w-full py-2.5 px-4 bg-[#0C2340] hover:bg-[#13325B] text-white font-sans font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {isAgentNegotiating ? 'Negotiating (4 Rounds Active)...' : 'Start Agent Negotiation →'}
+                  </button>
+                </div>
+              ) : singleOffer?.state === 'PAID' || paymentResult?.status === 'captured' ? (
                 <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2.5 text-xs font-sans">
                   <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
                     <span>✓</span>
@@ -610,7 +658,7 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                     disabled={isRefunding}
                     className="w-full py-2 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-xs font-sans font-semibold transition-colors disabled:opacity-50 cursor-pointer shadow-2xs mt-2"
                   >
-                    {isRefunding ? 'Processing Refund...' : 'Simulate SLA Breach & Trigger Auto-Refund'}
+                    {isRefunding ? 'Processing Auto-Refund...' : 'Simulate Late Delivery (SLA Breach) & Auto-Refund'}
                   </button>
                 </div>
               ) : (
@@ -676,22 +724,24 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
         </div>
       </div>
 
-      {/* Real-Time Agent-to-Agent Autonomous Settlement Visualizer */}
-      <AgentSettlementProofVisualizer
-        amountPaise={negotiatedPricePaise}
-        buyerVpa="buyer@okhdfcbank"
-        merchantName="Sprint Athletics Ltd (BLR-WH-01)"
-        merchantAccount="HDFC Bank •••• 4921"
-        mandateId={buyerMandate?.mandate_id || 'man_live_98432'}
-        paymentId={paymentResult?.payment_id || 'pay_live_s2s_783294'}
-        signature={signedContractPayload?.signature || 'sig_3f92e4a415a5d4ae78903949bf9333b1e02a2421'}
-        isAlreadyPaid={singleOffer?.state === 'PAID' || paymentResult?.status === 'captured'}
-        onPaymentComplete={() => {
-          if (singleOffer?.state !== 'PAID') {
-            handleExecuteAutonomousPayment();
-          }
-        }}
-      />
+      {/* Real-Time Agent-to-Agent Autonomous Settlement Visualizer (Only visible once consensus is reached) */}
+      {isNegotiationDone && (
+        <AgentSettlementProofVisualizer
+          amountPaise={negotiatedPricePaise}
+          buyerVpa="buyer@okhdfcbank"
+          merchantName="Sprint Athletics Ltd (BLR-WH-01)"
+          merchantAccount="HDFC Bank •••• 4921"
+          mandateId={buyerMandate?.mandate_id || 'man_live_98432'}
+          paymentId={paymentResult?.payment_id || 'pay_live_s2s_783294'}
+          signature={signedContractPayload?.signature || 'sig_3f92e4a415a5d4ae78903949bf9333b1e02a2421'}
+          isAlreadyPaid={singleOffer?.state === 'PAID' || paymentResult?.status === 'captured'}
+          onPaymentComplete={() => {
+            if (singleOffer?.state !== 'PAID') {
+              handleExecuteAutonomousPayment();
+            }
+          }}
+        />
+      )}
 
       {/* Collapsible Bottom Drawer: Judge Architecture & Audit Inspector */}
       <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-sm">
