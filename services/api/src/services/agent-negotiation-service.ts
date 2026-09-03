@@ -267,7 +267,7 @@ export class AgentNegotiationService {
         proposedBuyerPricePaise = currentBuyerBidPaise + concession;
 
         // In test cases, simulate an accidental out-of-bounds LLM proposal to prove safety clamping
-        if (r === 2 && proposedBuyerPricePaise > buyerCeilingPaise) {
+        if (r === 2 && forceFallbackForTesting) {
           proposedBuyerPricePaise = buyerCeilingPaise + 10000; // Intentionally over ceiling to trigger clamping
         }
 
