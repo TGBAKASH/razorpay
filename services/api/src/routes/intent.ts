@@ -38,13 +38,17 @@ export async function registerIntentRoutes(fastify: FastifyInstance) {
 
   // 1a. Gemini API Key Status Check
   fastify.get('/api/debug/gemini-status', async () => {
-    const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY || '';
+    const poolKeys = geminiKeyPool.getAvailableKeys();
+    const rawKey = poolKeys.length > 0 
+      ? poolKeys[0].key 
+      : (process.env.GEMINI_API_KEYS?.split(/[,;\n]/)[0] || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY || '');
     const key = rawKey.trim();
     if (!key) {
       return {
         configured: false,
-        message: 'No GEMINI_API_KEY found in process.env',
-        env_keys_checked: ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GEMINI_KEY'],
+        message: 'No Gemini API keys found in process.env',
+        env_keys_checked: ['GEMINI_API_KEYS', 'GEMINI_API_KEY', 'GEMINI_API_KEY_1..10', 'GOOGLE_API_KEY', 'GEMINI_KEY'],
+        pool_status: geminiKeyPool.getPoolStatus(),
       };
     }
 

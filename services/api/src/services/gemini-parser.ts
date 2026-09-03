@@ -3,6 +3,7 @@ import {
   type PaymentPreferenceMethod,
   type PriorityFactor,
 } from '@razorpay-dealflow/adapters';
+import { geminiKeyPool } from './gemini-key-pool.js';
 
 export interface ParseIntentResult {
   category?: string;
@@ -275,7 +276,10 @@ export async function parseBuyerIntent(
   const refDate = referenceDateString ? new Date(referenceDateString) : new Date();
   let extracted: ReturnType<typeof extractIntentDeterministically> | null = null;
   let parsedBy: 'gemini_1.5_flash' | 'deterministic_rules' = 'deterministic_rules';
-  const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY || '';
+  const poolKeys = geminiKeyPool.getAvailableKeys();
+  const rawKey = poolKeys.length > 0 
+    ? poolKeys[0].key 
+    : (process.env.GEMINI_API_KEYS?.split(/[,;\n]/)[0] || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY || '');
   const apiKey = rawKey.trim();
 
   if (apiKey !== '' && process.env.VITEST !== 'true') {
@@ -397,7 +401,11 @@ Important Rules:
 export async function parseMerchantPolicy(rawQuery: string): Promise<ParsePolicyResult> {
   const lower = rawQuery.toLowerCase();
   let policyResult: ParsePolicyResult['policy'] = {};
-  const apiKey = process.env.GEMINI_API_KEY;
+  const poolKeys = geminiKeyPool.getAvailableKeys();
+  const rawKey = poolKeys.length > 0 
+    ? poolKeys[0].key 
+    : (process.env.GEMINI_API_KEYS?.split(/[,;\n]/)[0] || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY || '');
+  const apiKey = rawKey.trim();
 
   if (apiKey && apiKey.trim() !== '' && process.env.VITEST !== 'true') {
     try {
