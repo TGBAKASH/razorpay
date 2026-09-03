@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { TabularNumber } from './TabularNumber';
 import { AgentTransactionVisualizer } from './AgentTransactionVisualizer';
 import { AgentSettlementProofVisualizer } from './AgentSettlementProofVisualizer';
+import { BargainingConcessionCurve } from './BargainingConcessionCurve';
 
 interface ExecutiveDealRoomCockpitProps {
   freeTextIntent: string;
@@ -296,7 +297,13 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
             {/* Launch Primary CTA */}
             <div>
               <button
-                onClick={handleRunAgentNegotiation}
+                onClick={() => {
+                  handleRunAgentNegotiation();
+                  setTimeout(() => {
+                    const el = document.getElementById('negotiation-chat-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 150);
+                }}
                 disabled={isAgentNegotiating}
                 className="w-full py-3.5 px-6 rounded-xl bg-[#0C2340] hover:bg-[#13325B] text-white font-sans font-semibold text-sm transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
               >
@@ -311,7 +318,10 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
 
           {/* Card 2: Live Multi-Turn Dialogue Stream */}
           {(flowStep === 'negotiation' || agentNegotiationResult) && (
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-5 animate-fade-in">
+            <div
+              id="negotiation-chat-section"
+              className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-5 animate-fade-in scroll-mt-24"
+            >
               <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 gap-2">
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-sans font-bold text-slate-900 tracking-tight">
@@ -335,6 +345,14 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                   </span>
                 </div>
               </div>
+
+              {/* Real-Time 2D Bargaining Concession Curve (Pareto Frontier Visualizer) */}
+              <BargainingConcessionCurve
+                revealedTurns={revealedTurns}
+                buyerCeiling={budgetInr}
+                merchantFloor={3232}
+                agreedPrice={singleOffer ? singleOffer.final_price_paise / 100 : 3783.12}
+              />
 
               {/* Chat turns */}
               <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
