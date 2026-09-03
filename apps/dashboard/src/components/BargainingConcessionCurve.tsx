@@ -31,35 +31,62 @@ export function BargainingConcessionCurve({
 
   const isEquilibrium = revealedTurns >= 8;
 
+  // Calculate current spread dynamically based on revealed turns
+  const currentSpread = revealedTurns >= 8
+    ? 0
+    : revealedTurns >= 6
+    ? 199.00
+    : revealedTurns >= 4
+    ? 349.00
+    : revealedTurns >= 2
+    ? 473.07
+    : 774.00;
+
+  const convergencePct = Math.min(100, Math.round((revealedTurns / 8) * 100));
+
   return (
-    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 sm:p-5 font-sans shadow-2xs space-y-3">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 sm:p-5 font-sans shadow-2xs space-y-3.5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
             2D Bargaining Concession Curve (Pareto Frontier)
           </span>
           <span
             className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border transition-colors ${
               isEquilibrium
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold'
                 : 'bg-blue-50 text-blue-700 border-blue-200 animate-pulse'
             }`}
           >
             {isEquilibrium ? '✓ Consensus Equilibrium Reached' : `Negotiating Round ${Math.min(4, Math.ceil(revealedTurns / 2))} of 4`}
           </span>
         </div>
-        <div className="flex items-center gap-3 flex-wrap text-[11px] font-sans">
-          <span className={`flex items-center gap-1 transition-opacity ${revealedTurns >= 1 ? 'text-blue-700 font-semibold' : 'text-slate-400'}`}>
-            <span className="w-2.5 h-0.5 bg-blue-600 inline-block" /> Buyer Bid
+
+        {/* Live Spread Convergence Ticker */}
+        <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+            <span className="text-slate-500 text-[11px]">Bargaining Gap:</span>
+            <span className={`font-mono font-bold text-xs ${isEquilibrium ? 'text-emerald-700' : 'text-blue-700'}`}>
+              ₹{currentSpread.toFixed(2)}
+            </span>
+            <span className="text-[10px] text-slate-400">({convergencePct}% converged)</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between flex-wrap gap-2 text-[11px] font-sans">
+        <div className="flex items-center gap-4">
+          <span className={`flex items-center gap-1.5 transition-opacity ${revealedTurns >= 1 ? 'text-blue-700 font-semibold' : 'text-slate-400'}`}>
+            <span className="w-3 h-1 bg-blue-600 rounded-full inline-block" /> Buyer Bid Trajectory
           </span>
-          <span className={`flex items-center gap-1 transition-opacity ${revealedTurns >= 2 ? 'text-amber-700 font-semibold' : 'text-slate-400'}`}>
-            <span className="w-2.5 h-0.5 bg-amber-600 inline-block" /> Merchant Ask
-          </span>
-          <span className={`flex items-center gap-1 font-bold transition-opacity ${isEquilibrium ? 'text-emerald-700' : 'text-slate-400'}`}>
-            <span className={`w-2 h-2 rounded-full bg-emerald-600 inline-block ${isEquilibrium ? 'animate-ping' : ''}`} />
-            Consensus: ₹{agreedPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          <span className={`flex items-center gap-1.5 transition-opacity ${revealedTurns >= 2 ? 'text-amber-700 font-semibold' : 'text-slate-400'}`}>
+            <span className="w-3 h-1 bg-amber-600 rounded-full inline-block" /> Merchant Ask Trajectory
           </span>
         </div>
+        <span className={`flex items-center gap-1 font-bold transition-opacity ${isEquilibrium ? 'text-emerald-700' : 'text-slate-400'}`}>
+          <span className={`w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block ${isEquilibrium ? 'animate-ping' : ''}`} />
+          Consensus Target: ₹{agreedPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+        </span>
       </div>
 
       <div className="relative w-full overflow-hidden bg-white rounded-lg border border-slate-200/80 p-2">

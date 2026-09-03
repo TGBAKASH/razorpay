@@ -445,10 +445,11 @@ export default function DealRoomPage() {
   const [agentNegotiationResult, setAgentNegotiationResult] = useState<any>(null);
   const [showAgentDialogModal, setShowAgentDialogModal] = useState(false);
   const [revealedTurns, setRevealedTurns] = useState<number>(1);
+  const [negotiationPacingMs, setNegotiationPacingMs] = useState<number>(1800);
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<'visualizer' | 'adr' | 'invariants'>('visualizer');
 
-  // Sequential pacing effect: reveals agent turns one-by-one when negotiation view is active
+  // Sequential pacing effect: reveals agent turns with deliberate pacing (1.8s default) for dramatic visibility
   useEffect(() => {
     if (flowStep !== 'negotiation') return;
     setRevealedTurns(1);
@@ -461,9 +462,9 @@ export default function DealRoomPage() {
         }
         return prev + 1;
       });
-    }, 700); // 700ms per turn for visible simultaneous pacing of curve and dialogue
+    }, negotiationPacingMs);
     return () => clearInterval(interval);
-  }, [flowStep, agentNegotiationResult]);
+  }, [flowStep, agentNegotiationResult, negotiationPacingMs]);
 
   // Auto-scroll to negotiation room when it appears
   useEffect(() => {
@@ -2118,6 +2119,9 @@ export default function DealRoomPage() {
             isAgentNegotiating={isAgentNegotiating}
             agentNegotiationResult={agentNegotiationResult}
             revealedTurns={revealedTurns}
+            setRevealedTurns={setRevealedTurns}
+            negotiationPacingMs={negotiationPacingMs}
+            setNegotiationPacingMs={setNegotiationPacingMs}
             handleRunAgentNegotiation={handleRunAgentNegotiation}
             handleApplyNegotiatedContract={handleApplyNegotiatedContract}
             singleOffer={singleOffer}
