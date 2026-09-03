@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 
-export function AgentTransactionVisualizer() {
+export function AgentTransactionVisualizer({ defaultExpanded = false }: { defaultExpanded?: boolean }) {
   const [activeStep, setActiveStep] = useState<number>(1);
-  const [isExpanded, setIsExpanded] = useState<boolean>(true);
+  const [isExpanded, setIsExpanded] = useState<boolean>(defaultExpanded);
 
   const steps = [
     {
