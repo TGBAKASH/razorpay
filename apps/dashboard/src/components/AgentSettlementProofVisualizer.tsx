@@ -12,6 +12,7 @@ interface AgentSettlementProofVisualizerProps {
   signature?: string;
   onPaymentComplete?: () => void;
   isAlreadyPaid?: boolean;
+  autoExecute?: boolean;
 }
 
 export function AgentSettlementProofVisualizer({
@@ -24,6 +25,7 @@ export function AgentSettlementProofVisualizer({
   signature = 'sig_3f92e4a415a5d4ae78903949bf9333b1e02a2421',
   onPaymentComplete,
   isAlreadyPaid = false,
+  autoExecute = true,
 }: AgentSettlementProofVisualizerProps) {
   const [animationStep, setAnimationStep] = useState<number>(isAlreadyPaid ? 4 : 0);
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
@@ -68,6 +70,16 @@ export function AgentSettlementProofVisualizer({
       }
     }, 2300);
   };
+
+  // Auto-execute settlement autonomously without waiting for manual click
+  useEffect(() => {
+    if (autoExecute && animationStep === 0 && !isAlreadyPaid && !isExecuting) {
+      const timer = setTimeout(() => {
+        runSettlementAnimation();
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, [autoExecute, animationStep, isAlreadyPaid]);
 
   useEffect(() => {
     if (isAlreadyPaid && animationStep !== 4) {

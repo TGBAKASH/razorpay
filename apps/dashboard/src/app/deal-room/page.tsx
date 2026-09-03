@@ -862,7 +862,12 @@ export default function DealRoomPage() {
         }
         if (typeof bc.quantity === 'number' && bc.quantity > 0) {
           setAnimatingField('quantity');
-          setQuantity(bc.quantity);
+          let parsedQty = bc.quantity;
+          const lowerQ = freeTextIntent.toLowerCase();
+          if (parsedQty > 1 && new RegExp(`(?:budget|under|below|max|upto|price|cost|rs\\.?|₹)\\s*${parsedQty}\\b`, 'i').test(lowerQ)) {
+            parsedQty = 1;
+          }
+          setQuantity(parsedQty);
           await new Promise((r) => setTimeout(r, 160));
         }
         if (bc.delivery_deadline) {
@@ -2920,17 +2925,19 @@ export default function DealRoomPage() {
         </div>
       )}
 
-      {/* Persistent Footer */}
-      <footer className="border-t border-ink-800 bg-ink-900 py-4 mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-mono text-ink-400">
-          <div>
-            <span>Razorpay DealFlow</span> • Sovereign Deal Desk for Agentic Commerce
+      {/* Modern Clean Persistent Footer */}
+      <footer className="border-t border-slate-200 bg-white py-6 mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-sans text-slate-500">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-900">Razorpay DealFlow</span>
+            <span>&bull;</span>
+            <span>Sovereign Deal Desk for Agentic Commerce</span>
           </div>
-          <div className="flex items-center gap-4">
-            <Link href="/" className="hover:text-ink-200">Overview</Link>
-            <Link href="/merchant-console" className="hover:text-ink-200">Merchant Console</Link>
-            <Link href="/deal-room" className="hover:text-ink-200 text-signal-light">Deal Room</Link>
-            <Link href="/audit" className="hover:text-ink-200">Audit Ledger</Link>
+          <div className="flex items-center gap-5 text-slate-600 font-medium">
+            <Link href="/" className="hover:text-slate-900 transition-colors">Overview</Link>
+            <Link href="/merchant-console" className="hover:text-slate-900 transition-colors">Merchant Console</Link>
+            <Link href="/deal-room" className="text-[#0052CC] font-semibold">Deal Room</Link>
+            <Link href="/audit" className="hover:text-slate-900 transition-colors">Audit Ledger</Link>
           </div>
         </div>
       </footer>

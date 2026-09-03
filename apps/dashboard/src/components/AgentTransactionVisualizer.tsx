@@ -213,7 +213,7 @@ POST /v1/payments/create/recurring
                     <span className="font-semibold uppercase">Telemetry Payload</span>
                     <span className="text-emerald-700 font-semibold">● Live Proof</span>
                   </div>
-                  <pre className="p-3 bg-slate-900 rounded-lg text-[11px] font-mono text-emerald-400 overflow-x-auto max-h-[160px] leading-snug">
+                  <pre className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-mono text-slate-800 overflow-x-auto max-h-[160px] leading-snug shadow-2xs">
                     {current.codeSnippet}
                   </pre>
                 </div>

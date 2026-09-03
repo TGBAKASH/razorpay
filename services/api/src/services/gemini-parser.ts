@@ -298,11 +298,9 @@ JSON Schema:
   "delivery_deadline": ISO8601 date string | null,
   "payment_preference": ["upi" | "card" | "netbanking" | "cod"],
   "return_preference": string | null,
-  "priorities": ["price" | "delivery_speed" | "return_terms" | "extras"]
-}
-
-Important Rules:
-- If quantity is mentioned (e.g. "29 shoes"), extract quantity = 29.
+  "priorities": ["price" | "delivery_speed" | "return_terms" | "ex- Important Rules:
+- CRITICAL: Numbers following words like "budget", "under", "below", "max", "upto", "cost", "₹", "rs", or "price" (e.g. "budget 3500", "under 4000") are STRICTLY BUDGET CEILINGS, NEVER QUANTITY! If no explicit quantity count is specified (e.g. "10 pairs", "5 shoes", "20 boxes"), quantity MUST BE 1.
+- If quantity is explicitly mentioned (e.g. "29 shoes", "50 pairs"), extract quantity = integer.
 - If user says "at 3000 each" or "3000 per shoe", total budget ceiling is quantity * unit price * 100 paise.
 - Hindi words like "teen hazar" = 3000 INR = 300000 paise.
 - If the user explicitly asks for "fast delivery", "fastest delivery", "express", "urgent", "jaldi", "turant", or specifies a delivery date priority, put "delivery_speed" first in priorities: ["delivery_speed", ...] (even if a budget number like "at 3000 each" is also present).
@@ -334,10 +332,15 @@ Important Rules:
             if (text) {
               console.log(`[Gemini Response via ${model}] Successful structured extraction: ${text.substring(0, 120)}...`);
               const parsed = JSON.parse(text);
-              const q = typeof parsed.quantity === 'number' && parsed.quantity > 0 ? parsed.quantity : 1;
+              let q = typeof parsed.quantity === 'number' && parsed.quantity > 0 ? parsed.quantity : 1;
               let bPaise = typeof parsed.budget_max_paise === 'number' ? Math.round(parsed.budget_max_paise) : undefined;
               if (typeof parsed.unit_budget_inr === 'number' && parsed.unit_budget_inr > 0 && q > 1) {
                 bPaise = Math.round(q * parsed.unit_budget_inr * 100);
+              }
+
+              // Safeguard against LLM extracting budget as quantity (e.g. "budget 3500" -> quantity: 3500)
+              if (q > 1 && new RegExp(`(?:budget|under|below|max|upto|price|cost|rs\\.?|₹)\\s*${q}\\b`, 'i').test(rawQuery)) {
+                q = 1;
               }
 
               extracted = {

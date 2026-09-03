@@ -816,7 +816,7 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                 <div className="text-slate-600 text-xs">
                   Agent Decision Record (ADR) &bull; Verified inputs, rejected alternatives, and deterministic consensus rule:
                 </div>
-                <pre className="p-4 bg-slate-900 rounded-xl text-emerald-400 font-mono text-xs overflow-x-auto max-h-[240px]">
+                <pre className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-mono text-xs overflow-x-auto max-h-[240px] shadow-2xs">
                   {JSON.stringify(
                     {
                       decision_id: `adr_${singleOffer?.offer_id || 'deal_mtljfrfn'}`,
