@@ -99,37 +99,37 @@ POST /v1/payments/create/recurring
   ];
 
   return (
-    <div className="bg-ink-950 border border-ink-800 rounded-xl p-5 shadow-2xl mb-6">
+    <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-xs mb-4">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-ink-800 pb-3">
+      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-sky-950 border border-sky-700/60 flex items-center justify-center text-sky-300 font-mono text-sm font-bold">
+          <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">
             ⚡
           </div>
           <div>
-            <h3 className="text-sm font-bold font-mono text-ink-100 flex items-center gap-2">
+            <h3 className="text-sm font-bold font-sans text-slate-900 flex items-center gap-2">
               <span>Agent-to-Agent Autonomous Transaction Architecture</span>
-              <span className="text-[10px] bg-signal/20 text-signal-light border border-signal/40 px-2 py-0.5 rounded font-mono">
+              <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-semibold">
                 NPCI UAP + Razorpay Autopay
               </span>
             </h3>
-            <p className="text-[11px] text-ink-400 font-sans mt-0.5">
+            <p className="text-xs text-slate-500 font-sans mt-0.5">
               Interactive end-to-end trace of how autonomous AI agents discover, negotiate, sign, and settle with zero human intervention.
             </p>
           </div>
         </div>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-xs font-mono text-ink-400 hover:text-ink-200 px-3 py-1 rounded bg-ink-900 border border-ink-800 transition-all"
+          className="text-xs font-sans font-semibold text-slate-600 hover:text-slate-900 px-3 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
         >
           {isExpanded ? 'Collapse ▲' : 'Expand Flow ▼'}
         </button>
       </div>
 
       {isExpanded && (
-        <div className="mt-4 space-y-5">
+        <div className="mt-4 space-y-4">
           {/* Animated Flow Pipeline Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 font-mono text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 font-sans text-xs">
             {steps.map((s) => {
               const isCurrent = activeStep === s.num;
               return (
@@ -138,25 +138,25 @@ POST /v1/payments/create/recurring
                   onClick={() => setActiveStep(s.num)}
                   className={`p-3 rounded-lg border text-left transition-all cursor-pointer relative overflow-hidden ${
                     isCurrent
-                      ? 'bg-sky-950/70 border-sky-500 shadow-md shadow-sky-950/50'
-                      : 'bg-ink-900/60 border-ink-800 hover:border-ink-700 opacity-75 hover:opacity-100'
+                      ? 'bg-white border-blue-600 shadow-xs'
+                      : 'bg-slate-100/70 border-slate-200 hover:bg-white text-slate-600'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className={`text-[10px] font-bold ${isCurrent ? 'text-sky-300' : 'text-ink-400'}`}>
+                    <span className={`text-[10px] font-bold ${isCurrent ? 'text-blue-700' : 'text-slate-500'}`}>
                       STAGE 0{s.num}
                     </span>
                     <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
-                      isCurrent ? 'bg-sky-900 text-sky-200' : 'bg-ink-800 text-ink-400'
+                      isCurrent ? 'bg-blue-50 text-blue-700' : 'bg-slate-200 text-slate-600'
                     }`}>
                       {s.tag}
                     </span>
                   </div>
-                  <div className="text-[11px] font-bold text-ink-100 truncate">
+                  <div className="text-xs font-bold text-slate-900 truncate">
                     {s.title}
                   </div>
                   {isCurrent && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-signal animate-pulse" />
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
                   )}
                 </button>
               );
@@ -167,55 +167,53 @@ POST /v1/payments/create/recurring
           {(() => {
             const current = steps[activeStep - 1];
             return (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 bg-ink-900/40 p-4 rounded-xl border border-ink-850">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
                 {/* Visual Actor Diagram */}
                 <div className="lg:col-span-6 space-y-3">
-                  <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-sky-400 font-bold uppercase tracking-wider">
+                  <div className="flex items-center justify-between text-xs font-sans">
+                    <span className="text-slate-900 font-bold uppercase tracking-wider">
                       Stage {current.num}: {current.title}
                     </span>
-                    <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-mono">
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">
                       {current.badge}
                     </span>
                   </div>
 
-                  <p className="text-xs text-ink-300 font-sans leading-relaxed">
+                  <p className="text-xs text-slate-600 font-sans leading-relaxed">
                     {current.desc}
                   </p>
 
                   {/* Interaction Diagram */}
-                  <div className="p-3 bg-ink-950 rounded-lg border border-ink-800 flex items-center justify-between text-xs font-mono gap-2">
-                    <div className="p-2.5 bg-sky-950/80 border border-sky-800/80 rounded-lg text-center flex-1">
-                      <div className="text-base mb-1">🤖</div>
-                      <div className="text-[11px] font-bold text-sky-300">{current.actorA}</div>
-                      <div className="text-[9px] text-ink-400">Originator</div>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between text-xs font-sans gap-2">
+                    <div className="p-2.5 bg-white border border-slate-200 rounded-lg text-center flex-1 shadow-2xs">
+                      <div className="text-xs font-bold text-slate-900">{current.actorA}</div>
+                      <div className="text-[10px] text-slate-500">Originator</div>
                     </div>
 
                     <div className="flex flex-col items-center justify-center px-2">
-                      <span className="text-[9px] text-signal font-mono uppercase tracking-wider animate-pulse">
+                      <span className="text-[9px] text-blue-700 font-mono uppercase tracking-wider font-bold">
                         {current.tag}
                       </span>
-                      <div className="flex items-center text-ink-500 font-bold">
+                      <div className="flex items-center text-slate-400 font-bold text-xs">
                         <span>───►</span>
                       </div>
-                      <span className="text-[8px] text-ink-400">Zero Human Friction</span>
+                      <span className="text-[8px] text-slate-500">Autonomous</span>
                     </div>
 
-                    <div className="p-2.5 bg-amber-950/60 border border-amber-800/80 rounded-lg text-center flex-1">
-                      <div className="text-base mb-1">🏪</div>
-                      <div className="text-[11px] font-bold text-amber-300">{current.actorB}</div>
-                      <div className="text-[9px] text-ink-400">Recipient / Rails</div>
+                    <div className="p-2.5 bg-white border border-slate-200 rounded-lg text-center flex-1 shadow-2xs">
+                      <div className="text-xs font-bold text-slate-900">{current.actorB}</div>
+                      <div className="text-[10px] text-slate-500">Recipient / Rails</div>
                     </div>
                   </div>
                 </div>
 
                 {/* Live Code / Payload Payload Inspector */}
                 <div className="lg:col-span-6">
-                  <div className="flex items-center justify-between text-[11px] font-mono text-ink-400 mb-1.5">
-                    <span>TRANSACTION TELEMETRY PAYLOAD</span>
-                    <span className="text-[10px] text-emerald-400">● LIVE PROOF</span>
+                  <div className="flex items-center justify-between text-[11px] font-sans text-slate-500 mb-1.5">
+                    <span className="font-semibold uppercase">Telemetry Payload</span>
+                    <span className="text-emerald-700 font-semibold">● Live Proof</span>
                   </div>
-                  <pre className="p-3 bg-ink-950 border border-ink-800 rounded-lg text-[11px] font-mono text-emerald-300 overflow-x-auto max-h-[160px] leading-snug">
+                  <pre className="p-3 bg-slate-900 rounded-lg text-[11px] font-mono text-emerald-400 overflow-x-auto max-h-[160px] leading-snug">
                     {current.codeSnippet}
                   </pre>
                 </div>

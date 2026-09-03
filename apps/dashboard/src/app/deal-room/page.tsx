@@ -1952,66 +1952,66 @@ export default function DealRoomPage() {
   const isMerchant = user?.role === 'merchant';
 
   return (
-    <div className="min-h-screen bg-ink-950 text-ink-100 flex flex-col justify-between">
+    <div className="min-h-screen bg-[#F4F6F8] text-slate-900 flex flex-col justify-between">
       <DealLifecycleNav />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-6">
         {/* Modern Clean Deal Room Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 border-b border-white/[0.08] pb-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[11px] font-sans font-semibold uppercase tracking-wider text-emerald-400">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="text-[11px] font-sans font-semibold uppercase tracking-wider text-emerald-700">
                 Autonomous Settlement Network
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-sans font-bold text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-sans font-bold text-slate-900 tracking-tight">
               Live Deal Room
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl font-sans">
+            <p className="text-xs sm:text-sm text-slate-600 mt-0.5 max-w-2xl font-sans">
               Autonomous agentic negotiation, cryptographic contract sealing, and zero-human-click UPI Autopay settlement.
             </p>
           </div>
 
           {/* Modern Segmented Control Switcher */}
-          <div className="inline-flex items-center bg-slate-900/80 p-1.5 rounded-xl border border-slate-800 shadow-inner">
+          <div className="inline-flex items-center bg-slate-200/70 p-1 rounded-xl border border-slate-300/80 shadow-inner">
             <button
               onClick={() => {
                 setDealMode('single');
                 handleResetFlow();
               }}
-              className={`px-4 py-2 rounded-lg text-xs font-sans font-semibold transition-all ${
+              className={`px-4 py-2 rounded-lg text-xs font-sans font-semibold transition-all cursor-pointer ${
                 dealMode === 'single'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              ⚡ Single-Merchant Deal
+              Single-Merchant Deal
             </button>
             <button
               onClick={() => {
                 setDealMode('auction');
                 handleResetFlow();
               }}
-              className={`px-4 py-2 rounded-lg text-xs font-sans font-semibold transition-all flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-lg text-xs font-sans font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 dealMode === 'auction'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <span>🏢 B2B Multi-Merchant Auction</span>
+              <span>B2B Multi-Merchant Auction</span>
             </button>
           </div>
         </div>
 
         {/* Clean Modern Progress Timeline */}
-        <div className="grid grid-cols-5 gap-2 p-1.5 bg-slate-900/60 border border-slate-800/80 rounded-xl text-center text-xs font-sans">
+        <div className="grid grid-cols-5 gap-2 p-1.5 bg-white border border-slate-200 rounded-xl text-center text-xs font-sans shadow-2xs">
           <button
             onClick={() => handleSelectStep('request')}
-            className={`py-2 px-2 rounded-lg transition-all font-semibold ${
+            className={`py-2 px-2 rounded-lg transition-all font-semibold cursor-pointer ${
               flowStep === 'request'
-                ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
             }`}
           >
             1. Intent
@@ -2019,12 +2019,12 @@ export default function DealRoomPage() {
           <button
             onClick={() => handleSelectStep('negotiation')}
             disabled={candidateOffers.length === 0 && competingBids.length === 0}
-            className={`py-2 px-2 rounded-lg transition-all font-semibold disabled:opacity-30 ${
+            className={`py-2 px-2 rounded-lg transition-all font-semibold disabled:opacity-40 cursor-pointer ${
               flowStep === 'negotiation'
-                ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-sm'
+                ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs'
                 : candidateOffers.length > 0 || competingBids.length > 0
-                ? 'text-slate-300 hover:text-white hover:bg-white/[0.04]'
-                : 'text-slate-600'
+                ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                : 'text-slate-400'
             }`}
           >
             2. Negotiation
@@ -2032,12 +2032,12 @@ export default function DealRoomPage() {
           <button
             onClick={() => handleSelectStep('contract')}
             disabled={!singleOffer}
-            className={`py-2 px-2 rounded-lg transition-all font-semibold disabled:opacity-30 ${
+            className={`py-2 px-2 rounded-lg transition-all font-semibold disabled:opacity-40 cursor-pointer ${
               flowStep === 'contract'
-                ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-sm'
+                ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs'
                 : singleOffer
-                ? 'text-slate-300 hover:text-white hover:bg-white/[0.04]'
-                : 'text-slate-600'
+                ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                : 'text-slate-400'
             }`}
           >
             3. Contract
@@ -2045,12 +2045,12 @@ export default function DealRoomPage() {
           <button
             onClick={() => handleSelectStep('checkout')}
             disabled={!singleOffer}
-            className={`py-2 px-2 rounded-lg transition-all font-semibold disabled:opacity-30 ${
+            className={`py-2 px-2 rounded-lg transition-all font-semibold disabled:opacity-40 cursor-pointer ${
               flowStep === 'checkout' || flowStep === 'flagged'
-                ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-sm'
+                ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs'
                 : singleOffer
-                ? 'text-slate-300 hover:text-white hover:bg-white/[0.04]'
-                : 'text-slate-600'
+                ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                : 'text-slate-400'
             }`}
           >
             4. Checkout
@@ -2058,12 +2058,12 @@ export default function DealRoomPage() {
           <button
             onClick={() => handleSelectStep('paid')}
             disabled={singleOffer?.state !== 'PAID' && flowStep !== 'paid'}
-            className={`py-2 px-2 rounded-lg transition-all font-semibold disabled:opacity-30 ${
+            className={`py-2 px-2 rounded-lg transition-all font-semibold disabled:opacity-40 cursor-pointer ${
               flowStep === 'paid'
-                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs'
                 : singleOffer?.state === 'PAID'
-                ? 'text-emerald-400 hover:bg-white/[0.04]'
-                : 'text-slate-600'
+                ? 'text-emerald-700 hover:bg-emerald-50'
+                : 'text-slate-400'
             }`}
           >
             5. Settled

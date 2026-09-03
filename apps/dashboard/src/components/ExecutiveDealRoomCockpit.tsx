@@ -96,7 +96,6 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
     handleOpenRazorpayModal,
     handleTriggerRefund,
     isRefunding,
-    handleResetFlow,
     handleTriggerSafetyTest,
     flowStep,
     API_BASE_URL,
@@ -124,19 +123,21 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
         {/* LEFT COLUMN: Sovereign Deal Desk (Omnibox & Live Agent Arena) */}
         <div className="lg:col-span-7 space-y-6">
           {/* Card 1: Intent Omnibox */}
-          <div className="bg-[#0D121F]/80 border border-white/[0.08] backdrop-blur-2xl rounded-2xl p-6 shadow-2xl space-y-5">
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-base">💬</span>
-                <h2 className="text-sm font-sans font-bold text-white tracking-tight">
-                  Commercial Intent Omnibox
+              <div>
+                <h2 className="text-sm font-sans font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                  <span>Commercial Intent Desk</span>
+                  <span className="text-[11px] font-sans font-normal text-slate-500">
+                    (Natural Language Intent)
+                  </span>
                 </h2>
-                <span className="text-[11px] font-sans text-slate-400">
-                  (Multilingual Natural Language)
-                </span>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Input commercial procurement constraints in English, Hindi, or Hinglish.
+                </p>
               </div>
               {parseSuccessMsg && (
-                <span className="text-xs font-sans text-emerald-400 font-medium animate-fade-in bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
+                <span className="text-xs font-sans font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full animate-fade-in">
                   {parseSuccessMsg}
                 </span>
               )}
@@ -148,8 +149,8 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                 type="text"
                 value={freeTextIntent}
                 onChange={(e) => setFreeTextIntent(e.target.value)}
-                placeholder="e.g. i need running shoes budget 3000 , fast delivery or 20 gift boxes by friday"
-                className="w-full bg-slate-950/80 border border-white/[0.1] focus:border-blue-500 rounded-xl pl-4 pr-32 py-3.5 text-sm font-sans text-white focus:outline-none placeholder:text-slate-500 shadow-inner transition-all"
+                placeholder="e.g. need running shoes budget 3000, fast delivery or 20 corporate gift boxes by friday"
+                className="w-full bg-slate-50 border border-slate-300 focus:border-[#0052CC] focus:bg-white rounded-xl pl-4 pr-32 py-3.5 text-sm font-sans text-slate-900 focus:outline-none placeholder:text-slate-400 transition-all shadow-xs"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
@@ -161,7 +162,7 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                 type="button"
                 onClick={handleParseFreeTextIntent}
                 disabled={isParsingIntent || !freeTextIntent.trim()}
-                className="absolute right-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-sans font-semibold rounded-lg shadow-md transition-all disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+                className="absolute right-2 px-4 py-2 bg-[#0052CC] hover:bg-[#0747A6] text-white text-xs font-sans font-semibold rounded-lg shadow-sm transition-all disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
               >
                 {isParsingIntent ? (
                   <>
@@ -169,16 +170,14 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                     <span>Parsing...</span>
                   </>
                 ) : (
-                  <>
-                    <span>🤖 Interpret AI</span>
-                  </>
+                  <span>Interpret Intent</span>
                 )}
               </button>
             </div>
 
             {/* 1-Click Scenario Preset Chips */}
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <span className="text-xs font-sans font-medium text-slate-400">Presets:</span>
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              <span className="text-xs font-sans font-medium text-slate-500">Presets:</span>
               <button
                 type="button"
                 onClick={() => {
@@ -187,9 +186,9 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                   setPrioritiesOrder(['delivery_speed', 'price', 'return_terms', 'extras']);
                   setDealMode('single');
                 }}
-                className="text-xs font-sans px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/[0.08] hover:border-white/[0.15] transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                className="text-xs font-sans px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
-                <span>👟 Sprint Athletics (₹3,000)</span>
+                <span>Sprint Athletics (₹3,000)</span>
               </button>
 
               <button
@@ -203,9 +202,9 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                   setDeliveryDeadline(d.toISOString().split('T')[0] || '');
                   setDealMode('single');
                 }}
-                className="text-xs font-sans px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 hover:border-amber-500/30 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                className="text-xs font-sans px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
-                <span>⚡ Urgent Posture (&lt;24h SLA)</span>
+                <span>Urgent Posture (&lt;24h SLA)</span>
               </button>
 
               <button
@@ -217,80 +216,77 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                   setAuctionPriority('speed');
                   setFreeTextIntent('need 20 bulk procurement boxes under 30000 by friday with fast delivery');
                 }}
-                className="text-xs font-sans px-3 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 hover:border-blue-500/30 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                className="text-xs font-sans px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
-                <span>🏢 B2B Multi-Merchant Auction</span>
+                <span>B2B Multi-Merchant Auction</span>
               </button>
             </div>
 
             {/* Extracted Parameter Badges */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-3 border-t border-white/[0.06]">
-              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-white/[0.06]">
-                <span className="text-slate-400 text-[10px] font-sans font-medium block uppercase tracking-wider">Product</span>
-                <span className="text-white font-sans text-xs font-semibold truncate block mt-0.5">SPRINTPRO-X2</span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-3 border-t border-slate-100">
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                <span className="text-slate-500 text-[10px] font-sans font-medium block uppercase tracking-wider">Product</span>
+                <span className="text-slate-900 font-sans text-xs font-semibold truncate block mt-0.5">SPRINTPRO-X2</span>
               </div>
-              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-white/[0.06]">
-                <span className="text-slate-400 text-[10px] font-sans font-medium block uppercase tracking-wider">Budget Ceiling</span>
-                <span className="text-emerald-400 font-mono text-xs font-bold block mt-0.5">₹{budgetInr.toLocaleString()}</span>
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                <span className="text-slate-500 text-[10px] font-sans font-medium block uppercase tracking-wider">Budget Ceiling</span>
+                <span className="text-emerald-700 font-mono text-xs font-bold block mt-0.5">₹{budgetInr.toLocaleString()}</span>
               </div>
-              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-white/[0.06]">
-                <span className="text-slate-400 text-[10px] font-sans font-medium block uppercase tracking-wider">Quantity</span>
-                <span className="text-slate-200 font-sans text-xs font-semibold block mt-0.5">{quantity} {quantity === 1 ? 'Pair' : 'Pairs'}</span>
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                <span className="text-slate-500 text-[10px] font-sans font-medium block uppercase tracking-wider">Quantity</span>
+                <span className="text-slate-900 font-sans text-xs font-semibold block mt-0.5">{quantity} {quantity === 1 ? 'Pair' : 'Pairs'}</span>
               </div>
-              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-white/[0.06]">
-                <span className="text-slate-400 text-[10px] font-sans font-medium block uppercase tracking-wider">Priority</span>
-                <span className="text-emerald-400 font-sans text-xs font-semibold truncate block mt-0.5">
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                <span className="text-slate-500 text-[10px] font-sans font-medium block uppercase tracking-wider">Priority</span>
+                <span className="text-emerald-700 font-sans text-xs font-semibold truncate block mt-0.5">
                   {prioritiesOrder[0] === 'delivery_speed' ? 'Fast Delivery' : prioritiesOrder[0] === 'price' ? 'Lowest Price' : 'Return Terms'}
                 </span>
               </div>
-              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-white/[0.06]">
-                <span className="text-slate-400 text-[10px] font-sans font-medium block uppercase tracking-wider">SLA Target</span>
-                <span className="text-slate-200 font-sans text-xs font-semibold truncate block mt-0.5">{deliveryDeadline || 'Express (48h)'}</span>
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                <span className="text-slate-500 text-[10px] font-sans font-medium block uppercase tracking-wider">SLA Target</span>
+                <span className="text-slate-800 font-sans text-xs font-semibold truncate block mt-0.5">{deliveryDeadline || 'Express (48h)'}</span>
               </div>
-              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-white/[0.06]">
-                <span className="text-slate-400 text-[10px] font-sans font-medium block uppercase tracking-wider">Payment Rail</span>
-                <span className="text-blue-400 font-sans text-xs font-semibold block mt-0.5">{paymentPreferences[0]?.toUpperCase() || 'UPI'}</span>
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                <span className="text-slate-500 text-[10px] font-sans font-medium block uppercase tracking-wider">Payment Rail</span>
+                <span className="text-blue-700 font-sans text-xs font-semibold block mt-0.5">{paymentPreferences[0]?.toUpperCase() || 'UPI'}</span>
               </div>
             </div>
 
-            {/* Mandate Bar & Launch CTA */}
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-950/50 border border-white/[0.06] p-3.5 rounded-xl">
-              <div className="flex items-center gap-2.5 w-full sm:w-auto">
-                <span className="text-lg">⚡</span>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-sans font-bold text-white">
-                      {isMandateActive ? 'UPI Autopay Mandate Active' : 'Agent Spending Mandate'}
-                    </span>
-                    <span className={`text-[10px] font-sans font-semibold px-2 py-0.5 rounded-full ${
-                      isMandateActive
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                    }`}>
-                      {isMandateActive ? '✓ Pre-Approved' : 'Setup Required'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] font-sans text-slate-400 mt-0.5">
-                    {isMandateActive
-                      ? `Ceiling: ₹${buyerMandate?.max_amount_inr} • Pre-authorized for zero-click direct settlement`
-                      : 'Authorize a spending ceiling once so agents can execute payment without popups'}
-                  </p>
+            {/* Mandate Bar */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl p-3.5">
+              <div className="w-full sm:w-auto">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-sans font-bold text-slate-900">
+                    {isMandateActive ? 'UPI Autopay Mandate Active' : 'Agent Spending Mandate'}
+                  </span>
+                  <span className={`text-[10px] font-sans font-semibold px-2 py-0.5 rounded-full ${
+                    isMandateActive
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-amber-50 text-amber-700 border border-amber-200'
+                  }`}>
+                    {isMandateActive ? '✓ Pre-Approved' : 'Setup Required'}
+                  </span>
                 </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {isMandateActive
+                    ? `Ceiling: ₹${buyerMandate?.max_amount_inr} • Pre-authorized for zero-click direct settlement`
+                    : 'Authorize a spending ceiling once so agents can execute payment without popups'}
+                </p>
               </div>
 
               <div className="shrink-0 w-full sm:w-auto">
                 {isMandateActive ? (
-                  <span className="text-xs font-sans font-semibold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 flex items-center justify-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-xs font-sans font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 flex items-center justify-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
                     <span>S2S Direct Ready</span>
                   </span>
                 ) : (
                   <button
                     onClick={handleRegisterSpendingMandate}
                     disabled={isRegisteringMandate}
-                    className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-sans font-bold rounded-lg shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    className="w-full sm:w-auto px-4 py-2 bg-[#0052CC] hover:bg-[#0747A6] text-white text-xs font-sans font-semibold rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
-                    <span>⚡ 1-Time Setup (₹1 Auth)</span>
+                    <span>1-Time Setup (₹1 Auth)</span>
                   </button>
                 )}
               </div>
@@ -301,13 +297,12 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
               <button
                 onClick={handleRunAgentNegotiation}
                 disabled={isAgentNegotiating}
-                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-teal-500 hover:from-blue-500 hover:via-indigo-500 hover:to-teal-400 text-white font-sans font-bold text-sm transition-all shadow-xl shadow-blue-600/20 hover:shadow-blue-600/30 hover:scale-[1.005] active:scale-[0.995] flex items-center justify-center gap-2.5 disabled:opacity-50 cursor-pointer"
+                className="w-full py-3.5 px-6 rounded-xl bg-[#0C2340] hover:bg-[#13325B] text-white font-sans font-semibold text-sm transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
               >
-                <span className="text-base animate-pulse">🤖</span>
                 <span>
                   {isAgentNegotiating
                     ? 'Autonomous Agents Negotiating (4 Rounds Active)...'
-                    : 'Launch Autonomous Agent-to-Agent Negotiation Room →'}
+                    : 'Launch Autonomous Agent Negotiation Room →'}
                 </span>
               </button>
             </div>
@@ -315,35 +310,33 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
 
           {/* Card 2: Live Multi-Turn Dialogue Stream */}
           {(flowStep === 'negotiation' || agentNegotiationResult) && (
-            <div className="bg-[#0D121F]/80 border border-white/[0.08] backdrop-blur-2xl rounded-2xl p-6 shadow-2xl space-y-5 animate-fade-in">
-              <div className="flex flex-wrap items-center justify-between border-b border-white/[0.08] pb-3 gap-2">
-                <div className="flex items-center gap-2.5">
-                  <h3 className="text-sm font-sans font-bold text-white tracking-tight flex items-center gap-2">
-                    <span>💬</span>
-                    <span>Live Multi-Turn Agent Dialogue</span>
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-5 animate-fade-in">
+              <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 gap-2">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-sans font-bold text-slate-900 tracking-tight">
+                    Multi-Turn Agent Dialogue
                   </h3>
-                  <span className="text-[10px] font-sans font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>Gemini 2.0 Flash</span>
+                  <span className="text-[10px] font-sans font-semibold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full">
+                    Gemini 2.0 Flash
                   </span>
                 </div>
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-3">
                   <a
                     href={`${API_BASE_URL}/api/debug/gemini-status`}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs font-sans text-blue-400 hover:text-blue-300 underline"
+                    className="text-xs font-sans text-blue-600 hover:text-blue-800 underline"
                   >
-                    Gemini Key Health ↗
+                    Key Pool Health ↗
                   </a>
-                  <span className="text-xs font-sans text-slate-400">
+                  <span className="text-xs font-sans text-slate-500">
                     {isAgentNegotiating ? 'Negotiating...' : 'Consensus Reached'}
                   </span>
                 </div>
               </div>
 
               {/* Chat turns */}
-              <div className="space-y-3.5 max-h-[460px] overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
                 {(agentNegotiationResult?.transcript || [
                   {
                     round: 1,
@@ -416,42 +409,41 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                     return (
                       <div
                         key={idx}
-                        className={`p-4 rounded-xl border transition-all text-sm shadow-sm animate-fade-in ${
+                        className={`p-4 rounded-xl border text-sm shadow-2xs ${
                           isBuyer
-                            ? 'bg-blue-950/25 border-blue-500/20 text-slate-100 mr-4 sm:mr-10'
-                            : 'bg-amber-950/20 border-amber-500/20 text-slate-100 ml-4 sm:ml-10'
+                            ? 'bg-blue-50/70 border-blue-100 text-slate-900 mr-4 sm:mr-10'
+                            : 'bg-slate-50 border-slate-200 text-slate-900 ml-4 sm:ml-10'
                         }`}
                       >
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
-                            <span className="text-base">{isBuyer ? '🤖' : '🏪'}</span>
-                            <span className={`font-sans font-bold text-xs ${isBuyer ? 'text-blue-400' : 'text-amber-400'}`}>
-                              {isBuyer ? `Buyer Agent • Round ${turn.round}` : `Merchant Agent • Round ${turn.round}`}
+                            <span className={`font-sans font-bold text-xs ${isBuyer ? 'text-blue-700' : 'text-slate-800'}`}>
+                              {isBuyer ? `Buyer Agent (Round ${turn.round})` : `Merchant Agent (Round ${turn.round})`}
                             </span>
                             {turn.model_source && (
-                              <span className="text-[10px] font-sans text-slate-400 bg-slate-900 px-2 py-0.5 rounded-full border border-white/[0.08]">
+                              <span className="text-[10px] font-sans text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
                                 {turn.model_source}
                               </span>
                             )}
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] font-sans text-slate-400">
+                            <span className="text-[11px] font-sans text-slate-500">
                               {isBuyer ? 'Bid:' : 'Counter:'}
                             </span>
-                            <span className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${isBuyer ? 'bg-blue-500/20 text-blue-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                            <span className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${isBuyer ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-800'}`}>
                               ₹{turn.proposed_price_inr}
                             </span>
                           </div>
                         </div>
 
-                        <p className="text-slate-200 font-sans text-xs sm:text-sm leading-relaxed">
+                        <p className="text-slate-700 font-sans text-xs sm:text-sm leading-relaxed">
                           {turn.message}
                         </p>
 
                         {turn.was_clamped && (
-                          <div className="mt-2 text-xs text-rose-300 bg-rose-950/50 border border-rose-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
-                            <span>🛡</span>
-                            <span>{turn.clamping_reason || 'Clamped strictly to policy invariant safety bounds.'}</span>
+                          <div className="mt-2 text-xs text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                            <span>Policy Invariant Bound:</span>
+                            <span>{turn.clamping_reason || 'Clamped to floor.'}</span>
                           </div>
                         )}
                       </div>
@@ -460,45 +452,44 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
               </div>
 
               {/* Consensus Bar */}
-              <div className="p-5 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-emerald-950/40 border border-emerald-500/30 rounded-xl shadow-lg space-y-3.5">
-                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-emerald-500/20 pb-2.5">
+              <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-emerald-200/80 pb-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-emerald-400 font-bold text-base">✓</span>
-                    <span className="font-sans font-bold text-emerald-300 text-sm">
+                    <span className="text-emerald-700 font-bold text-sm">✓</span>
+                    <span className="font-sans font-bold text-emerald-900 text-sm">
                       Consensus Reached at ₹3,783.12 (Pareto Optimum)
                     </span>
                   </div>
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 text-[11px] font-sans font-semibold border border-emerald-500/20">
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-sans font-semibold">
                     100% Policy Compliant
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-sans text-xs">
                   <div>
-                    <span className="text-slate-400 text-[11px] block">Agreed Price</span>
-                    <span className="text-emerald-400 font-mono font-bold text-sm">₹3,783.12 / unit</span>
+                    <span className="text-slate-500 text-[11px] block">Agreed Price</span>
+                    <span className="text-emerald-800 font-mono font-bold text-sm">₹3,783.12</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[11px] block">Total Savings</span>
-                    <span className="text-emerald-300 font-mono font-bold text-sm">₹515.88 (12%)</span>
+                    <span className="text-slate-500 text-[11px] block">Total Savings</span>
+                    <span className="text-emerald-800 font-mono font-bold text-sm">₹515.88 (12%)</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[11px] block">Guaranteed SLA</span>
-                    <span className="text-white font-semibold text-xs sm:text-sm">Thursday, Sep 3</span>
+                    <span className="text-slate-500 text-[11px] block">Guaranteed SLA</span>
+                    <span className="text-slate-800 font-semibold text-xs sm:text-sm">Thursday, Sep 3</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[11px] block">Return Window</span>
-                    <span className="text-white font-semibold text-xs sm:text-sm">14 Days VIP</span>
+                    <span className="text-slate-500 text-[11px] block">Return Window</span>
+                    <span className="text-slate-800 font-semibold text-xs sm:text-sm">14 Days VIP</span>
                   </div>
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-1">
                   <button
                     onClick={handleApplyNegotiatedContract}
-                    className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-sans font-bold text-xs sm:text-sm rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-2.5 bg-[#0052CC] hover:bg-[#0747A6] text-white font-sans font-semibold text-xs sm:text-sm rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                   >
-                    <span>Accept Negotiated Contract &amp; Proceed to Settlement</span>
-                    <span>→</span>
+                    <span>Accept Negotiated Contract &amp; Proceed to Settlement →</span>
                   </button>
                 </div>
               </div>
@@ -509,138 +500,122 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
         {/* RIGHT COLUMN: The Executive Settlement Desk & Live Deal Ticket */}
         <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
           {/* Card: Live Deal Ticket */}
-          <div className="bg-[#0D121F]/90 border border-white/[0.08] backdrop-blur-2xl rounded-2xl p-6 shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3.5">
-              <div className="flex items-center gap-2">
-                <span className="text-base">🎫</span>
-                <h3 className="text-sm font-sans font-bold text-white tracking-tight">
-                  Cryptographic Deal Ticket
-                </h3>
-              </div>
-              <span className="text-[11px] font-sans font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-sm font-sans font-bold text-slate-900 tracking-tight">
+                Cryptographic Deal Ticket
+              </h3>
+              <span className="text-[11px] font-sans font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full">
                 {singleOffer ? 'Contract Sealed' : 'Awaiting Settlement'}
               </span>
             </div>
 
             {/* Financial Numbers Highlight */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-baseline gap-3">
-                <span className="text-4xl font-sans font-black text-white tracking-tight">
+                <span className="text-4xl font-sans font-black text-slate-900 tracking-tight">
                   ₹{(negotiatedPricePaise / 100).toFixed(2)}
                 </span>
-                <span className="text-base font-sans text-slate-500 line-through">
+                <span className="text-base font-sans text-slate-400 line-through">
                   ₹{(listPricePaise / 100).toFixed(2)}
                 </span>
                 {savingsPaise > 0 && (
-                  <span className="text-xs font-sans font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                  <span className="text-xs font-sans font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
                     Save ₹{(savingsPaise / 100).toFixed(2)}
                   </span>
                 )}
               </div>
-              <p className="text-xs font-sans text-slate-400">
+              <p className="text-xs font-sans text-slate-500">
                 SprintPro X2 Running Shoes (Titanium Grey) &bull; Qty: {quantity} {quantity === 1 ? 'Pair' : 'Pairs'}
               </p>
             </div>
 
             {/* Key Commercial Terms */}
-            <div className="space-y-3 pt-2 border-t border-white/[0.06] text-xs font-sans">
-              <div className="flex items-center justify-between py-1">
-                <span className="text-slate-400 flex items-center gap-1.5">
-                  <span>🏪</span>
-                  <span>Merchant Partner</span>
-                </span>
-                <span className="text-white font-semibold">Sprint Athletics (BLR-WH-01)</span>
+            <div className="space-y-2.5 pt-2 border-t border-slate-100 text-xs font-sans">
+              <div className="flex items-center justify-between py-1 border-b border-slate-50">
+                <span className="text-slate-500">Merchant Partner</span>
+                <span className="text-slate-900 font-semibold">Sprint Athletics (BLR-WH-01)</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-50">
+                <span className="text-slate-500">Fulfillment SLA</span>
+                <span className="text-emerald-700 font-semibold">Guaranteed 48h Express</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-50">
+                <span className="text-slate-500">Replacement Guarantee</span>
+                <span className="text-slate-900 font-semibold">14-Day Free Replacement</span>
               </div>
               <div className="flex items-center justify-between py-1">
-                <span className="text-slate-400 flex items-center gap-1.5">
-                  <span>⚡</span>
-                  <span>Fulfillment SLA</span>
-                </span>
-                <span className="text-emerald-400 font-semibold">Guaranteed 48h Express</span>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-slate-400 flex items-center gap-1.5">
-                  <span>↩</span>
-                  <span>Replacement Guarantee</span>
-                </span>
-                <span className="text-white font-semibold">14-Day Free Replacement</span>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-slate-400 flex items-center gap-1.5">
-                  <span>🛡️</span>
-                  <span>Cryptographic Seal</span>
-                </span>
-                <span className="text-blue-400 font-mono text-[11px] truncate max-w-[170px]" title={signedContractPayload?.signature || 'HMAC-SHA256 Nonce-Sealed'}>
+                <span className="text-slate-500">Cryptographic Seal</span>
+                <span className="text-blue-700 font-mono text-[11px] truncate max-w-[170px]" title={signedContractPayload?.signature || 'HMAC-SHA256 Nonce-Sealed'}>
                   {signedContractPayload?.signature ? `${signedContractPayload.signature.substring(0, 16)}...` : 'HMAC-SHA256 Locked'}
                 </span>
               </div>
             </div>
 
             {/* Settlement Action Deck */}
-            <div className="pt-3 border-t border-white/[0.08] space-y-3.5">
+            <div className="pt-3 border-t border-slate-200 space-y-3">
               {singleOffer?.state === 'PAID' || paymentResult?.status === 'captured' ? (
-                <div className="p-4 bg-emerald-950/50 border border-emerald-500/30 rounded-xl space-y-3 text-xs font-sans">
-                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2.5 text-xs font-sans">
+                  <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
                     <span>✓</span>
                     <span>Order Settled via UPI Autopay</span>
                   </div>
-                  <div className="text-[11px] text-slate-300 space-y-1">
-                    <div>Payment ID: <strong className="text-white font-mono">{paymentResult?.payment_id || 'pay_live_captured'}</strong></div>
-                    <div>Method: <strong className="text-emerald-300 font-sans">NPCI UPI Autopay (S2S Direct)</strong></div>
-                    <div>Human Clicks: <strong className="text-blue-300 font-sans">0 (Autonomous)</strong></div>
+                  <div className="text-[11px] text-slate-700 space-y-1">
+                    <div>Payment ID: <strong className="font-mono text-slate-900">{paymentResult?.payment_id || 'pay_live_captured'}</strong></div>
+                    <div>Method: <strong className="text-slate-900 font-semibold">NPCI UPI Autopay (S2S Direct)</strong></div>
+                    <div>Human Clicks: <strong className="text-blue-700 font-semibold">0 (Autonomous)</strong></div>
                   </div>
                   <button
                     onClick={handleTriggerRefund}
                     disabled={isRefunding}
-                    className="w-full py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-sans font-bold transition-all disabled:opacity-50 cursor-pointer"
+                    className="w-full py-2 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-xs font-sans font-semibold transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
                   >
-                    {isRefunding ? 'Refunding...' : 'Simulate SLA Breach & Trigger Auto-Refund'}
+                    {isRefunding ? 'Processing Refund...' : 'Simulate SLA Breach & Trigger Auto-Refund'}
                   </button>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {/* Settlement Rail Toggle */}
                   <div className="flex items-center justify-between text-xs font-sans pb-1">
-                    <span className="text-slate-400">Settlement Mode:</span>
-                    <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-white/[0.08] text-[11px]">
+                    <span className="text-slate-500">Settlement Mode:</span>
+                    <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px]">
                       <button
                         onClick={() => setPaymentExecutionMode('autonomous')}
-                        className={`px-3 py-1 rounded-md transition-all font-semibold ${
+                        className={`px-3 py-1 rounded-md transition-all font-semibold cursor-pointer ${
                           paymentExecutionMode === 'autonomous'
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'text-slate-400 hover:text-white'
+                            ? 'bg-white text-slate-900 shadow-2xs'
+                            : 'text-slate-500 hover:text-slate-900'
                         }`}
                       >
-                        ⚡ S2S Autopay
+                        S2S Autopay
                       </button>
                       <button
                         onClick={() => setPaymentExecutionMode('manual')}
-                        className={`px-3 py-1 rounded-md transition-all font-semibold ${
+                        className={`px-3 py-1 rounded-md transition-all font-semibold cursor-pointer ${
                           paymentExecutionMode === 'manual'
-                            ? 'bg-slate-800 text-white shadow-sm'
-                            : 'text-slate-400 hover:text-white'
+                            ? 'bg-white text-slate-900 shadow-2xs'
+                            : 'text-slate-500 hover:text-slate-900'
                         }`}
                       >
-                        👤 Modal
+                        Modal
                       </button>
                     </div>
                   </div>
 
                   {paymentExecutionMode === 'autonomous' ? (
-                    <div className="space-y-2.5">
+                    <div className="space-y-2">
                       <button
                         onClick={handleExecuteAutonomousPayment}
                         disabled={isExecutingAutonomousPayment}
-                        className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-sans font-bold text-sm rounded-xl transition-all shadow-xl shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        className="w-full py-3.5 px-4 bg-[#0052CC] hover:bg-[#0747A6] text-white font-sans font-semibold text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                       >
-                        <span className="text-base animate-pulse">⚡</span>
                         <span>
                           {isExecutingAutonomousPayment
                             ? 'Debiting Mandate Token (0 Clicks)...'
                             : `Pay Autonomously (₹${(negotiatedPricePaise / 100).toFixed(2)})`}
                         </span>
                       </button>
-                      <p className="text-[11px] text-slate-400 text-center font-sans">
+                      <p className="text-[11px] text-slate-500 text-center font-sans">
                         Debited server-to-server via stored token_id &bull; Zero human clicks
                       </p>
                     </div>
@@ -648,10 +623,9 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                     <div className="space-y-2">
                       <button
                         onClick={handleOpenRazorpayModal}
-                        className="w-full py-3.5 px-4 bg-slate-800 hover:bg-slate-700 text-white font-sans font-bold text-xs rounded-xl border border-white/[0.1] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        className="w-full py-3.5 px-4 bg-slate-800 hover:bg-slate-700 text-white font-sans font-semibold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
                       >
-                        <span>Open Razorpay Standard Modal</span>
-                        <span>→</span>
+                        <span>Open Razorpay Standard Modal →</span>
                       </button>
                     </div>
                   )}
@@ -663,33 +637,33 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
       </div>
 
       {/* Collapsible Bottom Drawer: Judge Architecture & Audit Inspector */}
-      <div className="bg-[#0D121F]/80 border border-white/[0.08] backdrop-blur-2xl rounded-2xl overflow-hidden shadow-2xl">
+      <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-sm">
         <button
           onClick={() => setIsInspectorOpen(!isInspectorOpen)}
-          className="w-full px-6 py-4 flex items-center justify-between text-xs font-sans font-bold text-slate-300 hover:text-white hover:bg-white/[0.02] transition-all cursor-pointer"
+          className="w-full px-6 py-4 flex items-center justify-between text-xs font-sans font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-sm">⚡ Judge Architecture &amp; Cryptographic Audit Inspector</span>
-            <span className="text-xs text-slate-400 font-normal hidden sm:inline">
+            <span className="w-2 h-2 rounded-full bg-blue-600" />
+            <span className="text-sm">Architecture &amp; Cryptographic Audit Inspector</span>
+            <span className="text-xs text-slate-500 font-normal hidden sm:inline">
               (5-Stage Pipeline, ADR Governance, Safety Invariant Proofs)
             </span>
           </div>
-          <span className="text-xs text-blue-400 font-semibold">
+          <span className="text-xs text-blue-600 font-semibold">
             {isInspectorOpen ? 'Collapse ▲' : 'Inspect Full Architecture ▼'}
           </span>
         </button>
 
         {isInspectorOpen && (
-          <div className="p-6 space-y-5 border-t border-white/[0.08]">
+          <div className="p-6 space-y-5 border-t border-slate-200">
             {/* Inspector Tab Selector */}
-            <div className="flex items-center gap-2 border-b border-white/[0.08] pb-3 overflow-x-auto">
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto">
               <button
                 onClick={() => setInspectorTab('visualizer')}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-sans font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   inspectorTab === 'visualizer'
-                    ? 'bg-blue-600 text-white shadow'
-                    : 'bg-slate-900 text-slate-400 hover:text-white border border-white/[0.08]'
+                    ? 'bg-[#0052CC] text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200'
                 }`}
               >
                 1. 5-Stage Architecture Visualizer
@@ -698,8 +672,8 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                 onClick={() => setInspectorTab('adr')}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-sans font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   inspectorTab === 'adr'
-                    ? 'bg-blue-600 text-white shadow'
-                    : 'bg-slate-900 text-slate-400 hover:text-white border border-white/[0.08]'
+                    ? 'bg-[#0052CC] text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200'
                 }`}
               >
                 2. Cryptographic ADR &amp; Ledger
@@ -708,8 +682,8 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                 onClick={() => setInspectorTab('invariants')}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-sans font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   inspectorTab === 'invariants'
-                    ? 'bg-blue-600 text-white shadow'
-                    : 'bg-slate-900 text-slate-400 hover:text-white border border-white/[0.08]'
+                    ? 'bg-[#0052CC] text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200'
                 }`}
               >
                 3. Safety Invariant Proofs
@@ -724,10 +698,10 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
             {/* Tab 2: ADR */}
             {inspectorTab === 'adr' && (
               <div className="space-y-3 text-xs font-sans">
-                <div className="text-slate-400 text-xs">
+                <div className="text-slate-600 text-xs">
                   Agent Decision Record (ADR) &bull; Verified inputs, rejected alternatives, and deterministic consensus rule:
                 </div>
-                <pre className="p-4 bg-slate-950 border border-white/[0.08] rounded-xl text-emerald-300 font-mono text-xs overflow-x-auto max-h-[240px]">
+                <pre className="p-4 bg-slate-900 rounded-xl text-emerald-400 font-mono text-xs overflow-x-auto max-h-[240px]">
                   {JSON.stringify(
                     {
                       decision_id: `adr_${singleOffer?.offer_id || 'deal_mtljfrfn'}`,
@@ -762,19 +736,19 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <button
                     onClick={() => handleTriggerSafetyTest('inventory_race')}
-                    className="py-2 px-3.5 bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/30 rounded-xl transition-all font-medium cursor-pointer"
+                    className="py-2 px-3.5 bg-slate-50 hover:bg-slate-100 text-amber-800 border border-amber-300 rounded-xl transition-colors font-medium cursor-pointer"
                   >
                     Run Test: Inventory Race (25 Concurrent Requests)
                   </button>
                   <button
                     onClick={() => handleTriggerSafetyTest('budget_exceeded')}
-                    className="py-2 px-3.5 bg-slate-900 hover:bg-slate-800 text-rose-300 border border-rose-500/30 rounded-xl transition-all font-medium cursor-pointer"
+                    className="py-2 px-3.5 bg-slate-50 hover:bg-slate-100 text-rose-800 border border-rose-300 rounded-xl transition-colors font-medium cursor-pointer"
                   >
                     Run Test: Budget Exceeded (Ceiling Clamping)
                   </button>
                   <button
                     onClick={() => handleTriggerSafetyTest('human_approval')}
-                    className="py-2 px-3.5 bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-emerald-500/30 rounded-xl transition-all font-medium cursor-pointer"
+                    className="py-2 px-3.5 bg-slate-50 hover:bg-slate-100 text-emerald-800 border border-emerald-300 rounded-xl transition-colors font-medium cursor-pointer"
                   >
                     Run Test: High-Value Approval (&gt;₹10,000 Step-Up)
                   </button>

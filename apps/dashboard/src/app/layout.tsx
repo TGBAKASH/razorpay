@@ -36,9 +36,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable} dark`}
+      className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}
     >
-      <body className="min-h-screen bg-ink-950 text-ink-100 font-sans antialiased selection:bg-signal selection:text-white">
+      <body className="min-h-screen bg-[#F4F6F8] text-slate-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
         <AuthProvider>
           {children}
         </AuthProvider>

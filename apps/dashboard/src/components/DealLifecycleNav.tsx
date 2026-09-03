@@ -65,27 +65,27 @@ export function DealLifecycleNav(_props?: { currentStage?: string }) {
   const roleHomeHref = isMerchant ? '/merchant-console' : '/deal-room';
 
   return (
-    <header className="w-full bg-[#080C14]/90 backdrop-blur-xl border-b border-white/[0.08] select-none sticky top-0 z-40 shadow-xl">
+    <header className="w-full bg-white border-b border-slate-200/80 select-none sticky top-0 z-40 shadow-xs">
       {/* Top Main Navigation Bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
         {/* Brand Link to Role Home */}
         <Link
           href={roleHomeHref}
-          className="flex items-center gap-3 group focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded-xl"
+          className="flex items-center gap-3 group focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-none rounded-xl"
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-teal-400 flex items-center justify-center text-white text-base font-bold shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-all">
+          <div className="w-8 h-8 rounded-lg bg-[#0052CC] flex items-center justify-center text-white text-sm font-bold shadow-sm group-hover:bg-[#0747A6] transition-colors">
             ⚡
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-sans font-bold text-white tracking-tight text-base group-hover:text-blue-400 transition-colors">
+              <span className="font-sans font-bold text-slate-900 tracking-tight text-base group-hover:text-blue-600 transition-colors">
                 Razorpay DealFlow
               </span>
-              <span className="text-[10px] font-sans font-semibold uppercase px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              <span className="text-[10px] font-sans font-semibold uppercase px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                 {isMerchant ? 'Merchant Portal' : 'Buyer Agent'}
               </span>
             </div>
-            <span className="text-[11px] font-sans text-slate-400 block -mt-0.5 hidden sm:block">
+            <span className="text-[11px] font-sans text-slate-500 block -mt-0.5 hidden sm:block">
               The Sovereign Deal Desk for Agentic Commerce
             </span>
           </div>
@@ -109,10 +109,10 @@ export function DealLifecycleNav(_props?: { currentStage?: string }) {
               <Link
                 key={route.href}
                 href={route.href}
-                className={`text-xs font-sans font-medium px-3.5 py-1.5 rounded-lg whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+                className={`text-xs font-sans font-medium px-3.5 py-1.5 rounded-lg whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-none ${
                   isActive
-                    ? 'bg-white/[0.1] text-white border border-white/[0.15] font-semibold shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                    ? 'bg-slate-100 text-slate-900 border border-slate-200 font-semibold shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
                 {route.label}
@@ -130,21 +130,21 @@ export function DealLifecycleNav(_props?: { currentStage?: string }) {
               setTempRole(user?.role || 'buyer');
               setShowAuthModal(true);
             }}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 rounded-full text-xs font-sans text-slate-300 transition-all focus-visible:ring-1 focus-visible:ring-blue-500 shadow-sm"
+            className="flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-full text-xs font-sans text-slate-700 transition-all focus-visible:ring-1 focus-visible:ring-blue-600 shadow-2xs cursor-pointer"
             title="Click to switch role or edit session"
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
             <span className="max-w-[120px] truncate hidden md:inline">{user?.email}</span>
             <span
               className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                 user?.role === 'merchant'
-                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                  : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                  : 'bg-blue-50 text-blue-700 border border-blue-200'
               }`}
             >
               {user?.role === 'merchant' ? 'Merchant' : 'Buyer'}
             </span>
-            <span className="text-slate-500 text-[10px]">▼</span>
+            <span className="text-slate-400 text-[10px]">▼</span>
           </button>
 
           {/* Icon-only Reset Demo Control */}
