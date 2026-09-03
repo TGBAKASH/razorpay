@@ -79,7 +79,13 @@ Return valid JSON:
   "proposed_price_inr": number
 }`;
 
-    const candidateModels = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
+    const candidateModels = [
+      'gemini-flash-latest',
+      'gemini-flash-lite-latest',
+      'gemini-flash-latest-high-res-exp',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+    ];
 
     for (const model of candidateModels) {
       try {
@@ -114,6 +120,7 @@ Return valid JSON:
               return {
                 message: parsed.message,
                 proposedPricePaise: Math.round(parsed.proposed_price_inr * 100),
+                modelUsed: model,
               };
             }
           }
@@ -304,7 +311,7 @@ export class AgentNegotiationService {
         clamped_price_inr: (clampedBuyerPricePaise / 100).toFixed(2),
         was_clamped: buyerWasClamped,
         clamping_reason: buyerClampingReason,
-        model_source: geminiBuyer ? 'Gemini 2.0 Flash' : 'Deterministic Clamped Engine',
+        model_source: geminiBuyer ? `Gemini (${(geminiBuyer as any).modelUsed || 'flash'})` : 'Deterministic Clamped Engine',
       });
 
       // Check for agreement: if buyer bid meets or exceeds merchant target
@@ -388,7 +395,7 @@ export class AgentNegotiationService {
         clamped_price_inr: (clampedMerchantPricePaise / 100).toFixed(2),
         was_clamped: merchantWasClamped,
         clamping_reason: merchantClampingReason,
-        model_source: geminiMerchant ? 'Gemini 2.0 Flash' : 'Deterministic Clamped Engine',
+        model_source: geminiMerchant ? `Gemini (${(geminiMerchant as any).modelUsed || 'flash'})` : 'Deterministic Clamped Engine',
       });
 
       // Check for mutual convergence in Round 3 or 4
