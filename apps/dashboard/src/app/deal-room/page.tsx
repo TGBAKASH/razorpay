@@ -1956,75 +1956,75 @@ export default function DealRoomPage() {
       <DealLifecycleNav />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-8">
-        {/* Deal Room Header & Continuous Lifecycle Stepper */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-ink-800 pb-6">
+        {/* Modern Clean Deal Room Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 border-b border-white/[0.08] pb-6">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-signal animate-pulse" />
-              <span className="text-xs font-mono text-signal uppercase tracking-wider font-bold">
-                CONTINUOUS DEAL FLOW
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[11px] font-sans font-semibold uppercase tracking-wider text-emerald-400">
+                Autonomous Settlement Network
               </span>
             </div>
-            <h1 className="font-display text-2xl sm:text-3xl font-bold text-ink-100">
+            <h1 className="text-2xl sm:text-3xl font-sans font-bold text-white tracking-tight">
               Live Deal Room
             </h1>
-            <p className="text-xs sm:text-sm text-ink-400 mt-1">
-              Observe buyer intent, real-time candidate negotiation, cryptographic contract sealing, and instant settlement in one continuous view.
+            <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl font-sans">
+              Autonomous agentic negotiation, cryptographic contract sealing, and zero-human-click UPI Autopay settlement.
             </p>
           </div>
 
-          {/* Mode Switcher */}
-          <div className="flex items-center gap-2 bg-ink-900 border border-ink-700 p-1 rounded-lg self-start md:self-auto">
+          {/* Modern Segmented Control Switcher */}
+          <div className="inline-flex items-center bg-slate-900/80 p-1.5 rounded-xl border border-slate-800 shadow-inner">
             <button
               onClick={() => {
                 setDealMode('single');
                 handleResetFlow();
               }}
-              className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-xs font-sans font-semibold transition-all ${
                 dealMode === 'single'
-                  ? 'bg-signal text-white font-bold shadow-sm'
-                  : 'text-ink-400 hover:text-ink-200'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
-              Single-Merchant (Sprint Athletics)
+              ⚡ Single-Merchant Deal
             </button>
             <button
               onClick={() => {
                 setDealMode('auction');
                 handleResetFlow();
               }}
-              className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-xs font-sans font-semibold transition-all flex items-center gap-1.5 ${
                 dealMode === 'auction'
-                  ? 'bg-signal text-white font-bold shadow-sm'
-                  : 'text-ink-400 hover:text-ink-200'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
-              🏢 B2B Multi-Merchant RFP Auction (Bulk Procurement)
+              <span>🏢 B2B Multi-Merchant Auction</span>
             </button>
           </div>
         </div>
 
-        {/* Interactive Step Navigation Bar */}
-        <div className="grid grid-cols-5 gap-2 p-2 bg-ink-900 border border-ink-800 rounded-lg text-center text-xs font-mono">
+        {/* Clean Modern Progress Timeline */}
+        <div className="grid grid-cols-5 gap-2 p-1.5 bg-slate-900/60 border border-slate-800/80 rounded-xl text-center text-xs font-sans">
           <button
             onClick={() => handleSelectStep('request')}
-            className={`py-2 px-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal ${
+            className={`py-2 px-2 rounded-lg transition-all font-semibold ${
               flowStep === 'request'
-                ? 'bg-signal-bg border border-signal-border text-signal-light font-bold'
-                : 'text-ink-300 hover:bg-ink-800'
+                ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
             }`}
           >
-            1. Request
+            1. Intent
           </button>
           <button
             onClick={() => handleSelectStep('negotiation')}
             disabled={candidateOffers.length === 0 && competingBids.length === 0}
-            className={`py-2 px-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal disabled:opacity-40 disabled:hover:bg-transparent ${
+            className={`py-2 px-2 rounded-lg transition-all font-semibold disabled:opacity-30 ${
               flowStep === 'negotiation'
-                ? 'bg-signal-bg border border-signal-border text-signal-light font-bold'
+                ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-sm'
                 : candidateOffers.length > 0 || competingBids.length > 0
-                ? 'text-signal-light hover:bg-ink-800'
-                : 'text-ink-500'
+                ? 'text-slate-300 hover:text-white hover:bg-white/[0.04]'
+                : 'text-slate-600'
             }`}
           >
             2. Negotiation
@@ -2032,12 +2032,12 @@ export default function DealRoomPage() {
           <button
             onClick={() => handleSelectStep('contract')}
             disabled={!singleOffer}
-            className={`py-2 px-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal disabled:opacity-40 disabled:hover:bg-transparent ${
+            className={`py-2 px-2 rounded-lg transition-all font-semibold disabled:opacity-30 ${
               flowStep === 'contract'
-                ? 'bg-signal-bg border border-signal-border text-signal-light font-bold'
+                ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-sm'
                 : singleOffer
-                ? 'text-signal-light hover:bg-ink-800'
-                : 'text-ink-500'
+                ? 'text-slate-300 hover:text-white hover:bg-white/[0.04]'
+                : 'text-slate-600'
             }`}
           >
             3. Contract
@@ -2045,12 +2045,12 @@ export default function DealRoomPage() {
           <button
             onClick={() => handleSelectStep('checkout')}
             disabled={!singleOffer}
-            className={`py-2 px-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal disabled:opacity-40 disabled:hover:bg-transparent ${
+            className={`py-2 px-2 rounded-lg transition-all font-semibold disabled:opacity-30 ${
               flowStep === 'checkout' || flowStep === 'flagged'
-                ? 'bg-signal-bg border border-signal-border text-signal-light font-bold'
+                ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-sm'
                 : singleOffer
-                ? 'text-signal-light hover:bg-ink-800'
-                : 'text-ink-500'
+                ? 'text-slate-300 hover:text-white hover:bg-white/[0.04]'
+                : 'text-slate-600'
             }`}
           >
             4. Checkout
@@ -2058,12 +2058,12 @@ export default function DealRoomPage() {
           <button
             onClick={() => handleSelectStep('paid')}
             disabled={singleOffer?.state !== 'PAID' && flowStep !== 'paid'}
-            className={`py-2 px-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal disabled:opacity-40 disabled:hover:bg-transparent ${
+            className={`py-2 px-2 rounded-lg transition-all font-semibold disabled:opacity-30 ${
               flowStep === 'paid'
-                ? 'bg-emerald-950 border border-emerald-700 text-emerald-400 font-bold'
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm'
                 : singleOffer?.state === 'PAID'
-                ? 'text-emerald-400 hover:bg-ink-800'
-                : 'text-ink-500'
+                ? 'text-emerald-400 hover:bg-white/[0.04]'
+                : 'text-slate-600'
             }`}
           >
             5. Settled
