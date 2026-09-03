@@ -4,6 +4,7 @@ import { type BuyerConstraintsSection } from '@razorpay-dealflow/adapters';
 import { sign, type SignedOfferContract } from '@razorpay-dealflow/contract-service';
 import { stateMachine, type AgentDecisionRecord } from './state-machine.js';
 import { activeContracts } from '../routes/offers.js';
+import { geminiKeyPool } from './gemini-key-pool';
 
 export interface AgentNegotiationTurn {
   round: number;
@@ -48,9 +49,6 @@ async function callGeminiAgentTurn(params: {
   priorities: string[];
 }): Promise<{ message: string; proposedPricePaise: number } | null> {
   const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY || '';
-  const apiKey = rawKey.trim();
-  if (!apiKey) return null;
-
   try {
     const prompt =
       params.role === 'buyer'
@@ -87,55 +85,70 @@ Return valid JSON:
       'gemini-2.0-flash',
     ];
 
-    for (const model of candidateModels) {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
+    const poolResult = await geminiKeyPool.executeWithFailover<{ message: string; proposedPricePaise: number; modelUsed: string }>(
+      async (apiKey, maskedKey) => {
+        for (const model of candidateModels) {
+          try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 4000);
 
-        console.log(`[Gemini Agent] Calling model=${model} role=${params.role} round=${params.round} key=${apiKey.substring(0, 8)}...`);
+            console.log(`[Gemini Agent] Calling model=${model} role=${params.role} round=${params.round} key=${maskedKey}...`);
 
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { responseMimeType: 'application/json' },
-            }),
-            signal: controller.signal,
-          }
-        );
-        clearTimeout(timeout);
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: prompt }] }],
+                  generationConfig: { responseMimeType: 'application/json' },
+                }),
+                signal: controller.signal,
+              }
+            );
+            clearTimeout(timeout);
 
-        console.log(`[Gemini Agent] model=${model} status=${res.status}`);
+            console.log(`[Gemini Agent] model=${model} status=${res.status}`);
 
-        if (res.ok) {
-          const data: any = await res.json();
-          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (rawText) {
-            const parsed = JSON.parse(rawText);
-            if (parsed.message && typeof parsed.proposed_price_inr === 'number' && !isNaN(parsed.proposed_price_inr)) {
-              console.log(`[Gemini Agent] SUCCESS model=${model} role=${params.role} round=${params.round} price=₹${parsed.proposed_price_inr}`);
-              return {
-                message: parsed.message,
-                proposedPricePaise: Math.round(parsed.proposed_price_inr * 100),
-                modelUsed: model,
-              };
+            if (res.ok) {
+              const data: any = await res.json();
+              const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (rawText) {
+                const parsed = JSON.parse(rawText);
+                if (parsed.message && typeof parsed.proposed_price_inr === 'number' && !isNaN(parsed.proposed_price_inr)) {
+                  console.log(`[Gemini Agent] SUCCESS model=${model} role=${params.role} round=${params.round} price=₹${parsed.proposed_price_inr}`);
+                  return {
+                    success: true,
+                    data: {
+                      message: parsed.message,
+                      proposedPricePaise: Math.round(parsed.proposed_price_inr * 100),
+                      modelUsed: model,
+                    },
+                  };
+                }
+              }
+            } else {
+              const errBody = await res.text().catch(() => '');
+              console.log(`[Gemini Agent] FAILED model=${model} status=${res.status} body=${errBody.substring(0, 150)}`);
+              if (res.status === 429) {
+                return { success: false, status: 429 };
+              }
             }
+          } catch (e: any) {
+            console.log(`[Gemini Agent] ERROR model=${model}: ${e?.message || e}`);
           }
-        } else {
-          const errBody = await res.text().catch(() => '');
-          console.log(`[Gemini Agent] FAILED model=${model} status=${res.status} body=${errBody.substring(0, 200)}`);
         }
-      } catch (e: any) {
-        console.log(`[Gemini Agent] ERROR model=${model}: ${e?.message || e}`);
+        return { success: false };
       }
+    );
+
+    if (poolResult?.data) {
+      return poolResult.data;
     }
   } catch {
     // Graceful fallback to deterministic template
   }
-  console.log(`[Gemini Agent] All models exhausted for role=${params.role} round=${params.round}, returning null (fallback)`);
+  console.log(`[Gemini Agent] All keys and models exhausted for role=${params.role} round=${params.round}, returning null (fallback)`);
   return null;
 }
 

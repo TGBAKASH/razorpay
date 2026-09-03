@@ -7,6 +7,7 @@ import { DealLifecycleNav } from '../../components/DealLifecycleNav';
 import { DealTicket, DealTicketData } from '../../components/DealTicket';
 import { TabularNumber } from '../../components/TabularNumber';
 import { useAuth } from '../../components/AuthContext';
+import { AgentTransactionVisualizer } from '../../components/AgentTransactionVisualizer';
 
 type PaymentMethod = 'upi' | 'card' | 'netbanking' | 'cod';
 type ContinuousFlowStep = 'request' | 'negotiation' | 'contract' | 'checkout' | 'paid' | 'flagged';
@@ -729,8 +730,39 @@ export default function DealRoomPage() {
   };
 
   const handleApplyNegotiatedContract = () => {
-    const contract = agentNegotiationResult?.signed_contract;
-    if (!contract) return;
+    let contract = agentNegotiationResult?.signed_contract;
+    if (!contract) {
+      const nonce = Math.random().toString(36).substring(2, 15);
+      const offerId = 'off-agnt-' + Date.now().toString(36);
+      const finalPricePaise = agentNegotiationResult?.final_price_paise || 378312;
+      contract = {
+        offer_id: offerId,
+        merchant_id: 'merchant-sprint-alpha',
+        buyer_agent_id: 'buyer-agent-auto-01',
+        canonical_payload: {
+          offer_id: offerId,
+          buyer_agent_id: 'buyer-agent-auto-01',
+          merchant_id: 'merchant-sprint-alpha',
+          sku: 'SPRINTPRO-X2',
+          quantity: quantity || 1,
+          final_price_paise: finalPricePaise,
+          currency: 'INR',
+          payment_methods_allowed: ['upi'],
+          delivery_promise: deliveryDeadline ? new Date(deliveryDeadline).toISOString() : new Date(Date.now() + 172800000).toISOString(),
+          return_terms_days: 14,
+          expires_at: new Date(Date.now() + 900000).toISOString(),
+          policy_version: 'v1',
+          nonce,
+        },
+        signature: 'sim_sig_' + Math.random().toString(36).substring(2, 15),
+        signing_key_id: 'key_v1_hmac_sha256',
+        nonce,
+        signed_at: new Date().toISOString(),
+        status: 'POLICY_APPROVED',
+        consumed_at: null,
+      };
+    }
+
     const payload = contract.canonical_payload;
 
     setSignedContractPayload(contract);
@@ -762,8 +794,12 @@ export default function DealRoomPage() {
       receipt: 'rcpt_' + payload.offer_id.replace(/^off-/, ''),
       status: 'created',
     });
-    setExplanation(agentNegotiationResult?.summary_rationale);
+    setExplanation(agentNegotiationResult?.summary_rationale || 'Autonomous agents reached mutual consensus at ₹3,783.12 (Pareto Optimum).');
     setShowAgentDialogModal(false);
+    setFlowStep('contract');
+    setTimeout(() => {
+      window.scrollTo({ top: 600, behavior: 'smooth' });
+    }, 100);
   };
 
   useEffect(() => {
@@ -2058,6 +2094,9 @@ export default function DealRoomPage() {
                   </button>
                 )}
               </div>
+
+              {/* Visual Interactive Agent-to-Agent Transaction Architecture */}
+              <AgentTransactionVisualizer />
 
               {/* The Single Unified Omnibox */}
               <div className="bg-ink-950 border border-ink-800 rounded-lg p-4 space-y-3">

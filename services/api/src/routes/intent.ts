@@ -8,6 +8,7 @@ import {
   type CommonCommerceObject,
 } from '@razorpay-dealflow/adapters';
 import { parseBuyerIntent, parseMerchantPolicy } from '../services/gemini-parser.js';
+import { geminiKeyPool } from '../services/gemini-key-pool.js';
 
 export async function registerIntentRoutes(fastify: FastifyInstance) {
   // 1. Natural Language Intent Parsing endpoint (Buyer)
@@ -99,6 +100,7 @@ export async function registerIntentRoutes(fastify: FastifyInstance) {
         working_response: workingResponse,
         last_error_status: lastErrStatus,
         last_error_text: lastErrText ? lastErrText.substring(0, 200) : null,
+        pool_status: geminiKeyPool.getPoolStatus(),
       };
     } catch (err: any) {
       return {
