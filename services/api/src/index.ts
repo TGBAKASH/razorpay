@@ -6,6 +6,7 @@ import { registerRazorpayRoutes } from './routes/razorpay.js';
 import { registerAuctionRoutes } from './routes/auction.js';
 import { registerScenarioRoutes } from './routes/scenarios.js';
 import { registerBuyerOrderRoutes } from './routes/buyer-orders.js';
+import { registerMandateRoutes } from './routes/mandates.js';
 import { stateMachine } from './services/state-machine.js';
 import { prisma } from './db.js';
 
@@ -119,6 +120,7 @@ export function buildServer(): FastifyInstance {
   server.register(registerAuctionRoutes);
   server.register(registerScenarioRoutes);
   server.register(registerBuyerOrderRoutes);
+  server.register(registerMandateRoutes);
 
   return server;
 }

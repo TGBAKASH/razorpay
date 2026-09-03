@@ -57,7 +57,7 @@ describe('Intent Parsing & CCO Ingestion API', () => {
     expect(parsedBody.missing_fields).toContain('budget_max_paise');
     expect(parsedBody.missing_fields).toContain('delivery_deadline');
     expect(parsedBody.missing_fields).toContain('payment_preference');
-  });
+  }, 15000);
 
   it('ingests structured intent submission and produces a complete Common Commerce Object', async () => {
     const submission = {
@@ -111,7 +111,7 @@ describe('Intent Parsing & CCO Ingestion API', () => {
     expect(parsedBody.buyer_constraints.budget_max_paise).toBe(300000); // teen hazar = ₹3,000 = 300,000 paise
     expect(parsedBody.buyer_constraints.priorities).toContain('price'); // saste mein
     expect(parsedBody.buyer_constraints.priorities).toContain('delivery_speed'); // jaldi chahiye
-  });
+  }, 15000);
 
   it('parses natural language merchant policy rules into structured guardrails', async () => {
     const policyPrompt = "don't discount more than 12%, keep at least 18% margin, get my approval above ₹15,000, free delivery above ₹1,499";

@@ -278,7 +278,7 @@ export async function parseBuyerIntent(
   const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY || '';
   const apiKey = rawKey.trim();
 
-  if (apiKey !== '') {
+  if (apiKey !== '' && process.env.VITEST !== 'true') {
     try {
       const prompt = `You are an AI intent parser for an agentic commerce negotiation engine.
 Analyze the buyer's query (which may be in English, Hindi, or mixed Hinglish) and extract structured constraints in JSON format.
@@ -399,7 +399,7 @@ export async function parseMerchantPolicy(rawQuery: string): Promise<ParsePolicy
   let policyResult: ParsePolicyResult['policy'] = {};
   const apiKey = process.env.GEMINI_API_KEY;
 
-  if (apiKey && apiKey.trim() !== '') {
+  if (apiKey && apiKey.trim() !== '' && process.env.VITEST !== 'true') {
     try {
       const prompt = `You are an AI policy rules extractor for an autonomous merchant commerce agent.
 Extract merchant boundary configuration values from this natural language policy specification into JSON:

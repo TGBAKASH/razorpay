@@ -9,6 +9,7 @@ import {
   type RazorpayOrderResult,
 } from '@razorpay-dealflow/razorpay-client';
 import { activeContracts } from './offers.js';
+import { activeMandates } from './mandates.js';
 import { stateMachine } from '../services/state-machine.js';
 import { prisma } from '../db.js';
 
@@ -545,6 +546,33 @@ export async function registerRazorpayRoutes(fastify: FastifyInstance) {
         order_id: orderId,
         offer_id: offerId,
         refund_id: refundId,
+        event_id: eventId,
+        verified_at: new Date().toISOString(),
+        signature_verified: true,
+      });
+    }
+
+    // Handle Recurring Mandate Token Events (token.confirmed)
+    if (eventType === 'token.confirmed') {
+      const tokenEntity = payload.payload?.token?.entity;
+      const tokenId = tokenEntity?.id || payload.token_id;
+      const customerId = tokenEntity?.customer_id || payload.customer_id;
+
+      if (tokenId) {
+        const buyerAgentId = tokenEntity?.notes?.buyer_agent_id || 'buyer-agent-auto-01';
+        const existingMandate = activeMandates.get(buyerAgentId);
+        if (existingMandate) {
+          existingMandate.token_id = tokenId;
+          existingMandate.status = 'active';
+          if (customerId) existingMandate.customer_id = customerId;
+          activeMandates.set(buyerAgentId, existingMandate);
+        }
+      }
+
+      processedWebhookEvents.add(eventId);
+      return reply.status(200).send({
+        status: 'processed_token_confirmed',
+        token_id: tokenId,
         event_id: eventId,
         verified_at: new Date().toISOString(),
         signature_verified: true,
