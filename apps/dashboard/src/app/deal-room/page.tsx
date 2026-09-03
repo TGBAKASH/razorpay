@@ -834,6 +834,20 @@ export default function DealRoomPage() {
     }
   }, []);
 
+  // Auto-sync spending mandate ceiling when buyer specifies higher budget
+  useEffect(() => {
+    if (buyerMandate && budgetInr > 0) {
+      const currCeiling = parseFloat(buyerMandate.max_amount_inr) || 0;
+      if (budgetInr > currCeiling) {
+        setBuyerMandate((prev: any) => prev ? ({
+          ...prev,
+          max_amount_inr: budgetInr.toFixed(2),
+          max_amount_paise: budgetInr * 100,
+        }) : prev);
+      }
+    }
+  }, [budgetInr, buyerMandate]);
+
   // Free-Text Intent Parser with Sequential Staggered Animation
   const handleParseFreeTextIntent = async () => {
     if (!freeTextIntent.trim()) return;

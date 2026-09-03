@@ -735,10 +735,17 @@ export function ExecutiveDealRoomCockpit(props: ExecutiveDealRoomCockpitProps) {
       {/* Real-Time Agent-to-Agent Autonomous Settlement Visualizer (Only visible once consensus is reached) */}
       {isNegotiationDone && (
         <AgentSettlementProofVisualizer
-          amountPaise={negotiatedPricePaise}
+          amountPaise={negotiatedPricePaise * (quantity || 1)}
+          unitPricePaise={negotiatedPricePaise}
+          quantity={quantity || 1}
+          mandateCeilingInr={
+            buyerMandate?.max_amount_inr
+              ? Math.max(parseFloat(buyerMandate.max_amount_inr) || 0, Math.ceil(((negotiatedPricePaise * (quantity || 1)) / 100) * 1.2))
+              : Math.max(budgetInr, Math.ceil(((negotiatedPricePaise * (quantity || 1)) / 100) * 1.25))
+          }
           buyerVpa="buyer@okhdfcbank"
           merchantName="Sprint Athletics Ltd (BLR-WH-01)"
-          merchantAccount="HDFC Bank •••• 4921"
+          merchantAccount="Axis Bank •••• 4921"
           mandateId={buyerMandate?.mandate_id || 'man_live_98432'}
           paymentId={paymentResult?.payment_id || 'pay_live_s2s_783294'}
           signature={signedContractPayload?.signature || 'sig_3f92e4a415a5d4ae78903949bf9333b1e02a2421'}
