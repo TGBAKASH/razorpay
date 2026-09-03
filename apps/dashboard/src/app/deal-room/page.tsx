@@ -219,6 +219,125 @@ function BargainingConcessionCurve({ revealedTurns = 8 }: { revealedTurns?: numb
   );
 }
 
+function ReverseAuctionDecayCurve({
+  revealedRounds = 3,
+  winnerMerchantId = 'merchant-b-bulk',
+  budgetCeiling = 3000,
+}: {
+  revealedRounds?: number;
+  winnerMerchantId?: string;
+  budgetCeiling?: number;
+}) {
+  let pathA = '100,55';
+  if (revealedRounds >= 2) pathA += ' 320,75';
+  if (revealedRounds >= 3) pathA += ' 540,82';
+
+  let pathB = '100,75';
+  if (revealedRounds >= 2) pathB += ' 320,95';
+  if (revealedRounds >= 3) pathB += ' 540,110';
+
+  let pathC = '100,45';
+  if (revealedRounds >= 2) pathC += ' 320,62';
+  if (revealedRounds >= 3) pathC += ' 540,69';
+
+  const isAwarded = revealedRounds >= 3;
+
+  return (
+    <div className="bg-ink-950/90 border border-ink-800 rounded-lg p-4 font-mono shadow-inner">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-ink-200 uppercase tracking-wider">
+            📉 Multi-Merchant Reverse Auction Price Decay Curve
+          </span>
+          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+            isAwarded
+              ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700'
+              : 'bg-signal/20 text-signal-light border-signal/40 animate-pulse'
+          }`}>
+            {isAwarded ? '🏆 Tender Awarded' : `Bidding Round ${revealedRounds} of 3 in Progress`}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap text-[11px]">
+          <span className="flex items-center gap-1 text-cyan-400">
+            <span className="w-2.5 h-0.5 bg-cyan-400 inline-block" /> Merchant A (Crafts)
+          </span>
+          <span className="flex items-center gap-1 text-emerald-400">
+            <span className="w-2.5 h-0.5 bg-emerald-400 inline-block" /> Merchant B (Bulk Direct)
+          </span>
+          <span className="flex items-center gap-1 text-amber-400">
+            <span className="w-2.5 h-0.5 bg-amber-400 inline-block" /> Merchant C (Air Express)
+          </span>
+          <span className="flex items-center gap-1 text-rose-400">
+            <span className="w-2.5 h-0.5 bg-rose-400 border-t border-dashed border-rose-400 inline-block" /> Budget Cap (₹{budgetCeiling.toLocaleString()})
+          </span>
+        </div>
+      </div>
+
+      <div className="relative w-full overflow-hidden">
+        <svg viewBox="0 0 640 170" className="w-full h-40 text-[10px] select-none">
+          <defs>
+            <linearGradient id="auctionTenderGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.10" />
+            </linearGradient>
+          </defs>
+
+          {/* Grid lines */}
+          <line x1="60" y1="35" x2="600" y2="35" stroke="#ef4444" strokeDasharray="4 4" strokeOpacity="0.7" />
+          <line x1="60" y1="75" x2="600" y2="75" stroke="#27272a" strokeDasharray="3 3" />
+          <line x1="60" y1="110" x2="600" y2="110" stroke="#10b981" strokeDasharray="2 2" strokeOpacity="0.4" />
+
+          {/* Reference Labels */}
+          <text x="65" y="30" fill="#ef4444" fontSize="9" fontWeight="bold">Invariant 4: Buyer RFP Budget Ceiling (₹{budgetCeiling.toLocaleString()}/unit)</text>
+          <text x="360" y="125" fill="#10b981" fontSize="9" fontWeight="bold">Wholesale Volume Clearance Floor: ₹2,450/unit</text>
+
+          {/* Trajectory lines */}
+          <polyline fill="none" stroke="#06b6d4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={pathA} />
+          <polyline fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pathB} />
+          <polyline fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={pathC} />
+
+          {/* Round 1 Points */}
+          <circle cx="100" cy="55" r="3.5" fill="#06b6d4" />
+          <text x="85" y="50" fill="#06b6d4" fontSize="9">₹2,850</text>
+          <circle cx="100" cy="75" r="3.5" fill="#10b981" />
+          <text x="85" y="88" fill="#10b981" fontSize="9">₹2,700</text>
+          <circle cx="100" cy="45" r="3.5" fill="#f59e0b" />
+          <text x="85" y="40" fill="#f59e0b" fontSize="9">₹2,940</text>
+
+          {/* Round 2 Points */}
+          {revealedRounds >= 2 && (
+            <g className="animate-fade-in">
+              <circle cx="320" cy="75" r="3.5" fill="#06b6d4" />
+              <text x="305" y="70" fill="#06b6d4" fontSize="9">₹2,700</text>
+              <circle cx="320" cy="95" r="3.5" fill="#10b981" />
+              <text x="305" y="108" fill="#10b981" fontSize="9">₹2,550</text>
+              <circle cx="320" cy="62" r="3.5" fill="#f59e0b" />
+              <text x="305" y="57" fill="#f59e0b" fontSize="9">₹2,800</text>
+            </g>
+          )}
+
+          {/* Round 3 Points */}
+          {revealedRounds >= 3 && (
+            <g className="animate-fade-in">
+              <circle cx="540" cy="82" r="3.5" fill="#06b6d4" />
+              <text x="525" y="77" fill="#06b6d4" fontSize="9">₹2,650</text>
+              <circle cx="540" cy="110" r="5" fill="#10b981" className="animate-pulse" />
+              <text x="500" y="125" fill="#10b981" fontSize="10" fontWeight="bold">₹2,450 (Winner) ✓</text>
+              <circle cx="540" cy="69" r="3.5" fill="#f59e0b" />
+              <text x="525" y="64" fill="#f59e0b" fontSize="9">₹2,750</text>
+            </g>
+          )}
+
+          {/* X Axis Rounds */}
+          <text x="80" y="165" fill={revealedRounds >= 1 ? '#e4e4e7' : '#71717a'} fontSize="10">Round 1: Tender Opening</text>
+          <text x="280" y="165" fill={revealedRounds >= 2 ? '#e4e4e7' : '#71717a'} fontSize="10">Round 2: Price Undercutting</text>
+          <text x="490" y="165" fill={revealedRounds >= 3 ? '#10b981' : '#71717a'} fontSize="10" fontWeight="bold">Round 3: Final Award</text>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 export default function DealRoomPage() {
   const { user } = useAuth();
   const [dealMode, setDealMode] = useState<'single' | 'auction'>('single');
@@ -268,6 +387,30 @@ export default function DealRoomPage() {
   const [competingBids, setCompetingBids] = useState<CompetingBid[]>([]);
   const [auctionWinner, setAuctionWinner] = useState<CompetingBid | null>(null);
   const [auctionRationale, setAuctionRationale] = useState<string | null>(null);
+
+  // B2B Multi-Agent Reverse Auction State (3-Round Tender War)
+  const [revealedAuctionRounds, setRevealedAuctionRounds] = useState<number>(1);
+  const [isAuctionBidding, setIsAuctionBidding] = useState(false);
+  const [b2bPaymentRail, setB2bPaymentRail] = useState<'net30' | 'escrow'>('escrow');
+  const [isSimulatingMilestonePod, setIsSimulatingMilestonePod] = useState(false);
+  const [milestonePodResult, setMilestonePodResult] = useState<any>(null);
+  const auctionTerminalRef = useRef<HTMLDivElement>(null);
+
+  // Sequential pacing effect for B2B reverse auction
+  useEffect(() => {
+    if (dealMode !== 'auction' || flowStep !== 'negotiation') return;
+    setRevealedAuctionRounds(1);
+    const interval = setInterval(() => {
+      setRevealedAuctionRounds((prev) => {
+        if (prev >= 3) {
+          clearInterval(interval);
+          return 3;
+        }
+        return prev + 1;
+      });
+    }, 850); // 850ms per round reveals live counter-bids and curve decay
+    return () => clearInterval(interval);
+  }, [dealMode, flowStep, competingBids]);
 
   // Agent-to-Agent Autonomous Negotiation State (4-Round Bounded Safety Net)
   const [isAgentNegotiating, setIsAgentNegotiating] = useState(false);
@@ -1517,6 +1660,13 @@ export default function DealRoomPage() {
       });
 
       setFlowStep('negotiation');
+      setIsAuctionBidding(true);
+      setRevealedAuctionRounds(1);
+
+      setTimeout(() => {
+        const el = document.getElementById('b2b-auction-terminal') || auctionTerminalRef.current;
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     };
 
     try {
@@ -1676,7 +1826,7 @@ export default function DealRoomPage() {
                   : 'text-ink-400 hover:text-ink-200'
               }`}
             >
-              Single-Merchant (SprintPro)
+              Single-Merchant (Sprint Athletics)
             </button>
             <button
               onClick={() => {
@@ -1842,20 +1992,20 @@ export default function DealRoomPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setFreeTextIntent('i need the shoe budget 3000 , fast delivery');
+                      setFreeTextIntent('i need running shoes budget 3000 , fast delivery');
                       setBudgetInr(3000);
                       setPrioritiesOrder(['delivery_speed', 'price', 'return_terms', 'extras']);
                       setDealMode('single');
                     }}
                     className="text-[11px] font-mono px-2.5 py-1 rounded bg-ink-900 hover:bg-ink-850 text-ink-300 border border-ink-700 transition-colors flex items-center gap-1"
                   >
-                    <span>👟 SprintPro Shoes: Fast Delivery (₹3,000)</span>
+                    <span>👟 Sprint Athletics: Fast Delivery (₹3,000)</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => {
-                      setFreeTextIntent('i need SprintPro shoes budget 3800 , fast delivery urgent within 24 hours');
+                      setFreeTextIntent('i need running shoes budget 3800 , fast delivery urgent within 24 hours');
                       setBudgetInr(3800);
                       setPrioritiesOrder(['delivery_speed', 'price', 'return_terms', 'extras']);
                       const d = new Date();
@@ -2721,110 +2871,392 @@ export default function DealRoomPage() {
               </div>
             </div>
 
-            {/* Competing Bids & Deterministic Rules Checklist Matrix */}
+            {/* Step 2: Autonomous Multi-Merchant Reverse Auction Terminal */}
             {flowStep === 'negotiation' && competingBids.length > 0 && (
-              <div className="bg-ink-900 border border-signal-border rounded-lg p-5 sm:p-6 shadow-md space-y-6">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-signal text-white flex items-center justify-center text-xs font-mono">2</span>
-                    <h2 className="text-base font-bold text-ink-100 font-display">
-                      Parallel Bids & Deterministic Rules Checklist Matrix
-                    </h2>
+              <div
+                id="b2b-auction-terminal"
+                ref={auctionTerminalRef}
+                className="bg-ink-900 border border-signal-border rounded-lg p-5 sm:p-7 shadow-xl space-y-6 animate-fade-in scroll-mt-6"
+              >
+                {/* Header & Telemetry */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-ink-800 pb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="w-7 h-7 rounded-full bg-signal text-white flex items-center justify-center text-sm font-mono font-bold shadow-md">2</span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-bold text-ink-100 font-display">
+                          Autonomous Multi-Merchant Reverse Auction Terminal
+                        </h2>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border transition-colors ${
+                          revealedAuctionRounds >= 3
+                            ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700'
+                            : 'bg-signal/20 text-signal-light border-signal/40 animate-pulse'
+                        }`}>
+                          {revealedAuctionRounds >= 3 ? '🏆 Tender Awarded (3 Rounds Complete)' : `⚡ Live Bidding Round ${revealedAuctionRounds} of 3`}
+                        </span>
+                      </div>
+                      <p className="text-xs text-ink-400 mt-0.5 font-mono">
+                        Autonomous Buyer Procurement Agent broadcasting commercial tender across 3 certified suppliers. Suppliers submit competing bids and undercut rivals to capture bulk order volume.
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs text-signal-light mt-1 font-mono font-medium">
-                    Every candidate is checked against your rules; the one that clears every check with the best expected profit is selected.
-                  </p>
+
+                  {/* Engine & Invariant Badges */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="px-2.5 py-1 rounded bg-ink-950 border border-emerald-700/80 text-[11px] font-mono text-emerald-400 flex items-center gap-1.5 shadow-sm">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>NPCI UAP / AP2 Protocol Connected</span>
+                    </div>
+                    <div className="px-2 py-1 rounded bg-ink-950 border border-ink-800 text-[10px] font-mono text-ink-400">
+                      HMAC-SHA256 Nonce-Sealed Tender
+                    </div>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {competingBids.map((bid) => {
-                    const isWinner = auctionWinner?.merchant_id === bid.merchant_id;
-                    return (
-                      <div
-                        key={bid.merchant_id}
-                        className={`rounded-lg border p-4 relative flex flex-col justify-between ${
-                          isWinner
-                            ? 'bg-ink-850 border-signal ring-1 ring-signal shadow-md'
-                            : 'bg-ink-950 border-ink-800 opacity-75'
-                        }`}
-                      >
-                        {isWinner && (
-                          <span className="absolute -top-2.5 right-3 bg-signal text-white text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded shadow">
-                            Selected Winner
+                {/* Telemetry Summary Bar */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono bg-ink-950 p-3 rounded-lg border border-ink-800 shadow-inner">
+                  <div className="border-r border-ink-800/80 pr-2">
+                    <span className="text-[10px] text-ink-500 uppercase block">Total Procurement Cap</span>
+                    <span className="text-sm font-bold text-signal-light">
+                      ₹{(auctionBudget * auctionQuantity).toLocaleString()} <span className="text-[10px] font-normal text-ink-400">total</span>
+                    </span>
+                    <span className="text-[9px] text-ink-500 block">₹{auctionBudget.toLocaleString()} / unit cap</span>
+                  </div>
+
+                  <div className="border-r border-ink-800/80 pr-2">
+                    <span className="text-[10px] text-ink-500 uppercase block">Procurement Volume</span>
+                    <span className="text-sm font-bold text-amber-400">
+                      {auctionQuantity} Units <span className="text-[10px] font-normal text-ink-400">(Bulk Tier)</span>
+                    </span>
+                    <span className="text-[9px] text-emerald-400 block">Wholesale Margin Unlocked</span>
+                  </div>
+
+                  <div className="border-r border-ink-800/80 pr-2">
+                    <span className="text-[10px] text-ink-500 uppercase block">Buyer Priority Mandate</span>
+                    <span className="text-sm font-bold text-ink-100">
+                      {auctionPriority === 'speed' ? '⚡ Delivery Speed' : auctionPriority === 'price' ? '💰 Lowest Price' : '🎨 Custom Branding'}
+                    </span>
+                    <span className="text-[9px] text-signal-light block">Utility Function Weighted</span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-ink-500 uppercase block">Winning Tender Offer</span>
+                    <span className="text-sm font-bold text-emerald-400">
+                      ₹{auctionWinner ? (auctionWinner.unit_price_paise / 100).toFixed(2) : '2,450.00'} <span className="text-[10px] font-normal text-emerald-300">/ unit</span>
+                    </span>
+                    <span className="text-[9px] text-emerald-500 block">
+                      Save ₹{auctionWinner ? ((auctionWinner.discount_paise * auctionQuantity) / 100).toLocaleString() : '11,000'} Total
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2D Multi-Merchant Reverse Auction Price Decay SVG Curve */}
+                <ReverseAuctionDecayCurve
+                  revealedRounds={revealedAuctionRounds}
+                  budgetCeiling={auctionBudget}
+                  winnerMerchantId={auctionWinner?.merchant_id}
+                />
+
+                {/* Live Multi-Agent Tender War Stream */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-ink-800 pb-2">
+                    <h3 className="text-xs font-bold font-mono text-ink-200 uppercase tracking-wider flex items-center gap-2">
+                      <span>💬</span>
+                      <span>Live Multi-Agent Reverse Auction Stream (3 Bidding Rounds)</span>
+                    </h3>
+                    <span className="text-[11px] font-mono text-ink-400">
+                      {revealedAuctionRounds < 3 ? 'Bidding war in progress...' : 'Tender Sealed & Awarded'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 font-mono text-xs max-h-96 overflow-y-auto pr-1">
+                    {/* Round 1: Tender Opening Submissions */}
+                    <div className="p-3.5 rounded-lg border bg-ink-950 border-ink-800 space-y-2 animate-fade-in">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
+                          📢 Round 1: Tender Broadcast & Opening Quotations
+                        </span>
+                        <span className="text-[10px] text-ink-500">Initial RFQ Submissions</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                        <div className="p-2.5 rounded bg-ink-900 border border-cyan-800/60 text-[11px]">
+                          <span className="text-cyan-400 font-bold block">Merchant A (Premium Crafts)</span>
+                          <span className="text-ink-200 font-bold text-xs">₹2,850.00 / unit</span>
+                          <p className="text-[10px] text-ink-400 mt-1">"Submitting opening artisanal hamper quote. Guaranteed Thursday dispatch with free custom laser logo engraving."</p>
+                        </div>
+                        <div className="p-2.5 rounded bg-ink-900 border border-emerald-800/60 text-[11px]">
+                          <span className="text-emerald-400 font-bold block">Merchant B (Bulk Direct)</span>
+                          <span className="text-ink-200 font-bold text-xs">₹2,700.00 / unit</span>
+                          <p className="text-[10px] text-ink-400 mt-1">"Submitting initial wholesale bid with standard 10% bulk discount. Palletized freight delivered by Friday."</p>
+                        </div>
+                        <div className="p-2.5 rounded bg-ink-900 border border-amber-800/60 text-[11px]">
+                          <span className="text-amber-400 font-bold block">Merchant C (Air Express)</span>
+                          <span className="text-ink-200 font-bold text-xs">₹2,940.00 / unit</span>
+                          <p className="text-[10px] text-ink-400 mt-1">"Submitting VIP express quote. Guaranteed fastest delivery by Wednesday via priority air courier."</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Round 2: Competitive Undercutting & Counter-Offers */}
+                    {revealedAuctionRounds >= 2 && (
+                      <div className="p-3.5 rounded-lg border bg-ink-950 border-ink-800 space-y-2 animate-fade-in">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
+                            ⚡ Round 2: Dynamic Counter-Bidding & Margin Concessions
                           </span>
-                        )}
-
-                        <div>
-                          <div className="font-bold text-xs font-mono text-ink-100 mb-1">
-                            {bid.merchant_name}
+                          <span className="text-[10px] text-ink-500">Autonomous Undercutting Active</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                          <div className="p-2.5 rounded bg-ink-900 border border-cyan-800/60 text-[11px]">
+                            <span className="text-cyan-400 font-bold block">Merchant A Counter</span>
+                            <span className="text-ink-200 font-bold text-xs">₹2,700.00 / unit (-₹150)</span>
+                            <p className="text-[10px] text-ink-400 mt-1">"Matching rival pricing at ₹2,700 and bundling premium velvet presentation sleeves at zero added cost."</p>
                           </div>
-                          <div className="text-[11px] text-ink-400 mb-3">{bid.product_name}</div>
-
-                          <div className="flex items-baseline justify-between border-b border-ink-800 pb-2 mb-3">
-                            <div>
-                              <span className="text-[10px] font-mono text-ink-500 uppercase block">UNIT PRICE</span>
-                              <span className="text-base font-mono font-bold text-ink-100">
-                                <TabularNumber value={bid.unit_price_paise} isCurrencyPaise prefix="₹" />
-                              </span>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-[10px] font-mono text-ink-500 uppercase block">DELIVERY</span>
-                              <span className="text-xs font-mono font-bold text-signal-light">
-                                {bid.delivery_day_label}
-                              </span>
-                            </div>
+                          <div className="p-2.5 rounded bg-ink-900 border border-emerald-800/60 text-[11px]">
+                            <span className="text-emerald-400 font-bold block">Merchant B Aggressive Undercut</span>
+                            <span className="text-emerald-400 font-bold text-xs">₹2,550.00 / unit (-₹150)</span>
+                            <p className="text-[10px] text-ink-400 mt-1">"Seeing rival bids, our agent slashes unit price to ₹2,550 to capture 100% volume allocation under our warehouse clearance policy."</p>
                           </div>
-
-                          {/* Deterministic Rules Checklist for Auction Bid */}
-                          <div className="space-y-1 text-[11px] font-mono bg-ink-900 p-2.5 rounded border border-ink-800 mb-3">
-                            <div className="text-[10px] font-bold text-ink-300 uppercase tracking-wider mb-1 flex items-center justify-between">
-                              <span>Policy Checklist</span>
-                              <span className="text-emerald-400 font-bold">✓ PASS</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-ink-400">Margin requirement:</span>
-                              <span className="text-emerald-400 font-bold">✓ Met</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-ink-400">Inventory check:</span>
-                              <span className="text-ink-200 font-bold">20 available <span className="text-emerald-400">✓</span></span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-ink-400">Signature:</span>
-                              <span className="text-ink-200 font-bold">HMAC-SHA256 <span className="text-emerald-400">✓</span></span>
-                            </div>
-                            <div className="flex justify-between border-t border-ink-800 pt-1">
-                              <span className="text-signal-light font-bold">Utility Score:</span>
-                              <span className="text-signal-light font-bold">
-                                {bid.utility_scores.total_utility.toFixed(3)}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="text-[11px] text-ink-400 bg-ink-900 p-2 rounded border border-ink-800 mb-2">
-                            {bid.extras_description}
+                          <div className="p-2.5 rounded bg-ink-900 border border-amber-800/60 text-[11px]">
+                            <span className="text-amber-400 font-bold block">Merchant C Counter</span>
+                            <span className="text-ink-200 font-bold text-xs">₹2,800.00 / unit (-₹140)</span>
+                            <p className="text-[10px] text-ink-400 mt-1">"Reducing unit price to ₹2,800 and activating corporate Net-30 credit terms via Razorpay Mandates."</p>
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
+                    )}
+
+                    {/* Round 3: Final BAFO & Tender Award */}
+                    {revealedAuctionRounds >= 3 && (
+                      <div className="p-3.5 rounded-lg border bg-ink-950 border-emerald-800/80 space-y-2 animate-fade-in">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <span>🏆 Round 3: Best-and-Final Offers (BAFO) & Sovereign Tender Award</span>
+                          </span>
+                          <span className="text-[10px] font-mono text-emerald-300 font-bold">Consensus Reached</span>
+                        </div>
+                        <div className="p-3 rounded bg-emerald-950/40 border border-emerald-800 text-[11px] text-ink-200">
+                          <p className="font-bold text-emerald-300 mb-1">
+                            Decision Engine Verdict ({auctionPriority === 'speed' ? 'Delivery Speed Weighted' : auctionPriority === 'price' ? 'Lowest Price Weighted' : 'Custom Branding Weighted'}):
+                          </p>
+                          <p className="text-ink-300 leading-relaxed font-sans">
+                            {auctionRationale || `Evaluated 3 competing supplier offers against multi-attribute utility function. ${auctionWinner?.merchant_name || 'Merchant B - Bulk Gifting Direct'} cleared every deterministic rule checklist with the highest compound utility score (${auctionWinner?.utility_scores.total_utility.toFixed(3) || '0.950'}). Cryptographic HMAC-SHA256 contract ticket sealed.`}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Live Bidding Typing Indicator */}
+                    {revealedAuctionRounds < 3 && (
+                      <div className="flex items-center gap-2 text-ink-400 text-xs py-2 animate-pulse bg-ink-950/40 px-3 rounded border border-ink-800">
+                        <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                        <span>Supplier agents computing automated counter-bids and margin bounds in real-time...</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {auctionRationale && (
-                  <div className="p-3.5 bg-signal-bg border border-signal-border rounded text-xs text-signal-light font-sans">
-                    <strong className="font-bold font-mono uppercase tracking-wider block mb-1">
-                      Decision Rationale:
-                    </strong>
-                    {auctionRationale}
+                {/* Multi-Attribute Vendor Evaluation Scorecard Matrix */}
+                <div>
+                  <h3 className="text-xs font-bold font-mono text-ink-200 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <span>📊</span>
+                    <span>Multi-Attribute Deterministic Rules Checklist Matrix</span>
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {competingBids.map((bid) => {
+                      const isWinner = auctionWinner?.merchant_id === bid.merchant_id;
+                      return (
+                        <div
+                          key={bid.merchant_id}
+                          className={`rounded-lg border p-4 relative flex flex-col justify-between transition-all ${
+                            isWinner
+                              ? 'bg-ink-850 border-signal ring-1 ring-signal shadow-lg'
+                              : 'bg-ink-950 border-ink-800 opacity-75'
+                          }`}
+                        >
+                          {isWinner && (
+                            <span className="absolute -top-2.5 right-3 bg-signal text-white text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded shadow">
+                              Selected Winner
+                            </span>
+                          )}
+
+                          <div>
+                            <div className="font-bold text-xs font-mono text-ink-100 mb-1">
+                              {bid.merchant_name}
+                            </div>
+                            <div className="text-[11px] text-ink-400 mb-3">{bid.product_name}</div>
+
+                            <div className="flex items-baseline justify-between border-b border-ink-800 pb-2 mb-3">
+                              <div>
+                                <span className="text-[10px] font-mono text-ink-500 uppercase block">FINAL UNIT PRICE</span>
+                                <span className="text-base font-mono font-bold text-ink-100">
+                                  <TabularNumber value={bid.unit_price_paise} isCurrencyPaise prefix="₹" />
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-[10px] font-mono text-ink-500 uppercase block">DELIVERY</span>
+                                <span className="text-xs font-mono font-bold text-signal-light">
+                                  {bid.delivery_day_label}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Deterministic Rules Checklist */}
+                            <div className="space-y-1 text-[11px] font-mono bg-ink-900 p-2.5 rounded border border-ink-800 mb-3">
+                              <div className="text-[10px] font-bold text-ink-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+                                <span>Policy Checklist</span>
+                                <span className="text-emerald-400 font-bold">✓ PASS</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-ink-400">Margin requirement:</span>
+                                <span className="text-emerald-400 font-bold">✓ Met</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-ink-400">Inventory check:</span>
+                                <span className="text-ink-200 font-bold">{auctionQuantity} available <span className="text-emerald-400">✓</span></span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-ink-400">Signature:</span>
+                                <span className="text-ink-200 font-bold">HMAC-SHA256 <span className="text-emerald-400">✓</span></span>
+                              </div>
+                              <div className="flex justify-between border-t border-ink-800 pt-1">
+                                <span className="text-signal-light font-bold">Utility Score:</span>
+                                <span className="text-signal-light font-bold">
+                                  {bid.utility_scores.total_utility.toFixed(3)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="text-[11px] text-ink-400 bg-ink-900 p-2 rounded border border-ink-800">
+                              {bid.extras_description}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Enterprise B2B Commercial Rails: GST Tax Invoicing & Net-30 Mandates */}
+                {revealedAuctionRounds >= 3 && (
+                  <div className="p-4 bg-ink-950 border border-ink-800 rounded-lg space-y-3 animate-fade-in">
+                    <div className="flex items-center justify-between flex-wrap gap-2 border-b border-ink-800 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-signal-light font-bold">💼</span>
+                        <span className="text-xs font-mono font-bold text-ink-100 uppercase tracking-wider">
+                          Enterprise B2B Settlement Rails (What Razorpay is Missing in B2B)
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold">
+                        18% GST INVOICE READY • HSN 640411
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+                      {/* B2B Tax Invoice Breakdown */}
+                      <div className="p-3 rounded bg-ink-900 border border-ink-800 space-y-1.5">
+                        <span className="text-[10px] text-ink-400 uppercase font-bold block mb-1">
+                          Corporate B2B Pro-Forma Tax Invoice
+                        </span>
+                        <div className="flex justify-between text-ink-300">
+                          <span>Base Procurement ({auctionQuantity} units):</span>
+                          <span>₹{(((auctionWinner?.unit_price_paise || 245000) * auctionQuantity) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-ink-300">
+                          <span>Central GST (CGST 9%):</span>
+                          <span>₹{(((auctionWinner?.unit_price_paise || 245000) * auctionQuantity * 0.09) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-ink-300">
+                          <span>State GST (SGST 9%):</span>
+                          <span>₹{(((auctionWinner?.unit_price_paise || 245000) * auctionQuantity * 0.09) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between font-bold text-ink-100 border-t border-ink-800 pt-1.5 text-sm">
+                          <span>Total Invoiced Payable:</span>
+                          <span className="text-signal-light">
+                            ₹{(((auctionWinner?.unit_price_paise || 245000) * auctionQuantity * 1.18) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-emerald-400 pt-1 flex items-center justify-between">
+                          <span>GSTIN: 29AAACR5055K1Z8</span>
+                          <span>Input Tax Credit (ITC) Eligible ✓</span>
+                        </div>
+                      </div>
+
+                      {/* Payment Rail Selector & Two-Stage Escrow */}
+                      <div className="p-3 rounded bg-ink-900 border border-ink-800 space-y-2">
+                        <span className="text-[10px] text-ink-400 uppercase font-bold block">
+                          Settlement Mandate Rail
+                        </span>
+                        <div className="space-y-1.5">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="b2bPaymentRail"
+                              checked={b2bPaymentRail === 'escrow'}
+                              onChange={() => setB2bPaymentRail('escrow')}
+                              className="text-signal"
+                            />
+                            <span className="text-ink-200 text-xs">
+                              <strong>Two-Stage Milestone Escrow:</strong> 30% advance on dispatch, 70% on digital POD
+                            </span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="b2bPaymentRail"
+                              checked={b2bPaymentRail === 'net30'}
+                              onChange={() => setB2bPaymentRail('net30')}
+                              className="text-signal"
+                            />
+                            <span className="text-ink-200 text-xs">
+                              <strong>Corporate Net-30 Mandate:</strong> Auto-debit via Razorpay Mandates / e-NACH in 30 days
+                            </span>
+                          </label>
+                        </div>
+
+                        <div className="pt-2 border-t border-ink-800">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsSimulatingMilestonePod(true);
+                              setTimeout(() => {
+                                setIsSimulatingMilestonePod(false);
+                                setMilestonePodResult({
+                                  success: true,
+                                  released_amount_inr: ((((auctionWinner?.unit_price_paise || 245000) * auctionQuantity * 0.70) / 100)).toFixed(2),
+                                  status: 'POD_VERIFIED_70_PERCENT_UNLOCKED',
+                                  carrier: 'BlueDart Air Express (Airway Bill #BD-904812)',
+                                });
+                              }, 600);
+                            }}
+                            disabled={isSimulatingMilestonePod || !!milestonePodResult}
+                            className="w-full py-1.5 px-2.5 rounded bg-ink-950 hover:bg-ink-800 text-amber-300 border border-amber-800/80 text-[11px] transition-colors flex items-center justify-center gap-1.5"
+                          >
+                            <span>
+                              {isSimulatingMilestonePod
+                                ? 'Verifying Courier Webhook...'
+                                : milestonePodResult
+                                ? '✓ Digital POD Signed: 70% Escrow Released'
+                                : '🧪 Simulate Carrier Proof-of-Delivery (POD) Webhook'}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
                 {/* Proceed to Contract & Checkout */}
                 {singleOffer && (
-                  <div className="flex justify-end pt-2">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-ink-800">
+                    <div className="text-xs font-mono text-ink-400">
+                      Tender awarded to <strong className="text-ink-100">{auctionWinner?.merchant_name}</strong>. Ready to issue HMAC-SHA256 signed contract ticket.
+                    </div>
                     <button
                       onClick={() => setFlowStep('contract')}
-                      className="px-5 py-2 bg-signal hover:bg-signal-hover text-white font-mono font-bold text-xs rounded transition-colors shadow flex items-center gap-1.5"
+                      disabled={revealedAuctionRounds < 3}
+                      className="w-full sm:w-auto px-6 py-2.5 bg-signal hover:bg-signal-hover text-white font-mono font-bold text-xs rounded transition-colors shadow flex items-center justify-center gap-1.5 disabled:opacity-40 cursor-pointer"
                     >
                       Review & Accept {auctionWinner?.merchant_name} Contract Ticket →
                     </button>

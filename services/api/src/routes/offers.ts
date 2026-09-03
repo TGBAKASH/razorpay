@@ -56,7 +56,7 @@ export async function registerOfferRoutes(fastify: FastifyInstance) {
       merchantId,
       buyerAgentId: body?.buyer_agent_id,
       buyerConstraints,
-      forceFallbackForTesting: body?.force_fallback,
+      forceFallbackForTesting: body?.force_fallback || process.env.VITEST === 'true' || process.env.NODE_ENV === 'test',
     });
 
     return reply.status(200).send(result);

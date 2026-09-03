@@ -231,20 +231,22 @@ export class AgentNegotiationService {
       let rawBuyerMessage = '';
       let proposedBuyerPricePaise = 0;
 
-      // Try Gemini 1.5 Flash LLM for dynamic turn
-      const geminiBuyer = await callGeminiAgentTurn({
-        role: 'buyer',
-        productName: product.name,
-        round: r,
-        currentBidPaise: currentBuyerBidPaise,
-        currentAskPaise: currentMerchantAskPaise,
-        targetPricePaise: targetOptimalPricePaise,
-        buyerCeilingPaise,
-        merchantFloorPaise,
-        isUrgent: isUrgentDeadline,
-        deadlineStr: deadlineDate?.toLocaleDateString(),
-        priorities: buyerConstraints.priorities || ['delivery_speed', 'price'],
-      });
+      // Try Gemini Flash LLM for dynamic turn when not in testing fallback mode
+      const geminiBuyer = !forceFallbackForTesting
+        ? await callGeminiAgentTurn({
+            role: 'buyer',
+            productName: product.name,
+            round: r,
+            currentBidPaise: currentBuyerBidPaise,
+            currentAskPaise: currentMerchantAskPaise,
+            targetPricePaise: targetOptimalPricePaise,
+            buyerCeilingPaise,
+            merchantFloorPaise,
+            isUrgent: isUrgentDeadline,
+            deadlineStr: deadlineDate?.toLocaleDateString(),
+            priorities: buyerConstraints.priorities || ['delivery_speed', 'price'],
+          })
+        : null;
 
       if (geminiBuyer) {
         rawBuyerMessage = geminiBuyer.message;
@@ -324,20 +326,22 @@ export class AgentNegotiationService {
       let rawMerchantMessage = '';
       let proposedMerchantCounterPaise = 0;
 
-      // Try Gemini 1.5 Flash LLM for merchant response
-      const geminiMerchant = await callGeminiAgentTurn({
-        role: 'merchant',
-        productName: product.name,
-        round: r,
-        currentBidPaise: currentBuyerBidPaise,
-        currentAskPaise: currentMerchantAskPaise,
-        targetPricePaise: targetOptimalPricePaise,
-        buyerCeilingPaise,
-        merchantFloorPaise,
-        isUrgent: isUrgentDeadline,
-        deadlineStr: deadlineDate?.toLocaleDateString(),
-        priorities: buyerConstraints.priorities || ['delivery_speed', 'price'],
-      });
+      // Try Gemini Flash LLM for merchant response when not in testing fallback mode
+      const geminiMerchant = !forceFallbackForTesting
+        ? await callGeminiAgentTurn({
+            role: 'merchant',
+            productName: product.name,
+            round: r,
+            currentBidPaise: currentBuyerBidPaise,
+            currentAskPaise: currentMerchantAskPaise,
+            targetPricePaise: targetOptimalPricePaise,
+            buyerCeilingPaise,
+            merchantFloorPaise,
+            isUrgent: isUrgentDeadline,
+            deadlineStr: deadlineDate?.toLocaleDateString(),
+            priorities: buyerConstraints.priorities || ['delivery_speed', 'price'],
+          })
+        : null;
 
       if (geminiMerchant) {
         rawMerchantMessage = geminiMerchant.message;
@@ -402,7 +406,8 @@ export class AgentNegotiationService {
       fallbackApplied = true;
       finalAgreedPricePaise = targetOptimalPricePaise; // Fallback directly to Part 1 / Part 2 candidate
       governingRule = 'RULE_AGENT_NEGOTIATION_FALLBACK_TO_PART2_OPTIMAL';
-      summaryRationale = `Negotiation completed 4 rounds without direct convergence. Safety net activated: automatically presenting the standard Part 1/Part 2 ranked optimal candidate (₹${(targetOptimalPricePaise / 100).toFixed(2)}) preserving merchant policy floor and buyer priority.`;
+      const urgencyNote = isUrgentDeadline ? ' with active deadline-aware posture (<24h urgency)' : '';
+      summaryRationale = `Negotiation completed 4 rounds without direct convergence. Safety net activated: automatically presenting the standard Part 1/Part 2 ranked optimal candidate (₹${(targetOptimalPricePaise / 100).toFixed(2)})${urgencyNote} preserving merchant policy floor and buyer priority.`;
     } else {
       const urgencyNote = isUrgentDeadline ? ' with active deadline-aware posture (<24h urgency)' : '';
       summaryRationale = `Autonomous agents reached mutual convergence within ${roundsCompleted} rounds at ₹${(finalAgreedPricePaise / 100).toFixed(2)}${urgencyNote}, clearing the 18% merchant floor and buyer budget ceiling.`;
