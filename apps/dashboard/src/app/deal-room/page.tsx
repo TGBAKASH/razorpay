@@ -2706,20 +2706,6 @@ export default function DealRoomPage() {
         )}
       </main>
 
-      {/* Persistent Footer */}
-      <footer className="border-t border-slate-200 bg-white py-4 mt-12 shadow-2xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-sans text-slate-500">
-          <div>
-            <span className="font-semibold text-slate-800">Razorpay DealFlow</span> &bull; Sovereign Deal Desk for Agentic Commerce
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="/" className="hover:text-slate-900">Overview</Link>
-            <Link href="/merchant-console" className="hover:text-slate-900">Merchant Console</Link>
-            <Link href="/deal-room" className="hover:text-slate-900 text-blue-700 font-semibold">Deal Room</Link>
-            <Link href="/audit" className="hover:text-slate-900">Audit Ledger</Link>
-          </div>
-        </div>
-      </footer>
 
       {/* Autonomous Agent Negotiation Modal (4-Round Bounded Safety Net) */}
       {showAgentDialogModal && (
